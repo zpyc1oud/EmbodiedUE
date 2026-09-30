@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UE-RL-Engine 项目说明文档 · 基于 UE5 Chaos 的机器人强化学习训练平台</title>
+<style>
+  :root{
+    --ink:#1b1f24;
+    --ink-2:#3d454e;
+    --ink-3:#6b7480;
+    --line:#e3e7ec;
+    --line-2:#cfd6de;
+    --bg:#f6f7f9;
+    --paper:#ffffff;
+    --accent:#1f5fa9;
+    --accent-soft:#eaf1fa;
+    --warn:#a5601b;
+    --warn-soft:#fdf4e8;
+    --good:#1f7a55;
+    --good-soft:#eaf6f0;
+    --code-bg:#20262e;
+    --code-ink:#e6edf3;
+    --mono:"JetBrains Mono","Cascadia Mono","Consolas","SFMono-Regular",monospace;
+    --sans:"Inter","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.78;
+    -webkit-font-smoothing:antialiased;
+  }
+  .shell{max-width:1400px;margin:0 auto;padding:0 28px 96px;display:grid;grid-template-columns:264px minmax(0,1fr);gap:44px;}
+  @media (max-width:1080px){.shell{grid-template-columns:1fr;padding:0 18px 64px;}}
+
+  /* ---------- 封面 ---------- */
+  .cover{grid-column:1/-1;margin:38px 0 30px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:46px 52px 40px;position:relative;overflow:hidden;}
+  .cover::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:linear-gradient(90deg,#1f5fa9,#2f8fb5 45%,#4bb79a);}
+  .cover .eyebrow{font-size:12.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);font-weight:600;}
+  .cover h1{font-size:34px;line-height:1.32;margin:16px 0 8px;letter-spacing:-.01em;}
+  .cover h2{font-size:19px;font-weight:500;color:var(--ink-2);margin:0 0 26px;line-height:1.6;}
+  .cover .meta{display:flex;flex-wrap:wrap;gap:10px 34px;border-top:1px solid var(--line);padding-top:20px;font-size:14.5px;color:var(--ink-2);}
+  .cover .meta b{color:var(--ink);font-weight:600;}
+  .cover .tagline{display:inline-block;margin-top:22px;padding:9px 16px;background:var(--accent-soft);color:#164b86;border-radius:8px;font-size:14.5px;font-weight:600;}
+
+  /* ---------- 目录 ---------- */
+  nav.toc{align-self:start;position:sticky;top:26px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px 18px;font-size:14px;max-height:calc(100vh - 60px);overflow:auto;}
+  nav.toc h3{margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);}
+  nav.toc ol{list-style:none;margin:0;padding:0;}
+  nav.toc li{margin:2px 0;}
+  nav.toc a{display:block;padding:5px 8px;border-radius:6px;color:var(--ink-2);text-decoration:none;line-height:1.45;transition:background .15s ease,color .15s ease,box-shadow .15s ease;}
+  nav.toc a:hover{background:var(--accent-soft);color:#164b86;}
+  nav.toc a.active{background:var(--accent-soft);color:#164b86;box-shadow:inset 3px 0 0 var(--accent);font-weight:650;}
+  nav.toc .lv1{font-weight:650;color:var(--ink);}
+  nav.toc .lv1.active{background:#dfeafa;color:#164b86;}
+  nav.toc .lv2{padding-left:16px;font-size:13.2px;color:var(--ink-3);}
+  nav.toc .lv2.active{color:#164b86;}
+  @media (max-width:1080px){nav.toc{position:static;max-height:none;}}
+
+  /* ---------- 正文 ---------- */
+  main{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:46px 54px 60px;min-width:0;}
+  @media (max-width:680px){main{padding:30px 22px 44px;}}
+  h2.sec{font-size:26px;margin:64px 0 6px;padding-top:10px;letter-spacing:-.01em;border-top:2px solid var(--ink);}
+  h2.sec:first-of-type{margin-top:8px;}
+  h2.sec .num{color:var(--accent);font-family:var(--mono);font-size:20px;margin-right:12px;}
+  h2.sec + .lead{color:var(--ink-3);font-size:15px;margin:0 0 26px;}
+  h3{font-size:19.5px;margin:38px 0 12px;}
+  h3 .num{color:var(--accent);font-family:var(--mono);font-size:16px;margin-right:9px;}
+  h4{font-size:16.5px;margin:26px 0 8px;color:var(--ink-2);}
+  p{margin:12px 0;}
+  ul,ol{margin:12px 0;padding-left:26px;}
+  li{margin:6px 0;}
+  strong{font-weight:650;}
+  code{font-family:var(--mono);font-size:13.4px;background:#f0f2f5;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#1f3350;}
+  a{color:var(--accent);}
+
+  pre{background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:18px 20px;overflow:auto;font-family:var(--mono);font-size:13.2px;line-height:1.65;margin:18px 0;}
+  pre code{background:none;border:none;color:inherit;padding:0;font-size:inherit;}
+  pre .cm{color:#8b97a6;}
+  pre .kw{color:#8fd0ff;}
+  pre .st{color:#a8e0a0;}
+
+  table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14.4px;}
+  th,td{border:1px solid var(--line-2);padding:9px 12px;text-align:left;vertical-align:top;}
+  th{background:#eef1f5;font-weight:650;font-size:13.6px;letter-spacing:.02em;}
+  tbody tr:nth-child(even){background:#fafbfc;}
+  td code{font-size:12.8px;}
+  .tbl-cap{font-size:13px;color:var(--ink-3);margin:-12px 0 24px;}
+
+  .box{border:1px solid var(--line-2);border-left:4px solid var(--accent);background:#fbfcfd;border-radius:0 8px 8px 0;padding:16px 20px;margin:22px 0;}
+  .box .t{font-weight:650;font-size:14px;letter-spacing:.04em;color:var(--accent);margin-bottom:6px;}
+  .box p:first-of-type{margin-top:0;}
+  .box p:last-child{margin-bottom:0;}
+  .box.key{border-left-color:var(--good);background:var(--good-soft);}
+  .box.key .t{color:var(--good);}
+  .box.note{border-left-color:var(--warn);background:var(--warn-soft);}
+  .box.note .t{color:var(--warn);}
+
+  /* 链路图 */
+  .flow{margin:24px 0;border:1px solid var(--line);border-radius:10px;background:#fbfcfd;padding:22px 20px;}
+  .flow .row{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;}
+  .flow .node{flex:1 1 150px;min-width:140px;background:var(--paper);border:1px solid var(--line-2);border-radius:8px;padding:11px 13px;}
+  .flow .node .n{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:650;}
+  .flow .node .d{font-size:13.4px;color:var(--ink-2);line-height:1.55;margin-top:3px;}
+  .flow .node.py{border-top:3px solid #2f6fb5;}
+  .flow .node.wire{border-top:3px solid #7b6bb5;}
+  .flow .node.ue{border-top:3px solid #3f9c7a;}
+  .flow .arrow{display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:20px;padding:0 2px;}
+  .flow .band{margin-top:14px;font-size:13px;color:var(--ink-3);border-top:1px dashed var(--line-2);padding-top:10px;}
+  @media (max-width:720px){.flow .arrow{transform:rotate(90deg);}}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0;}
+  @media (max-width:820px){.grid2{grid-template-columns:1fr;}}
+  .card{border:1px solid var(--line-2);border-radius:10px;padding:18px 20px;background:#fbfcfd;}
+  .card h4{margin:0 0 8px;font-size:16px;color:var(--ink);}
+  .card .tag{display:inline-block;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:3px 8px;border-radius:5px;margin-bottom:10px;}
+  .card.a .tag{background:#fdecec;color:#a83232;}
+  .card.b .tag{background:var(--good-soft);color:var(--good);}
+  .card ul{padding-left:20px;margin:8px 0 0;font-size:14.4px;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:22px 0;}
+  .stat{border:1px solid var(--line-2);border-radius:10px;padding:14px 16px;background:#fbfcfd;}
+  .stat .v{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent);letter-spacing:-.02em;}
+  .stat .k{font-size:13px;color:var(--ink-3);margin-top:2px;line-height:1.5;}
+
+  hr.soft{border:none;border-top:1px solid var(--line);margin:34px 0;}
+  footer{grid-column:1/-1;margin-top:26px;color:var(--ink-3);font-size:13px;text-align:center;}
+
+  /* ---------- 术语提示 ---------- */
+  .gl{
+    border-bottom:1px dashed var(--accent);
+    cursor:help;
+    padding-bottom:1px;
+    background:linear-gradient(transparent 72%, rgba(31,95,169,.10) 72%);
+  }
+  .gl:hover,.gl:focus{background:var(--accent-soft);outline:none;border-bottom-style:solid;}
+  .gl.pinned{background:var(--accent-soft);border-bottom-style:solid;}
+  #gl-tip{
+    position:fixed;z-index:99;max-width:min(400px,calc(100vw - 32px));
+    background:#ffffff;color:var(--ink);
+    border:1px solid var(--line-2);border-top:3px solid var(--accent);
+    border-radius:9px;box-shadow:0 8px 28px rgba(20,30,45,.16);
+    padding:12px 15px;font-size:13.8px;line-height:1.68;
+    opacity:0;visibility:hidden;transform:translateY(3px);
+    transition:opacity .12s ease,transform .12s ease;
+    pointer-events:none;
+  }
+  #gl-tip.on{opacity:1;visibility:visible;transform:translateY(0);}
+  #gl-tip .gt{font-weight:700;font-size:13px;letter-spacing:.03em;color:var(--accent);margin-bottom:4px;}
+  .gl-hint{
+    display:inline-block;margin-top:14px;font-size:13.2px;color:var(--ink-3);
+    border-left:3px solid var(--line-2);padding:2px 0 2px 11px;
+  }
+  .gl-hint b{color:var(--ink-2);font-weight:600;border-bottom:1px dashed var(--accent);}
+
+  @media (max-width:1080px){nav.toc{position:static;max-height:none;}}
+
+  @media print{
+    body{background:#fff;font-size:11.5pt;}
+    .shell{display:block;max-width:none;padding:0;}
+    nav.toc{display:none;}
+    main,.cover{border:none;border-radius:0;padding:0;}
+    h2.sec{page-break-after:avoid;}
+    pre,table,.flow,.box{page-break-inside:avoid;}
+    #gl-tip{display:none;}
+    .gl{border-bottom:none;background:none;}
+    .gl-hint{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="cover">
+    <div class="eyebrow">Project Documentation · Explanation</div>
+    <h1>UE-RL-Engine：基于 UE5 Chaos 的<br>机器人强化学习训练与部署平台</h1>
+    <h2>为什么放弃跨引擎迁移，在游戏引擎自有物理后端上建立「训练即部署」的闭环，<br>以及这套平台如何组织成一个可复用的通用机器人训练基础设施。</h2>
+    <div class="tagline">训练环境 = 部署环境：策略在哪学，就在哪跑</div>
+    <div class="meta">
+      <span><b>文档类型</b>　Explanation（理解向说明）</span>
+      <span><b>项目代号</b>　UE-RL-Engine</span>
+      <span><b>产品版本</b>　1.0.0（2026-09-17）</span>
+      <span><b>引擎版本</b>　Unreal Engine 5.8 / Chaos</span>
+      <span><b>训练算法栈</b>　PPO（rsl-rl）</span>
+      <span><b>已接入机器人</b>　CartPole · PhantomX 六足</span>
+    </div>
+    <div><span class="gl-hint">正文中带虚线下划线的术语（如 <b>PPO</b>、<b>Slot</b>、<b>PD 增益</b>）可鼠标悬停查看简短说明，点击可将说明固定，再次点击或按 Esc 关闭。领域术语以仓库 <b>CONTEXT.md</b> 为准；附录 A 只补充本文额外用到的词。</span></div>
+  </header>
+
+  <nav class="toc">
+    <h3>目录</h3>
+    <ol>
+      <li><a class="lv1" href="#s1">1　项目背景与实际问题</a></li>
+      <li><a class="lv2" href="#s1-1">1.1　问题起点与目标</a></li>
+      <li><a class="lv2" href="#s1-2">1.2　Isaac Lab 路线为何断在部署</a></li>
+      <li><a class="lv2" href="#s1-3">1.3　路线取舍：消除迁移</a></li>
+      <li><a class="lv2" href="#s1-4">1.4　为什么不用 Learning Agents</a></li>
+      <li><a class="lv1" href="#s2">2　系统整体架构与模块划分</a></li>
+      <li><a class="lv2" href="#s2-1">2.1　一句话架构与职责边界</a></li>
+      <li><a class="lv2" href="#s2-2">2.2　运行链路</a></li>
+      <li><a class="lv2" href="#s2-3">2.3　Python 侧模块</a></li>
+      <li><a class="lv2" href="#s2-4">2.4　UE 侧模块与依赖方向</a></li>
+      <li><a class="lv2" href="#s2-5">2.5　配置体系</a></li>
+      <li><a class="lv2" href="#s2-6">2.6　通用机器人接入路径</a></li>
+      <li><a class="lv1" href="#s3">3　核心功能与关键技术</a></li>
+      <li><a class="lv2" href="#s3-1">3.1　控制帧与固定步进</a></li>
+      <li><a class="lv2" href="#s3-2">3.2　并行 Slot 与隔离</a></li>
+      <li><a class="lv2" href="#s3-3">3.3　拓扑反射与统一执行器律</a></li>
+      <li><a class="lv2" href="#s3-4">3.4　观测体系</a></li>
+      <li><a class="lv2" href="#s3-5">3.5　协议与批量数据面</a></li>
+      <li><a class="lv2" href="#s3-6">3.6　声明式 MDP 与跨语言 plan</a></li>
+      <li><a class="lv2" href="#s3-7">3.7　训练算法与课程</a></li>
+      <li><a class="lv2" href="#s3-8">3.8　场景随机化与 sim2sim 泛化</a></li>
+      <li><a class="lv2" href="#s3-9">3.9　部署制品与游戏内推理</a></li>
+      <li><a class="lv2" href="#s3-10">3.10　性能工程</a></li>
+      <li><a class="lv2" href="#s3-11">3.11　可复现性与故障边界</a></li>
+      <li><a class="lv1" href="#s4">4　运行方式与执行流程</a></li>
+      <li><a class="lv2" href="#s4-1">4.1　前置环境</a></li>
+      <li><a class="lv2" href="#s4-2">4.2　训练</a></li>
+      <li><a class="lv2" href="#s4-3">4.3　评估与录制</a></li>
+      <li><a class="lv2" href="#s4-4">4.4　导出与游戏内部署</a></li>
+      <li><a class="lv2" href="#s4-5">4.5　场景泛化训练与评测</a></li>
+      <li><a class="lv2" href="#s4-6">4.6　验证</a></li>
+      <li><a class="lv1" href="#a1">附录 A　本文补充术语</a></li>
+      <li><a class="lv1" href="#a2">附录 B　关键参数</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <!-- ================= 1 ================= -->
+  <h2 class="sec" id="s1"><span class="num">01</span>项目背景与实际问题</h2>
+  <p class="lead">从一个游戏里的机器人，到一个必须自建的训练平台。</p>
+
+  <h3 id="s1-1"><span class="num">1.1</span>问题起点与目标</h3>
+  <p>《ARC Raiders》里的敌方机器人不靠动画驱动：它的腿在真实物理中试探、打滑、重新找平衡，玩家看到的每一步都是当场算出来的。这类表现依赖<strong>与地形的即时交互</strong>，无法靠 K 帧穷举——同一段动画换一块起伏地面就失真。代价是控制策略必须被「学」出来，于是需求落到强化学习。</p>
+  <p>项目要的是一个闭环，不只是一个能收敛的训练脚本：</p>
+  <div class="grid2">
+    <div class="card b">
+      <span class="tag">01 训练</span>
+      <h4>把策略训出来</h4>
+      <ul>
+        <li>在物理交互中反复试错，学到可用的运动控制</li>
+        <li>能稳定行走、转向、抗扰动</li>
+        <li>交付物：可部署的 Policy Checkpoint</li>
+      </ul>
+    </div>
+    <div class="card b">
+      <span class="tag">02 部署</span>
+      <h4>让策略用起来</h4>
+      <ul>
+        <li>训练产物接入 UE 项目，在最终运行环境中直接执行</li>
+        <li>部署行为与训练表现保持一致</li>
+        <li>验收：项目环境中稳定可用</li>
+      </ul>
+    </div>
+  </div>
+  <p>关键在第二条的验收标准：<strong>不是「能加载」，而是「行为一致」</strong>。后续所有技术选择都是这条标准逼出来的。</p>
+
+  <h3 id="s1-2"><span class="num">1.2</span>为什么 Isaac Lab 路线断在部署</h3>
+  <p>最短路径是复用现成的机器人学训练栈：先在 Isaac Lab / PhysX 里训练，再迁移到 UE5 / Chaos 接入项目。实际结果是前两步成立、第三步不成立——六足机器人在 Isaac Lab 中可训练可收敛、在 PhysX 内表现符合预期，但同一策略进入 Chaos 后出现持续高频抖动，无法维持稳定步态；针对单个机器人调参能缓解个别现象，换机器人、换地形后结论就不成立。</p>
+  <div class="box note">
+    <div class="t">问题定性</div>
+    <p>这不是「模型训得不够好」——策略在训练环境里是达标的。问题在于<strong>训练环境与运行环境根本不是同一套物理</strong>：同一策略 → 不同物理引擎 → 动作反馈不一致 → 部署行为偏移。</p>
+  </div>
+  <p>「两个引擎不一样」是一句正确但没用的话。要判断迁移是否可行，必须知道差异在哪一层。这些不是能靠调参对齐的实现细节，而是求解方式的不同：</p>
+  <table>
+    <thead><tr><th style="width:18%">差异层</th><th style="width:25%">Isaac Lab / PhysX</th><th style="width:25%">UE5 / Chaos</th><th>对策略的影响</th></tr></thead>
+    <tbody>
+      <tr><td>铰接体表达</td><td>缩减坐标 articulation，关节自由度本身就是求解变量，父子关系由公式保证</td><td>刚体 + 关节约束（最大坐标），由迭代求解器逐步满足</td><td>长运动链上（六足每腿三级串联）误差沿链累积，同一组 PD 增益产生不同的关节跟踪误差</td></tr>
+      <tr><td>关节驱动</td><td>drive 可作为隐式项进入求解器，PD 与约束同步联立</td><td>drive 以约束/力的形式参与迭代</td><td>同样写下一组刚度阻尼，实际力矩曲线与高增益下的稳定边界都不同</td></tr>
+      <tr><td>接触与摩擦</td><td>自有接触生成与摩擦组合</td><td>Chaos 的碰撞裕度、manifold 组织与摩擦实现</td><td>相同落脚动作的支撑力与打滑倾向不同：PhysX 里「蹬地不滑」，Chaos 里可能是滑的</td></tr>
+      <tr><td>时间与约定</td><td>米 / 右手系；自有子步策略</td><td>厘米 / 左手 Z-up；引擎子步策略；四元数分量顺序不同</td><td>不直接致抖，但让「对齐参数」变成一堆易错换算，每换一个机器人重做一遍</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 1-1　两套物理后端的结构性差异</p>
+  <div class="box">
+    <div class="t">为什么 RL 策略对这些差异格外敏感</div>
+    <p>监督学习的模型只要输入分布一致；RL 策略是<strong>闭环控制器</strong>，它在训练中隐式学到了环境的响应模型，并会主动利用响应里的细微规律来省力——包括接触响应的边界与驱动的滞后。这些被利用的部分恰好是两个引擎最不一致的地方。表现出来就是：静态站立看得过去，一旦进入动态支撑切换，就在控制边界上出现自激的高频抖动。</p>
+  </div>
+
+  <h3 id="s1-3"><span class="num">1.3</span>路线取舍：不解决「怎么迁移」，而是消除「迁移」</h3>
+  <p>部署失败后真正的决策，不是继续修补迁移链路，而是判断是否应彻底取消迁移环节。</p>
+  <div class="grid2">
+    <div class="card a">
+      <span class="tag">路线 A · 未采用</span>
+      <h4>保留跨引擎迁移</h4>
+      <p style="font-size:14px;color:var(--ink-3);margin:0 0 6px">PhysX 训练 → 参数对齐 / 补偿 → Chaos 部署</p>
+      <ul>
+        <li>迁移环节始终存在，风险只是被推后</li>
+        <li>机器人、地形、增益一变就要重复对齐调参</li>
+        <li><strong>本质：持续为物理差异付适配成本</strong></li>
+      </ul>
+    </div>
+    <div class="card b">
+      <span class="tag">路线 B · 采用</span>
+      <h4>基于 Chaos 建训练闭环</h4>
+      <p style="font-size:14px;color:var(--ink-3);margin:0 0 6px">Chaos 训练 → 同一物理后端 → Chaos 部署</p>
+      <ul>
+        <li>训练环境即部署环境，从链路上消除迁移</li>
+        <li>训练基础设施一次建设、后续持续复用</li>
+        <li><strong>代价：补齐 UE5 缺失的 RL 训练基础设施</strong></li>
+      </ul>
+    </div>
+  </div>
+  <p>选择路线 B，等于把不确定的「适配问题」换成确定的「建设问题」：前者每次都要重来，后者只做一次。而「缺什么」也随之变得具体——UE 是游戏引擎，没有理由自带这些，但 RL 训练一个都不能少：</p>
+  <table>
+    <thead><tr><th style="width:26%">缺失能力</th><th>要求</th></tr></thead>
+    <tbody>
+      <tr><td>请求驱动的固定步进</td><td>训练时间不能由渲染帧率决定；一次控制步等于该 Step 的 <code>step_decimation</code> 个固定物理子步，数量落在 Session 的闭区间内。</td></tr>
+      <tr><td>并行仿真</td><td>一个进程、一个世界内承载数百个机器人实例，且实例之间物理互不影响。</td></tr>
+      <tr><td>跨进程通信</td><td>Python 训练进程与 UE 仿真进程之间传输批量动作与状态，格式与时序都必须确定。</td></tr>
+      <tr><td>Reset 语义</td><td>按需重置任意子集实例，恢复到确定的默认物理状态后再施加本次采样的初始状态。</td></tr>
+      <tr><td>Observation / Action</td><td>从物理状态中按声明采集观测，把策略输出按声明施加为关节驱动，单位与坐标系明确。</td></tr>
+      <tr><td>训练宿主与物理基线</td><td>固定步长相关的全局物理设置必须在物理场景创建前生效，并可校验。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 1-2　路线 B 需要自建的能力清单</p>
+  <p>这份清单就是 UE-RL-Engine 的范围定义。</p>
+
+  <h3 id="s1-4"><span class="num">1.4</span>为什么不用 UE 5.8 的 Learning Agents</h3>
+  <p>既然要在 UE 里训练，一个自然的问题是：Epic 官方已在 UE 5.8 提供 Learning Agents 插件（含 PPO、与外部 Python 训练进程通信、NNE 推理部署），为什么不直接以它为框架？项目评估其源码后的结论是<strong>定位不匹配</strong>——不是它不能用，而是它为另一类问题优化，那类问题的关键约束与本项目相反。</p>
+  <table>
+    <thead><tr><th style="width:20%">关键维度</th><th style="width:38%">Learning Agents 的形态</th><th>本项目需要的形态</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>控制步与物理步</td>
+        <td>训练时用固定时间步（默认 60 Hz），并可把物理步长设为与之一致；一次 agent tick 就是一个引擎帧、也是一个物理步。</td>
+        <td>两者必须<strong>解耦</strong>：Session 固定 <code>physics_dt</code> 与闭区间 decimation，每个 Step 另带该区间内的 <code>step_decimation</code>，同一控制步内保持同一个关节目标。足式接触求解需要物理步短于控制步。当前 PhantomX 行走是物理 5 ms、区间 <code>[1, 7]</code>；对照 Learning Agents 时用过的固定 4 子步（50 Hz / 200 Hz）不是现役配置。</td>
+      </tr>
+      <tr>
+        <td>时间推进的所有权</td>
+        <td>引擎逐帧驱动，训练逻辑挂在 tick 回调上（推模型）。</td>
+        <td>训练侧持有时间：收到 Step 请求才推进固定数量物理帧，空闲时不推进训练时间（拉模型）。这样 episode 长度、reset 时机与随机数消费都由训练侧确定，可复现。</td>
+      </tr>
+      <tr>
+        <td>机器人语义</td>
+        <td>面向游戏 agent 的通用观测/动作类型库，逐个 agent 搭建；没有铰接机器人的驱动律、拓扑与重置分布抽象。</td>
+        <td>从 PhysicsAsset 反射拓扑，配合一份声明式机器人语义自动装配，<strong>接一台新机器人不写引擎代码</strong>；并需数百实例的显式碰撞隔离。</td>
+      </tr>
+      <tr>
+        <td>算法与可复现性</td>
+        <td>训练算法与训练进程由插件生态提供；配置以蓝图资产与编辑器设置为载体。插件位于引擎 Experimental 目录（0.2 版）。</td>
+        <td>沿用腿足社区标准 PPO（rsl-rl），承接 Isaac Lab 阶段的超参与观测设计经验；配置需规范化哈希并写入 manifest 与 checkpoint 绑定。</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 1-3　Learning Agents 与本项目需求的定位对比</p>
+  <div class="box key">
+    <div class="t">结论</div>
+    <p>Learning Agents 解决的是「让游戏 agent 在游戏节拍里学会玩游戏」；本项目解决的是「让铰接机器人在受控物理节拍里学会走路，而且训练用的那套物理就是发布时跑的那套物理」。两者在<strong>时间所有权</strong>与<strong>机器人语义抽象</strong>上要求相反，因此选择自建运行时，并把 Learning Agents 源码作为设计参考保留在 <code>references/</code> 中。</p>
+  </div>
+
+  <!-- ================= 2 ================= -->
+  <h2 class="sec" id="s2"><span class="num">02</span>系统整体架构与模块划分</h2>
+  <p class="lead">谁拥有语义，谁拥有物理，以及为什么这条线必须画清楚。</p>
+
+  <h3 id="s2-1"><span class="num">2.1</span>一句话架构与职责边界</h3>
+  <div class="box key">
+    <div class="t">架构原则</div>
+    <p><strong>训练侧拥有语义，仿真侧拥有物理，接口只传数值。</strong>再加一条推论：<strong>一份声明编译出两件东西——训练时求值用的执行器，和部署时装进制品的 plan，两者是同一个对象。</strong></p>
+  </div>
+  <p>这条边界回答了一个反复出现的问题：某个东西该写在 Python 还是写在 C++？答案取决于它是「事实」还是「解释」。</p>
+  <table>
+    <thead><tr><th style="width:32%">内容</th><th style="width:22%">归属</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td>刚体、关节、父子关系、关节限位</td><td>UE 资产（物理事实）</td><td>由 PhysicsAsset 唯一确定，不应在配置里重写一遍。</td></tr>
+      <tr><td>哪些关节是执行器、增益多少、参考姿态、动作缩放</td><td>Robot semantics 配置</td><td>这是「怎么用这台机器人」的训练决策，不是资产属性。</td></tr>
+      <tr><td>观测清单、奖励、终止、课程、reset 分布</td><td>Python Task</td><td>任务数学，随任务变化，不进引擎。</td></tr>
+      <tr><td>动作施加、状态采集、固定步进、Slot 隔离</td><td>UE Worker / Robot</td><td>需要贴着物理引擎执行，且必须在物理线程节拍内完成。</td></tr>
+      <tr><td>帧格式、字节传输、数据布局校验</td><td>Transport</td><td>只关心协议，不理解机器人。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 2-1　语义与物理的归属划分</p>
+
+  <h3 id="s2-2"><span class="num">2.2</span>运行链路</h3>
+  <div class="flow">
+    <div class="row">
+      <div class="node py"><div class="n">Python</div><div class="d"><b>Task / Runner</b><br>动作映射、观测、奖励、终止、PPO</div></div>
+      <div class="arrow">→</div>
+      <div class="node py"><div class="n">Python</div><div class="d"><b>Session / Codec</b><br>配置解析、进程管理、协议会话、张量↔字节</div></div>
+      <div class="arrow">→</div>
+      <div class="node wire"><div class="n">Wire</div><div class="d"><b>UE Transport</b><br>帧协议与字节传输</div></div>
+      <div class="arrow">→</div>
+      <div class="node ue"><div class="n">Unreal</div><div class="d"><b>Worker</b><br>Slot 生命周期、Initialize / Step / Reset、固定步进</div></div>
+      <div class="arrow">→</div>
+      <div class="node ue"><div class="n">Unreal</div><div class="d"><b>Robot + Environment</b><br>驱动、观测、重置 / 放置、地面、地形</div></div>
+    </div>
+    <div class="band">同步单请求在途：一次 Step 请求携带全部 Slot 的动作批，返回全部 Slot 的状态批。超时、协议错误或歧义传输失败即整个 Session 失效，不做静默重放。</div>
+  </div>
+  <p>再补一条与训练链路平行、但依赖更短的部署链路——它不经过 Worker 与 Transport：</p>
+  <div class="flow">
+    <div class="row">
+      <div class="node ue"><div class="n">Artifact</div><div class="d"><b>策略制品</b><br>观测 plan + 动作 plan + ONNX</div></div>
+      <div class="arrow">→</div>
+      <div class="node ue"><div class="n">Runtime</div><div class="d"><b>Policy Controller</b><br>采集状态 → 观测 plan → 网络推理 → 动作 plan → 施加命令</div></div>
+      <div class="arrow">→</div>
+      <div class="node ue"><div class="n">Game</div><div class="d"><b>UE 项目</b><br>关卡中的机器人按策略行动</div></div>
+    </div>
+    <div class="band">部署依赖链：<code>UERLPolicy → UERLRobot → UERLProvider → UERLInterface</code>。发布包里不含训练用的 Worker 与 Transport。</div>
+  </div>
+
+  <h3 id="s2-3"><span class="num">2.3</span>Python 侧模块</h3>
+  <table>
+    <thead><tr><th style="width:20%">包</th><th style="width:26%">职责</th><th>要点</th></tr></thead>
+    <tbody>
+      <tr><td><code>cli/</code></td><td>产品入口</td><td>训练、评估回放、视口录制、制品导出四个命令；负责拼装 UE 启动参数并接管子进程生命周期。</td></tr>
+      <tr><td><code>core/config/</code></td><td>配置与身份</td><td>类型化配置分区、命令行覆盖与可配置性校验、机器人语义解析、资产拓扑与语义的合并、规范化哈希与运行 manifest。</td></tr>
+      <tr><td><code>core/codec/</code></td><td>协议编解码</td><td>帧头封装、严格 JSON（规范化后哈希）、批量数据布局校验与映射、Socket 传输与会话状态机。</td></tr>
+      <tr><td><code>core/mdp/</code></td><td>声明式 MDP</td><td>term 声明 → plan 编译 → plan 执行；observation / action / reward / termination / event / curriculum 六个 manager；算子注册表。</td></tr>
+      <tr><td><code>core/direct/</code></td><td>框架无关运行时</td><td>Gymnasium 语义的环境外壳：只在有效 Slot 上做任务数学，终止前抓终态，稀疏 reset 行合并。</td></tr>
+      <tr><td><code>runtime/session/</code></td><td>会话与进程</td><td>Worker 进程的启动/附着/关闭；把已解析的机器人描述投影成仿真侧可消费的运行配置；命名二进制段与张量之间的转换。</td></tr>
+      <tr><td><code>assets/robots/</code></td><td>预置机器人库</td><td>机器人声明的唯一来源：资产路径、关节与刚体名、正则参考姿态、执行器组、观测选择、重置分布；支持派生出变体。现有 CartPole、PhantomX 两个成员。</td></tr>
+      <tr><td><code>tasks/</code></td><td>任务与注册表</td><td>任务 ID 到「环境 + 机器人 + 各工厂函数」的注册；CartPole 与 PhantomX 系列（平地、连续地形、离散地形、追逐）。</td></tr>
+      <tr><td><code>training/</code></td><td>训练宿主</td><td>配置构建、PPO 训练与评估驱动、向量环境契约实现、课程状态随 checkpoint 持久化、制品导出。</td></tr>
+      <tr><td><code>policy/</code></td><td>制品定义</td><td>策略制品的容器读写与校验，以及一个参考推理器（用于跨语言一致性测试）。不依赖 <code>training/</code>。</td></tr>
+      <tr><td><code>presentation/</code></td><td>录制</td><td>消费 UE 输出的原始像素流并编码为视频。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 2-2　Python 侧模块职责</p>
+  <p>三条硬性依赖方向：<code>policy/</code> 不得引用 <code>training/</code>（否则部署侧被训练框架污染）；<code>core/mdp/</code> 不得引用 <code>tasks/</code>（否则通用机制被具体任务绑死）；算子注册表是<strong>唯一</strong>需要在 C++ 侧维护对偶实现的模块。这些方向由自动化测试守住。</p>
+
+  <h3 id="s2-4"><span class="num">2.4</span>UE 侧模块与依赖方向</h3>
+  <p>UE 侧是一个训练宿主工程加一个插件，插件划分为七个运行时模块，另有仅编辑器加载的 <code>UERLPolicyEditor</code>（制品导入）。划分依据只有一条：<strong>部署时用不到的东西，不能出现在部署依赖链上</strong>。</p>
+  <table>
+    <thead><tr><th style="width:20%">模块</th><th style="width:14%">用于</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>UERLInterface</code></td><td>两者</td><td>最底层 POD 类型：机器人/执行器/观测/重置/地形配置结构，拓扑描述，批量数据的 schema 与视图，plan 的数据结构与校验。</td></tr>
+      <tr><td><code>UERLProvider</code></td><td>两者</td><td>Environment 与 Robot 的抽象接口、工厂、Slot 上下文、重置批、故障码、碰撞隔离计划、批量字段绑定。</td></tr>
+      <tr><td><code>UERLRobot</code></td><td>两者</td><td>通用 SkeletalMesh 机器人实现：拓扑反射、观测计划编译、统一执行器律、动作施加、运动学换算、观测采样、接触采样、重置恢复；以及一个不依赖训练会话的部署期物理适配器。</td></tr>
+      <tr><td><code>UERLTerrain</code></td><td>两者</td><td>地形几何生成：平面、高度场、箱体阵列等基元与地形图集。地形几何从不经过协议传输。</td></tr>
+      <tr><td><code>UERLPolicy</code></td><td>部署</td><td>制品载入、plan 运行时（算子注册表的 C++ 对偶）、神经网络推理封装、通用控制循环。</td></tr>
+      <tr><td><code>UERLTransport</code></td><td>训练</td><td>帧协议、Socket 服务、JSON 与规范化哈希、批量布局编译。只管协议与字节。</td></tr>
+      <tr><td><code>UERLWorker</code></td><td>训练</td><td>Worker 生命周期与阶段机、固定步进闸门、物理前后的步进管线、Slot 池、Environment 实现（栅格隔离 / 共享世界 / 美术地图）、安全监控、视口观察与录制。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 2-3　UE 侧模块职责</p>
+  <p>工程侧（训练宿主）承载全局物理基线：固定步长相关的设置必须在物理场景创建前生效，插件负责读取并在启动时校验，不满足即拒绝运行——而不是训练到一半才发现步长被改过。</p>
+
+  <h3 id="s2-5"><span class="num">2.5</span>配置体系</h3>
+  <p>配置分三类，各自回答一个不同的问题，互不重复。其中<strong>机器人声明是 Python 代码，而不是 YAML</strong>——原因见下：</p>
+  <div class="flow">
+    <div class="row">
+      <div class="node py"><div class="n">assets/robots/*.py</div><div class="d"><b>怎么用这台机器人</b><br>执行器（增益、力矩上限、参考姿态、动作缩放）、观测选择、重置分布</div></div>
+      <div class="node py"><div class="n">tasks/*.yaml 或 Task 声明</div><div class="d"><b>这次训练怎么跑</b><br>任务身份与版本、机器人资产引用、任务参数与奖励权重、Worker 与 runner 参数</div></div>
+      <div class="node py"><div class="n">environments/*.yaml</div><div class="d"><b>在什么地面上跑</b><br>地形来源、难度分级、基元与生成参数</div></div>
+    </div>
+    <div class="band">机器人声明<strong>不</strong>描述质量、惯量、几何或关节限位——那些是资产的事实。</div>
+  </div>
+  <p>机器人声明之所以从 YAML 收敛为 Python，是因为它需要<strong>派生</strong>与<strong>正则匹配</strong>：「每条腿三节、各有固定默认角」这件事写成正则字典是一行，写成 18 个逐个列出的数值就把结构信息丢掉了；而变体（例如把整组执行器的刚度调高）在 Python 里就是一次替换，在 YAML 里则要发明一套继承语法。收敛的同时旧的机器人 YAML 被删除，不保留为覆盖层——需要不改代码做参数实验时，走已有的命令行点路径覆盖通路，而不是新开一条合并语义待定的第二来源。</p>
+  <p>预置库目前有两个成员：CartPole 与 PhantomX 六足。机器人声明只在 Python。CartPole 与 PhantomX 行走的任务、Worker 和 runner 参数在 <code>configs/tasks/*/training.yaml</code>；地形、追逐等其余 Task 在 Python 任务声明里组装。</p>
+  <p>运行时的合成过程是确定的：Initialize 阶段先由 UE 侧从资产反射出拓扑<strong>与字段描述符</strong>，Python 侧据此建立形状表、把它与机器人声明合并成一份<strong>可运行的机器人描述</strong>，其中动作与观测的索引关系被固定下来；然后编译出不可变的会话契约，投影成仿真侧的运行配置。整条链路上不存在「第二份机器人配置」——投影是内部产物，不是用户要维护的东西。</p>
+  <p>与此同时，用户命令行覆盖会被校验（不可配置的字段拒绝覆盖）、整份解析后配置被规范化并哈希，与 git 标识、构建标识、数据布局哈希一起写入运行 manifest。评估一个 checkpoint 时可以精确回答「它是哪份配置、哪个提交、哪套布局产出的」。</p>
+
+  <h3 id="s2-6"><span class="num">2.6</span>通用机器人接入路径</h3>
+  <p>平台的长期形态是一个通用机器人训练平台，衡量标准很直接：</p>
+  <div class="box key">
+    <div class="t">接入一台新机器人 = 机器人资产 + 一份 Python 机器人声明 + 一个 Python Task</div>
+    <p>不新增机器人专用的引擎代码，不新增动作字段，不新增第二条 reset 路径。</p>
+  </div>
+  <p>支撑这条路径的机制分布在几个位置：</p>
+  <table>
+    <thead><tr><th style="width:26%">机制</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td>拓扑反射</td><td>机器人的结构由资产提供，引擎只读不猜；结构不完整（缺 PhysicsAsset、非树形、多自由度关节）直接失败，不静默降级成一个「能跑但不对」的模型。</td></tr>
+      <tr><td>统一执行器律</td><td>位置控制、力矩控制、被动关节共用同一个力矩计算与同一个限幅，不为控制模式分叉出多条代码路径。</td></tr>
+      <tr><td>声明式观测与动作</td><td>观测清单与动作映射在配置与 Task 中声明，编译为固定索引；热路径上不再解析名字。</td></tr>
+      <tr><td>单一契约权威</td><td>字段的形状、单位、坐标系与语义由仿真侧的字段描述符统一发布，训练侧不再各自维护一份常量；绑定前会逐字段比对声明与描述符，不一致直接在初始化阶段失败并给出字段路径，而不是带着错误形状进入训练。</td></tr>
+      <tr><td>预置机器人库</td><td>机器人声明以 Python 形式随平台提供（支持正则匹配与派生），新任务直接引用；机器人参数只有这一个来源。</td></tr>
+      <tr><td>场景泛化</td><td>Environment 支持两种碰撞范围（每 Slot 独立几何 / 多 Slot 共享地形），地形来源既可以是程序化生成，也可以是美术制作的关卡地图；切换来源不改变隔离性质。训练侧另有场景随机化与固定的美术地图评测入口（见 3.8）。</td></tr>
+      <tr><td>接入验收</td><td>新机器人只增加资产和 Python 声明，不增加机器人专用引擎代码。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 2-4　支撑通用接入的机制</p>
+
+  <p>目前平台上有两台形态差异很大的机器人在跑，走的是同一条接入路径、同一套引擎代码：</p>
+  <table>
+    <thead><tr><th style="width:20%">机器人</th><th style="width:16%">结构</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td>CartPole</td><td>1 自由度</td><td>验证协议与训练链路本身，作为最小冒烟任务。</td></tr>
+      <tr><td>PhantomX 六足</td><td>18 自由度，浮动基座</td><td>真实运动控制：行走、转向、地形课程、追逐任务。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 2-5　已接入的两台机器人</p>
+
+  <div class="box key">
+    <div class="t">通用接入路径</div>
+    <p>接入一台新的 SkeletalMesh 机器人，只新增机器人声明、任务声明、UE 内容资产和部署制品。<code>src/uerl/core</code>、<code>src/uerl/policy</code>、<code>src/uerl/training</code> 与 UE 插件 C++ 不为新机器人改动。</p>
+  </div>
+
+  <!-- ================= 3 ================= -->
+  <h2 class="sec" id="s3"><span class="num">03</span>核心功能与关键技术</h2>
+  <p class="lead">把训练组织起来，把训练跑快，把能力做通用。</p>
+
+  <h3 id="s3-1"><span class="num">3.1</span>控制帧与固定步进：从 Game Tick 到 Parallel RL Step</h3>
+  <p>游戏引擎的默认时序是「引擎逐帧驱动，逻辑跟着引擎走」：一帧渲染、一帧物理，训练请求与环境规模在这套时序里没有统一语义。RL 训练需要相反的关系——<strong>训练请求驱动时间推进</strong>。</p>
+  <p>项目把时序重组为三条正交的语义：</p>
+  <div class="stats">
+    <div class="stat"><div class="v">控制步</div><div class="k">管时间：一次请求推进一个控制帧</div></div>
+    <div class="stat"><div class="v">机器人数量</div><div class="k">管规模：一次往返承载全部 Slot</div></div>
+    <div class="stat"><div class="v">物理帧</div><div class="k">管计算量：一个控制步 = N × 固定步长</div></div>
+  </div>
+  <p>实现上有三个关键点。第一，引擎时间由一个自定义时间步闸门控制：只有存在已被接受的 Step 请求时才让应用时间按固定物理步长前进，空闲 tick 不推进训练时间。第二，请求被接受后剩余物理帧数被置为本次 <code>step_decimation</code>，物理前施加动作、窗口末采样接触并递减计数，归零时才组装回包并重新关闸。第三，同一控制窗口内动作目标保持不变（对需要每个物理帧重发的驱动方式，重发的是同一个目标而不是新目标）。</p>
+  <div class="box">
+    <div class="t">一个控制帧的完整定义</div>
+    <p>训练侧提交一次动作目标与本次 <code>step_decimation</code> → 仿真侧在该数量物理子步内保持该目标 → 返回一次观测。Session 内不可变的是 <code>physics_dt</code> 和闭区间 <code>decimation</code>；每个 Step 另带区间内的一个标量。PhantomX 行走任务：物理步长 5 ms（200 Hz），区间 <code>[1, 7]</code>，控制间隔 5–35 ms；折扣与动作变化率按参考间隔 0.02 s 标定。CartPole 把区间收成单点 <code>[2, 2]</code>：物理步长 1/120 s（120 Hz），控制间隔 1/60 s（60 Hz）。</p>
+  </div>
+
+  <h3 id="s3-2"><span class="num">3.2</span>并行 Slot 与隔离</h3>
+  <p>一次 Session 在一个 UE 世界里运行固定数量的 Slot，每个 Slot 是一个机器人实例加其任务状态。PhantomX 行走任务使用 512 个 Slot，CartPole 使用 64 个。</p>
+  <p>并行的难点不是「摆得下」，而是「互不影响」。项目把这一点定义为运行不变量：<strong>不同 Slot 的机器人碰撞与接触不能相互影响；空间上错开摆放本身不构成隔离</strong>。为此 Environment 必须声明碰撞范围，隔离由编译出的碰撞计划保证：</p>
+  <table>
+    <thead><tr><th style="width:24%">碰撞范围</th><th style="width:30%">几何归属</th><th>隔离手段</th></tr></thead>
+    <tbody>
+      <tr><td>Slot 独立</td><td>每个 Slot 拥有自己的地形几何</td><td>每 Slot 分配专属碰撞通道，地形与射线查询一并隔离；上限受引擎通道数量限制。</td></tr>
+      <tr><td>共享世界</td><td>多个 Slot 共享同一份地形几何（程序化生成或美术地图）</td><td>地形作为静态世界几何共享，机器人之间通过碰撞分组保持隔离；可支持的 Slot 数量大得多。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-1　两种碰撞范围与隔离手段</p>
+  <p>Slot 的放置由 Environment 拥有：按行列间距生成锚点，向下射线确定地面高度与法线，得到每个 Slot 的局部地面参考系。机器人的位姿与速度观测都相对这个参考系表达，因此策略看不到 UE 世界坐标，换一张地图、换一个摆放方式都不影响观测分布。</p>
+  <p>连续地形的 8 级生成参数来自一份地形定义，与并行机器人数量分开。当前任务默认采用 Slot 独立几何，为 64 个 Slot 预设 8×8 放置网格；每个 Slot 根据同一份定义生成自己的地形实例。Run 的 resolved config 同时保存地形定义和 Slot 数，因此其中出现 64 不表示复制了 64 份地形配置。操作步骤见 <code>docs/how-to/phantomx-robust-training.md</code>。</p>
+
+  <h3 id="s3-3"><span class="num">3.3</span>拓扑反射与统一执行器律</h3>
+  <p>机器人的结构不是配置出来的，而是从资产读出来的：从 PhysicsAsset 与骨骼中反射出刚体、关节、运动类型、唯一解锁的关节坐标、SI 单位下的限位以及父子关系。反射只负责给出结构事实；这些名字与执行器、观测、控制模式的对应关系由训练侧决定。</p>
+  <p>动作施加侧只有一条计算路径：给定刚度、阻尼、力矩上限、目标值、当前位置与速度，算出应施加的力矩并限幅。刚度大于零时按位置目标解释，否则按力矩解释，被动关节是同一个公式的退化情形。这样做的收益是行为可预测——不存在「某个控制模式下走了另一条分支」的问题。</p>
+
+  <h3 id="s3-4"><span class="num">3.4</span>观测体系</h3>
+  <p>观测在配置里以「类型 + 目标」的形式声明，编译成固定顺序的字段，运行时按索引写入批量缓冲。可用的观测类型是一个封闭集合：</p>
+  <table>
+    <thead><tr><th style="width:26%">类型</th><th style="width:16%">形状</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>关节位置 / 速度</td><td>标量</td><td>按关节声明，SI 单位。</td></tr>
+      <tr><td>刚体位姿</td><td>7 维</td><td>位置（米）+ 四元数（<code>xyzw</code>），相对所属 Slot 的地面参考系。</td></tr>
+      <tr><td>刚体线速度 / 角速度</td><td>3 维</td><td>同样在 Slot 局部参考系下表达。</td></tr>
+      <tr><td>离地高度</td><td>标量</td><td>指定刚体相对地面的高度。</td></tr>
+      <tr><td>接触</td><td>标量 0/1</td><td>指定刚体在控制窗口末、最后一个已完成 solver step 的几何支撑。只在窗口末查询一次，不累计窗口早期的支撑或碰撞事件。</td></tr>
+      <tr><td>接触力</td><td>标量</td><td>同一窗口末已完成 solver step 的净冲量按该步秒数换算得到的牛顿值。不是窗口内峰值，也不是控制窗口时长上的平均。</td></tr>
+      <tr><td>地形高程扫描</td><td>7×5 网格</td><td>以机器人根为参考、沿世界水平面建立 footprint；每个值是射线命中点 Z 减 root.Z 的米制高度。它是外感知输入，不暴露世界坐标，也不复制地形配置。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-2　观测类型</p>
+  <p>单位与坐标系的换算只在观测写入这一处发生。这一条约束的价值在于：当训练与部署对不上时，可能出错的地方只有一个。</p>
+  <div class="box">
+    <div class="t">形状与语义由谁定义</div>
+    <p>上表的形状<strong>不是训练侧写死的常量</strong>。每个字段的 dtype、形状、单位、参考系与语义由仿真侧在初始化时随拓扑一起发布为字段描述符，训练侧据此建立形状表，再编译观测计划。绑定之前会逐字段比对「声明想要的」与「仿真能给的」，任何一项不一致都在初始化阶段失败并指出具体字段路径——不会带着错误形状进入物理。</p>
+    <p>这条约束消除的是一类很难查的错误：两侧各存一份「地形扫描是 35 维」这样的常量，一侧改了另一侧没改，训练照样跑，只是策略看到的东西错位了。</p>
+  </div>
+
+  <h3 id="s3-5"><span class="num">3.5</span>协议与批量数据面</h3>
+  <p>两侧通过本机 TCP 连接通信，同步、单请求在途。协议分成两个面：<strong>控制面用严格 JSON</strong>（初始化、拓扑、schema 协商、布局描述、manifest 哈希），<strong>数据面用协商好的二进制批量布局</strong>（动作、状态、重置）。</p>
+  <table>
+    <thead><tr><th style="width:26%">要素</th><th>设计</th></tr></thead>
+    <tbody>
+      <tr><td>帧头</td><td>固定 48 字节大端头：魔数、主/次版本、消息类型、标志位、载荷长度、序号、会话 UUID、布局标识。控制载荷上限 1 MiB，数据载荷上限 64 MiB。</td></tr>
+      <tr><td>消息</td><td>Hello / Initialize / InitialState / Ready / Shutdown 与 Step / Reset，加统一的错误消息与稳定错误码。</td></tr>
+      <tr><td>会话阶段</td><td>两侧各有明确的阶段机，阶段不匹配的请求直接拒绝，不进入物理。</td></tr>
+      <tr><td>规范化哈希</td><td>控制面 JSON 按规范化形式序列化后哈希，用于配置身份、schema 选择与布局标识——两侧对同一份内容算出同一个值。</td></tr>
+      <tr><td>批量布局</td><td>五种：初始状态、动作、步进结果、重置请求、重置结果。每种由有序的命名段组成，段有 dtype 与形状，首维恒为 Slot 数，对齐与零填充被显式校验。</td></tr>
+      <tr><td>失败语义</td><td>超时、协议错误或无法判定是否已送达的传输失败，一律视为整个 Session 失效，不重放已发出的请求。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-3　协议要素</p>
+  <p>数据面上还有两个刻意的选择。其一，段是<strong>字段主序</strong>的：每个观测字段各占一段，形状首维是 Slot 数；动作则是单段的 <code>[Slot 数 × 执行器数]</code>。其二，布局在初始化时协商并哈希，运行期只按偏移读写，不做名字解析。这两点共同保证了热路径上没有字典查找与字符串比较。</p>
+  <div class="box">
+    <div class="t">Reset 的表达</div>
+    <p>重置请求携带一个位掩码（哪些 Slot 需要重置）、每 Slot 的地形难度等级、以及重置目标值矩阵。仿真侧先恢复初始化时为每个 Slot 捕获的<strong>完整默认物理状态</strong>，再施加本次的覆盖值——不存在「部分重置」的降级路径。</p>
+  </div>
+
+  <h3 id="s3-6"><span class="num">3.6</span>声明式 MDP 与跨语言 plan</h3>
+  <p>这是保证「训练即部署」的核心机制。任务的观测与动作不是一段 Python 函数，而是一组 term 声明；声明被编译成 <strong>plan</strong>——一个有向无环的算子序列，明确每个算子的输入槽、输出槽、输出宽度与参数。</p>
+  <div class="flow">
+    <div class="row">
+      <div class="node py"><div class="n">声明</div><div class="d">observation / action term<br>（配置与 Task 中书写）</div></div>
+      <div class="arrow">→</div>
+      <div class="node py"><div class="n">编译</div><div class="d">plan：拓扑序算子图<br>宽度编译期确定</div></div>
+      <div class="arrow">→</div>
+      <div class="node py"><div class="n">训练</div><div class="d">Python plan 执行器<br>manager 每步求值</div></div>
+      <div class="node ue"><div class="n">部署</div><div class="d">C++ plan 运行时<br>制品内同一份 plan</div></div>
+    </div>
+    <div class="band">关键不变量：制品里的 plan 直接取训练时用的那个对象序列化，不从配置二次推导。</div>
+  </div>
+  <p>要让两侧真的等价，机制上做了三件事：</p>
+  <ol>
+    <li><strong>算子集是封闭的。</strong>取字段、拼接、按四元数逆旋转到机体系、重力投影、命令通道注入、控制帧时长、上一帧动作、关节位置相对默认姿态、缩放、偏移、裁剪——大致就这些。声明层负责把「相对默认姿态」这类语义展开成带具体参数的通用算子，plan 层保持最小。PhantomX 把 <code>control_frame_dt</code>（秒 × 100）编进观测，策略才能在可变控制间隔下工作。</li>
+    <li><strong>新增算子有准入规则。</strong>Python 实现、C++ 实现、一致性语料和负向自检必须同一变更集落地。细则在 <code>engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md</code>。</li>
+    <li><strong>一致性由共同语料裁定。</strong>语料是版本控制里的数据（plan、原始状态、命令、期望输出、容差），Python 测试与 UE 自动化测试读同一份语料，各自与期望值比对——不是一侧对另一侧负责，而是两侧对同一个提交进仓库并经过评审的常量负责。</li>
+  </ol>
+  <p>而奖励、终止、事件、课程这些不进部署路径的部分，则完全不受算子约束，可以是任意 Python 实现。这条分界让「表达力」与「跨语言可验证性」各自落在需要它们的地方。</p>
+  <div class="box">
+    <div class="t">只有一条任务路径</div>
+    <p>任务侧刻意<strong>没有</strong>「抽象基类 + 声明式实现」两套东西：由 manager 装配的声明式任务就是唯一的任务类型，导出器直接从这个任务对象上读取两个 plan，中间不存在任何转接层。理由与算法侧一致——为唯一的实现留接缝，是在为不存在的第二个实现付代价，而两条路径共存的直接后果就是「plan 到底以哪一份为准」这类问题。</p>
+    <p>反过来，确实存在多个实现的地方就保留接口：命令来源目前有空来源、课程聚合来源与两种外部命令来源同时在用，因此它是真接口，不是间接层。判据是实现计数，不是风格偏好。</p>
+  </div>
+
+  <h3 id="s3-7"><span class="num">3.7</span>训练算法与课程</h3>
+  <p>算法侧使用腿足机器人社区的 rsl-rl PPO。项目提供向量环境包装、把课程状态随 checkpoint 持久化的 runner 子类，以及 PhantomX 变控制间隔专用的 PPO 回报计算：折扣和 GAE 按实际物理时间换算，CartPole 仍使用原始 PPO。新 PhantomX checkpoint 标记训练目标，旧目标 checkpoint 会在启动 UE 前被拒绝用于续训。</p>
+  <p>任务侧的关键机制如下：</p>
+  <table>
+    <thead><tr><th style="width:24%">机制</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>重置分布</td><td>每次重置时初始状态如何采样，由机器人声明给出（关节位置/速度相对参考姿态的偏移、根位姿与根速度）。采样使用确定性流标识，同一 seed 下可复现。</td></tr>
+      <tr><td>首个 episode</td><td>初始化返回的默认物理状态只用于建立运行时与验收协议；策略见到的第一份状态来自 Session 就绪后对全部 Slot 执行的一次正常重置，与后续 episode 应用同一套分布。不存在「启动宽限期」。</td></tr>
+      <tr><td>地形课程</td><td>地形在 Session 初始化时一次性生成全部难度区域；训练侧只在 episode 重置时根据上一 episode 沿指令方向的累计前进量和累计指令距离调整难度，转向路径与直线路径同样计入。一般晋级或降级移动一级，最高级再次晋级时在全部等级中重新抽样。终止和超时遵循相同规则。行走中途不修改几何、不重新生成地形。</td></tr>
+      <tr><td>奖励与终止</td><td>以 term 形式声明并加权：速度跟踪、朝向角速率跟踪、前进进度、竖直速度抑制、姿态保持、机身离地间隙、动作变化率、关节速度、跌倒等。PhantomX 持续奖励按已完成的物理时间积分，跌倒成本只计一次，episode 按 20 秒仿真时间终止。权重在任务 YAML 中集中管理。</td></tr>
+      <tr><td>命令</td><td>行走任务的目标速度与朝向变化以命令通道注入观测，转向阶段有明确的起转距离与完成容差，因此「是否按指令走」可以被直接评估。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-4　任务侧关键机制</p>
+
+  <h3 id="s3-8"><span class="num">3.8</span>场景随机化与 sim2sim 泛化</h3>
+  <p>训练在程序化地形上进行，最终运行环境却是美术做的关卡地图。两者同属一个物理引擎，但场景几何完全不同——这是 <strong>sim2sim 泛化</strong>问题：物理没变，场景变了。它是「训练即部署」在场景维度上的最后一段。本节数值来自物理时间目标修改前的历史实验，只说明当时的评测与消融过程；新目标的策略效果需要从新 Run 训练后重新评估。</p>
+
+  <h4>先建立基线，再改训练</h4>
+  <p>这件事最容易犯的错是「先加随机化，再看效果好不好」——因为「好不好」没有尺子。所以顺序被固定为：<strong>先在美术地图上量化现状</strong>，再动训练。评测入口本身是交付物的一部分：固定地图、固定起点、固定目标轨迹、固定随机种子，输出四项指标。</p>
+  <table>
+    <thead><tr><th style="width:26%">指标</th><th>定义</th></tr></thead>
+    <tbody>
+      <tr><td>存活时长</td><td>倒地前的存活秒数。</td></tr>
+      <tr><td>追击成功率</td><td>在给定时限内接近目标到停止距离内的比例。</td></tr>
+      <tr><td>平均根高</td><td>机身平均高度，偏低说明姿态在崩坏（腿撑不起来）。</td></tr>
+      <tr><td>非足端接触率</td><td>非足端刚体接触地面的时间比例，用于捕捉「靠身体蹭着走」这类退化。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-5　美术地图评测指标</p>
+  <p>可重复性先被验证：同一策略重复评测两次，四项指标的抖动均为 0（约定上限 1e-5）。这一步不能省——<strong>如果评测抖动大于策略之间的差异，后面所有结论都无意义</strong>。</p>
+
+  <h4>判据的刚性：逐项比较，不取平均</h4>
+  <p>现役训练把地面摩擦随机化和根部推力扰动表达为事件 term；地形起伏来自初始化时生成的等级区域，并由课程在 reset 时选择，不在运行中重采样地形参数。历史实验按「四项指标<strong>逐项</strong>不低于基线」验收。当前 <code>uerl play</code> 输出评测指标，基线报告需要另行逐项比较，命令不会接收基线报告并自动返回验收结论。</p>
+  <div class="box note">
+    <div class="t">为什么不取四项平均</div>
+    <p>取平均能让「三升一降」看起来像「总体改善」，而降的那一项恰好可能是姿态崩坏。判据的刚性不是形式主义：一旦允许用平均掩盖单项退化，评测就从「验证」退化成「找一个能过的说法」。</p>
+  </div>
+
+  <h4>实际过程：一次真实的退化定位</h4>
+  <p>加入随机化后的前两次实验都<strong>没有</strong>通过：平均根高低于基线。由于评测抖动为 0，可以确定这不是测量噪声，而是策略真的变差了。随后做单变量消融：</p>
+  <table>
+    <thead><tr><th style="width:40%">实验</th><th style="width:20%">平均根高</th><th style="width:20%">相对基线</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>完整随机化，从已有 checkpoint 续训</td><td>0.127515</td><td>−0.006606</td><td style="color:#a83232;font-weight:700">未通过</td></tr>
+      <tr><td>关闭观测归一化</td><td>0.129576</td><td>−0.004544</td><td style="color:#a83232;font-weight:700">未通过</td></tr>
+      <tr><td>从头训练 + 观测归一化</td><td>0.126373</td><td>−0.007748</td><td style="color:#a83232;font-weight:700">未通过</td></tr>
+      <tr><td>续训 + <b>冻结</b>观测归一化统计量</td><td>0.136270</td><td>+0.002150</td><td style="color:var(--good);font-weight:700">通过</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-6　旧训练目标的单变量消融结果（相同种子、相同地形配置、相同评测入口，100 次迭代后严格比较）</p>
+  <p>当时的退化来自一个不太直观的耦合：从已有 checkpoint 续训时，网络参数与<strong>观测归一化的统计量</strong>在同时漂移。随机化让观测分布本身变宽，统计量随之更新，而策略是按旧统计量学出来的——两者同时移动，策略在美术地图上的姿态就塌了。该次实验保留 checkpoint 中的归一化对象与统计量，并在续训开始后<strong>冻结其更新</strong>；这个结论不能替代新目标的从头训练与评估。</p>
+  <div class="box key">
+    <div class="t">历史实验结果</div>
+    <p>使用三个随机化事件 term、固定种子、64 个 Slot、100 次迭代训练出的策略，在固定美术地图上四项指标逐项不低于基线：存活时长与追击成功率、非足端接触率持平，平均根高从 0.13412 提升到 0.13627。两次重复评测抖动为 0，严格验收通过。基线与验收标准全程未被调整。</p>
+  </div>
+  <p>这一节的方法论价值大于数值本身：<strong>先量化、再改动、逐项比较、退化就做单变量消融</strong>，而不是把参数调到能过为止。</p>
+
+  <h3 id="s3-9"><span class="num">3.9</span>部署制品与游戏内推理</h3>
+  <p>训练产物不是一个裸权重文件，而是一个自带解释方式的<strong>策略制品</strong>：</p>
+  <pre><code><span class="cm">// 制品容器</span>
+magic        "UERLPOL2"      <span class="cm">8 字节</span>
+format_ver   uint32
+json_length  uint32
+json_bytes   <span class="cm">观测 plan / 动作 plan / 任务与机器人标识 / ArtifactTiming（physics_dt 与 decimation 区间）/ 运行元数据</span>
+onnx_length  uint64
+onnx_bytes   <span class="cm">训练框架导出的 ONNX 模型（原样承载）</span></code></pre>
+  <p>制品刻意<strong>不</strong>保存网络层宽、层数、激活函数、权重、观测归一化参数与确定性输出变换——这些已经在导出的计算图里，重复描述只会带来第二个真相。制品只做一件事：把「我们的 plan」和「框架导出的网络」绑在一起，并在读入时校验观测 plan 的输出宽度等于网络输入维、网络输出维等于动作 plan 的策略宽度。</p>
+  <p>游戏内的控制器因此变得很薄：载入制品 → 编译两个 plan → 绑定机器人物理适配器 → 每个控制周期执行「采集状态 → 观测 plan → 网络推理 → 动作 plan → 施加关节命令」。宿主侧的任务专属代码收缩到三件事：用哪个制品、在哪张地图上启用、命令怎么算。控制器配置里<strong>没有</strong>执行器与观测的枚举字段——它们全部从制品推导，因此「配错」这件事在接口上无法表达。</p>
+
+  <h3 id="s3-10"><span class="num">3.10</span>性能工程</h3>
+  <p>在 CPU 物理后端上做数百实例并行，吞吐必须被当作一等问题处理。项目采用的是「测量 → 批处理 → 攻热点 → 验证」的闭环，而不是寻找某个神奇开关。</p>
+  <p>先看瓶颈是怎么随配置移动的。下表是在<strong>固定每控制步 4 次物理计算</strong>的配置下测得的，用来说明瓶颈会迁移；当前 PhantomX 行走任务的 decimation 区间是 <code>[1, 7]</code>，不是这组测量当时的固定 4。</p>
+  <table>
+    <thead><tr><th style="width:28%">配置</th><th style="width:18%">单控制步耗时</th><th>构成</th></tr></thead>
+    <tbody>
+      <tr><td>每控制步 1 次物理计算</td><td>4.532 ms</td><td>数据收发 36.9% ｜ 物理计算 27.0% ｜ 训练进程 22.2% ｜ 其他 12.3%</td></tr>
+      <tr><td>每控制步 4 次物理计算</td><td>9.970 ms</td><td>物理计算 42.9% ｜ 训练进程 31.4% ｜ 数据收发 19.0% ｜ 其他 6.7%</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-7　瓶颈随物理子步数量迁移：子步少时通信占主导，子步多时物理占主导</p>
+  <p>结论很明确：<strong>最慢的环节会变</strong>，所以优化顺序必须由测量决定。实测的优化动作与收益：</p>
+  <table>
+    <thead><tr><th style="width:22%">优化动作</th><th style="width:34%">具体做法</th><th>实测收益（同配置前后对比）</th></tr></thead>
+    <tbody>
+      <tr><td>动作只应用一次</td><td>每个控制步合并写入动作，去掉重复执行与复制</td><td>动作处理耗时 <b>−57.0%</b>；控制步总耗时 −4.4%</td></tr>
+      <tr><td>不显示画面</td><td>关闭不需要的物体更新、动作混合与网格更新，固定物理频率不变</td><td>控制步总耗时 <b>−37.7%</b>；物理 −33.2%；引擎更新 −39.9%</td></tr>
+      <tr><td>训练进程缓存复用</td><td>复用故障、接触、目标数据缓冲，去掉临时数组与额外复制</td><td>控制步总耗时 <b>−6.5%</b></td></tr>
+      <tr><td>重置批量化</td><td>按标记只重置需要重置的 Slot，拆开请求与返回的热路径</td><td>重置平均耗时 −6.0%；重置检查耗时 <b>−84.8%</b></td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-8　优化动作与实测收益</p>
+  <div class="stats">
+    <div class="stat"><div class="v">+15.6%</div><div class="k">训练吞吐（叠加验证）</div></div>
+    <div class="stat"><div class="v">−9.4%</div><div class="k">每控制步总耗时</div></div>
+    <div class="stat"><div class="v">不变</div><div class="k">固定物理频率与数据格式</div></div>
+  </div>
+  <div class="box key">
+    <div class="t">优化原则</div>
+    <p>固定物理频率、训练语义与数据格式保持不变，只缩短真实耗时环节。每次优化后都要验证三件事：固定帧关系仍然成立、Slot 之间仍然互不干扰、轨迹仍然一致。<strong>吞吐提升不得以改变训练含义为代价</strong>——否则提升的是别的东西的速度。</p>
+  </div>
+
+  <h3 id="s3-11"><span class="num">3.11</span>可复现性与故障边界</h3>
+  <p>训练是长时间、随机性重的过程，因此「出了问题算谁的」必须在设计时就分好类。项目只承认两种故障：</p>
+  <table>
+    <thead><tr><th style="width:22%">故障类别</th><th style="width:30%">范围</th><th>处理</th></tr></thead>
+    <tbody>
+      <tr><td>Slot 故障</td><td>只破坏一个 Slot 的物理状态（非有限数值、约束失效、越出地形边界等）</td><td>该 Slot 的状态标记为无效，任务侧不在其上做数学；可通过显式的稀疏重置尝试恢复。</td></tr>
+      <tr><td>Session 致命故障</td><td>破坏协议、资产、执行计划、固定帧关系或 Slot 隔离</td><td>停止整个 Session。不自动重试，不降级为「任务终止」。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 3-9　故障分级</p>
+  <p>可复现性由几件事共同保证：配置规范化哈希、运行 manifest（含解析后配置、生效的 Worker 配置、构建标识、schema 与布局哈希、git 标识）、确定性的随机流标识、以及固定不变的控制帧关系。项目纪律要求 checkpoint 必须与产出它的提交、未提交差异、解析后配置、manifest 和评估结果绑定——否则它只是一个权重文件，不是一个结果。</p>
+  <p>验证分层也遵循同样的思路：Python 单测覆盖配置、机器人描述合并、各 manager 与 plan；协议测试用独立的 wire 实现作为对照，检查帧头、严格 JSON、布局哈希与非法输入；一致性测试用共同语料裁定跨语言等价；端到端测试拉起真实的 UE 进程跑完整链路；UE 自动化测试覆盖 Slot 隔离、地形归属、拓扑反射与接触采样。缺少外部依赖时测试返回失败而不是静默跳过。</p>
+
+  <!-- ================= 4 ================= -->
+  <h2 class="sec" id="s4"><span class="num">04</span>运行方式与执行流程</h2>
+  <p class="lead">从一条命令到关卡里运行的机器人策略。</p>
+
+  <h3 id="s4-1"><span class="num">4.1</span>前置环境</h3>
+  <table>
+    <thead><tr><th style="width:24%">项</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>引擎</td><td>Unreal Engine 5.8；训练通过 <code>UnrealEditor-Cmd</code> 以命令行方式拉起训练宿主工程。</td></tr>
+      <tr><td>工程</td><td><code>engine/UERLHost.uproject</code>，含 UERLEngine 插件（七个运行时模块）。UE 侧变更需编译 <code>UERLHostEditor Win64 Development</code>。</td></tr>
+      <tr><td>Python</td><td>项目内虚拟环境，依赖由 <code>pyproject.toml</code> 固定；<code>torch</code> 系列锁定到项目使用的 CUDA 索引，避免被回滚到 CPU 版本。</td></tr>
+      <tr><td>入口</td><td>唯一命令是 <code>uerl</code>（<code>train</code>、<code>play</code>、<code>export</code>、<code>deploy</code> 等子命令）。长时间训练使用已安装环境里的 <code>uerl</code>，避免运行中触发环境同步。可执行命令以 <code>README.md</code> 为准。</td></tr>
+    </tbody>
+  </table>
+  <p class="tbl-cap">表 4-1　运行前置</p>
+
+  <h3 id="s4-2"><span class="num">4.2</span>训练</h3>
+  <p>训练由 Python 侧发起：解析配置 → 拉起 UE Worker 进程（或附着到已运行的进程）→ 握手、初始化、就绪 → 进入 Step/Reset 循环。可复现的任务、Slot 数和设备写在仓库 <code>README.md</code>；未写出的字段来自 <code>configs/tasks/*/training.yaml</code>。命令行点路径覆盖会被校验并计入配置哈希。运行过程中会产出 checkpoint、日志与运行 manifest。manifest 把这次运行的配置身份、构建身份与数据布局身份固定下来，用于后续复现与结果比较。</p>
+
+  <h3 id="s4-3"><span class="num">4.3</span>评估与录制</h3>
+  <p>评估复用同一套 Session 与同一份任务定义。比较新训练目标时，应明确选择新目标 Run 的 checkpoint；<code>latest</code> 只按时间选择，不区分历史目标。PhantomX 的机身高度振动频率按每个已完成控制窗口的实际物理时间计算。录制走视口呈现：UE 内部输出原始像素流，编码为 MP4。训练默认不显示画面，这既是性能考虑，也保证录制与否不改变物理频率。命令见 <code>README.md</code> 与 <code>docs/how-to/record-video.md</code>。</p>
+
+  <h3 id="s4-4"><span class="num">4.4</span>导出与游戏内部署</h3>
+  <p>这一步是「训练即部署」真正落地的位置。导出命令在 <code>README.md</code>。导出时会校验制品自洽：观测 plan 的输出宽度等于网络输入维、网络输出维等于动作宽度、运行时执行器与命令字段逐一对应。运行时执行器参数由 Python 机器人声明生成，不手写第二份。</p>
+  <p>制品放入 UE 项目后，游戏内的部署路径不再涉及 Python、不涉及协议、不涉及 Worker：把 <code>BP_UERLPolicyRobot</code> 放进关卡，或把 <code>UUERLPolicyComponent</code> 接到已有 Skeletal Mesh。蓝图提供命令通道，插件完成观测、ONNX 推理和关节驱动。接到另一份工程的步骤在 <code>docs/in-game-deployment-guide.md</code>。宿主 Egypt 关卡是演示玩法，不是插件接口。</p>
+
+  <h3 id="s4-5"><span class="num">4.5</span>场景泛化训练与评测</h3>
+  <p>与 3.8 对应的顺序是<strong>先评测，再改训练</strong>。先在 <code>UERL-PhantomX-Pursuit-v0</code> 上评测，再从新 Run 训练 <code>UERL-PhantomX-ContinuousTerrain-v0</code>，然后用同一评测入口取得报告并逐项比较。入口就是 <code>README.md</code> 里的 <code>uerl play</code> 与 <code>uerl train</code>。固定美术地图评测走追逐任务；事件 term 提供摩擦与根部推力扰动，地形等级由课程选择。消融一次只覆盖一个点路径（事件权重或观测归一化），不同时改训练入口、评测入口和基线。</p>
+
+  <h3 id="s4-6"><span class="num">4.6</span>验证</h3>
+  <p>基础验证与完整门禁命令见仓库 <code>README.md</code> 与 <code>tests/README.md</code>。Python 单测不启动 UE；UE 变更还须编译 <code>UERLHostEditor Win64 Development</code>，并跑与本次切片相关的 Automation / E2E。缺少外部依赖时测试返回失败而不是静默跳过。第 3.10 节的性能数字来自当时的实测闭环，不是每次提交都重跑的门禁。</p>
+
+  <hr class="soft">
+
+  <!-- ================= 附录 ================= -->
+  <h2 class="sec" id="a1"><span class="num">A</span>本文补充术语</h2>
+  <p class="lead">领域词的定义在仓库根目录 <code>CONTEXT.md</code>。下表只收录本文用到、而该文件没有单列的词。</p>
+  <table class="no-gloss">
+    <thead><tr><th style="width:22%">术语</th><th>定义</th></tr></thead>
+    <tbody>
+      <tr><td>Robot asset declaration</td><td>预置机器人库中的一份 Python 声明：资产路径、关节与刚体名、参考姿态（正则字典）、执行器组、观测选择与重置分布。支持派生。</td></tr>
+      <tr><td>Observation shape table</td><td>由仿真侧字段描述符建立的形状/单位/参考系/语义表。训练侧据此编译观测计划，并在绑定前逐字段比对，不一致即在初始化阶段失败。</td></tr>
+      <tr><td>Plan</td><td>由声明编译出的算子图（数据，非代码）。训练时被 Python 执行器求值，部署时随制品由 C++ 运行时求值。</td></tr>
+      <tr><td>Policy artifact</td><td>把观测/动作 plan 与导出的网络绑在一起的部署制品。</td></tr>
+      <tr><td>Scene randomization</td><td>以事件 term 表达的场景维度随机化：地面摩擦、地形起伏参数、根部推力扰动。</td></tr>
+      <tr><td>Authored-map baseline</td><td>在固定美术地图、固定起点与固定种子下产出四项指标的可重复评测报告，作为泛化改动的严格逐项比较基准。</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec" id="a2"><span class="num">B</span>关键参数</h2>
+  <p class="lead">取自 <code>configs/tasks/cartpole/training.yaml</code> 与 <code>configs/tasks/phantomx/training.yaml</code>。这两份是 CartPole 与 PhantomX 行走的默认训练配置，不是全部 Task 的公共时钟。</p>
+  <table class="no-gloss">
+    <thead><tr><th style="width:24%">参数</th><th style="width:28%">CartPole</th><th>PhantomX 六足行走</th></tr></thead>
+    <tbody>
+      <tr><td>执行器数</td><td>1</td><td>18</td></tr>
+      <tr><td>基座</td><td>固定（轨道约束）</td><td>浮动</td></tr>
+      <tr><td>并行 Slot 数</td><td>64</td><td>512</td></tr>
+      <tr><td>物理步长</td><td>1/120 s（120 Hz）</td><td>5 ms（200 Hz）</td></tr>
+      <tr><td>decimation</td><td><code>[2, 2]</code></td><td><code>[1, 7]</code></td></tr>
+      <tr><td>控制间隔</td><td>1/60 s（60 Hz）</td><td>5–35 ms。动作变化率按参考间隔 0.02 s 标定</td></tr>
+      <tr><td>Environment</td><td>共享世界，平面（1 级）</td><td>共享世界。行走 YAML 不挂程序化地形图集</td></tr>
+      <tr><td>外感知观测</td><td>无</td><td>7×5 地形高程扫描 + 六足接触 + 接触力</td></tr>
+      <tr><td>episode 上限</td><td>300 控制步</td><td>20 秒仿真时间</td></tr>
+      <tr><td>PPO</td><td>MLP 隐层 32×2，ELU，学习率 1e-3，观测归一化关闭</td><td>MLP 隐层 128×3，ELU，学习率 3e-4，观测归一化开启</td></tr>
+      <tr><td>协议</td><td colspan="2">本机 TCP，48 字节帧头，控制面严格 JSON，数据面协商二进制布局</td></tr>
+      <tr><td>部署</td><td colspan="2">UERLPOL2 制品（plans + ONNX），引擎内 NNE 推理；部署一致性容差 2e-5</td></tr>
+    </tbody>
+  </table>
+  <p>其余 PhantomX Task 复用同一机器人声明，地面不同：连续地形 8 级，<code>noise_range</code> 从 ±0.015 m 增至 ±0.12 m；离散地形 6 级；追逐任务使用美术地图。README 里连续地形训练示例是 64 Slot，不是行走 YAML 的 512。</p>
+
+  </main>
+
+  <footer>UE-RL-Engine · 项目说明文档（Explanation）· 文档结构遵循 Diátaxis 框架</footer>
+</div>
+
+<div id="gl-tip" role="tooltip" aria-hidden="true"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* 术语词典：key 为主词，alias 为同义写法，desc 为简短说明。
+     说明面向不熟悉强化学习 / 机器人学的引擎开发者，只解释这一份文档里用到的含义。 */
+  var GLOSSARY = [
+    ["强化学习", ["Reinforcement Learning", "RL"],
+     "让策略在环境中反复试错、并根据奖励逐步变好的学习范式。放到机器人上：状态是身体状态，动作是关节目标，奖励衡量这一步做得好不好。"],
+    ["PPO", [],
+     "近端策略优化（Proximal Policy Optimization）：主流的策略梯度算法。用当前策略采集一批交互数据，再在限制单次更新幅度的前提下多轮优化，兼顾稳定性与样本效率。"],
+    ["PD 增益", ["PD 控制", "PD"],
+     "最常用的关节控制律：力矩 = 刚度 ×（目标位置 − 当前位置）− 阻尼 × 当前速度。刚度决定拉回目标的强度，阻尼抑制震荡；策略输出的通常就是这里的目标位置。"],
+    ["刚度", ["stiffness"],
+     "PD 控制中位置误差项的系数。越大则关节越硬、跟踪目标越快，但也越容易在接触瞬间激起震荡。"],
+    ["阻尼", ["damping"],
+     "PD 控制中速度项的系数，作用是消耗能量、抑制震荡。与刚度共同决定关节的动态响应。"],
+    ["执行器", ["actuator", "actuators"],
+     "把一个动作维度转换为某个可驱动关节物理作用的机器人部件。策略输出的第 k 个数值，经第 k 个执行器变成关节上的力矩或位置目标。"],
+    ["力矩上限", ["effort_limit", "effort"],
+     "执行器可施加的最大关节力矩。用于限幅，避免策略输出超出物理上可行的范围。"],
+    ["自由度", ["DOF", "dof"],
+     "机器人可独立运动的关节数量。CartPole 为 1，PhantomX 六足为 18（每腿 3 个）。"],
+    ["Robot semantics", ["机器人语义"],
+     "说明机器人的哪些结构参与驱动、观测与重置，以及这些行为如何解释。它不描述质量、惯量、几何或关节限位——那些是资产的事实。"],
+    ["RobotSpec", [],
+     "资产拓扑与机器人声明合并后得到的可运行机器人描述，其中动作与观测的索引关系已经固定下来，运行期不再按名字查找。"],
+    ["Topology", ["拓扑"],
+     "机器人资产中可被稳定引用的刚体、关节、父子关系与关节限制。由资产提供并在初始化时反射读出，不由配置重复声明。"],
+    ["Slot", ["Slots"],
+     "一次并行仿真中的单个机器人实例及其任务状态。512 个 Slot 就是同一个 UE 世界里并行推进、彼此物理互不影响的 512 个机器人。"],
+    ["Session", [],
+     "一次训练连接：固定的 Slot 数量、physics_dt、闭区间 decimation 与已编译的执行计划。每个 Step 另带区间内的一个 step_decimation，从初始化持续到关闭。"],
+    ["Worker", [],
+     "仿真侧的运行实体，负责 Slot 生命周期、初始化、固定步进、状态采集与重置。它不拥有奖励、终止等任务数学。"],
+    ["Environment", [],
+     "为 Slot 提供放置、地面与地形条件的仿真上下文。它不拥有机器人控制，也不拥有任务数学。"],
+    ["Task", [],
+     "训练侧对动作、观测、奖励、终止与 episode 规则的定义。换一个任务不需要改动引擎代码。"],
+    ["控制帧", ["control frame", "控制步"],
+     "训练侧提交一次动作目标与本次 step_decimation、仿真侧在该数量物理子步内保持该目标、随后返回一次观测的完整周期。它是训练侧看到的最小时间单位。"],
+    ["固定步进", ["fixed substep", "固定物理步"],
+     "物理按固定时间步长推进，且推进由训练请求触发，而不是跟随渲染帧率。这是可复现与稳定接触求解的前提。"],
+    ["decimation", [],
+     "Session 上是闭区间（min, max）：每个控制步实际使用的物理子步数 step_decimation 落在这个区间里。控制间隔 = physics_dt × step_decimation。PhantomX 行走为物理 200 Hz、区间 [1, 7]，即 5–35 ms。"],
+    ["episode", ["episodes"],
+     "一次完整的任务尝试：从重置开始，到达成终止条件或超时结束。策略的好坏通常用一个 episode 内累计的奖励衡量。"],
+    ["rollout", [],
+     "用当前策略连续采集若干控制步的交互数据，作为一次策略更新的样本来源。"],
+    ["checkpoint", [],
+     "训练过程中保存的模型权重与训练状态快照，可用于继续训练、评估或导出部署。"],
+    ["reset", ["重置"],
+     "先把机器人恢复到初始化时捕获的默认物理状态，再施加本次采样的初始值，从而开始一个新的 episode。"],
+    ["重置分布", ["Reset distribution"],
+     "描述每次重置时初始状态如何采样的规则，例如关节位置在参考姿态附近的随机偏移范围。它决定策略见到的初始条件有多丰富。"],
+    ["MDP", [],
+     "马尔可夫决策过程：强化学习的标准问题框架（状态、动作、奖励、转移）。本文把观测、动作、奖励、终止、事件等要素统称为 MDP term。"],
+    ["term", ["terms"],
+     "声明式配置中的一个条目，例如一项观测、一项奖励、一个终止条件或一个随机化事件。任务由一组 term 组装而成。"],
+    ["plan", ["plans"],
+     "由 term 声明编译出的算子图，是数据而不是代码。训练侧与部署侧各有一个解释器执行同一份 plan，这是训练与部署一致的根据。"],
+    ["算子", ["operator"],
+     "plan 中的最小计算单元，例如取字段、拼接、缩放、裁剪、按四元数把向量转到机体系。算子集是封闭的，新增算子需同时提交两侧实现与一致性语料。"],
+    ["观测归一化", [],
+     "用运行统计量把各维观测缩放到相近尺度，让网络更易训练。统计量本身也是模型状态：续训时若继续更新，会与策略参数同时漂移。"],
+    ["课程", ["curriculum", "地形课程"],
+     "按难度递进安排训练条件的机制。本项目在 episode 重置时依据上一 episode 的表现调整地形难度；一般移动一级，最高级再次晋级时在全部等级中重新抽样，训练途中不修改几何。"],
+    ["sim2sim", [],
+     "仿真到仿真的迁移：物理后端不变，但场景几何或环境条件改变（例如从程序化地形换到美术地图），用于检验策略是否只记住了训练场景。"],
+    ["Chaos", [],
+     "Unreal Engine 5 自带的物理引擎，也是本项目训练与部署共用的物理后端。"],
+    ["PhysX", [],
+     "NVIDIA 的物理引擎，Isaac Lab 用它作为仿真后端。它与 Chaos 在铰接体表达、关节驱动与接触处理上有结构性差异。"],
+    ["Isaac Lab", [],
+     "NVIDIA 基于 Isaac Sim / PhysX 的机器人强化学习训练框架，提供 GPU 并行仿真与成套的任务组件。"],
+    ["articulation", ["缩减坐标"],
+     "把铰接体按关节自由度直接建模的表达方式：关节自由度本身就是求解变量，父子约束由公式保证，而不依赖迭代逐步满足。"],
+    ["manifold", [],
+     "接触流形：碰撞检测为一对物体生成的接触点集合。它的组织方式直接影响支撑力分布与打滑表现。"],
+    ["PhysicsAsset", [],
+     "UE 中描述骨骼网格体物理结构的资产：刚体形状、质量属性与关节约束。本项目的机器人拓扑就是从它反射读出的。"],
+    ["SkeletalMesh", ["骨骼网格体"],
+     "UE 的骨骼网格体资产，带骨架层级；配合 PhysicsAsset 即可作为铰接刚体参与物理仿真。"],
+    ["四元数", ["quaternion"],
+     "用四个分量表示三维旋转的方式，避免万向锁。不同框架的分量顺序（xyzw / wxyz）不一致，跨引擎时必须明确约定。"],
+    ["ONNX", [],
+     "开放的神经网络交换格式：把训练好的网络导出为与训练框架无关的计算图，供推理端直接加载。"],
+    ["NNE", [],
+     "UE 的神经网络推理接口（Neural Network Engine），用于在引擎内执行 ONNX 模型。"],
+    ["制品", ["artifact"],
+     "部署交付单元。本项目的策略制品把观测 plan、动作 plan 与导出的网络绑在一起，读入时校验三者宽度自洽。"],
+    ["manifest", [],
+     "一次运行的身份记录：解析后配置、配置哈希、构建标识、数据布局哈希与代码版本。它让「这个 checkpoint 是怎么来的」可被回答。"],
+    ["哈希", ["hash"],
+     "把任意内容映射为固定长度摘要的函数。相同内容得到相同摘要，因此可用来判断两侧的配置或数据布局是否一致。"],
+    ["规范化", ["canonical"],
+     "把内容整理成唯一的书写形式（键序固定、数值格式固定）后再哈希，使语义相同的两份内容得到相同摘要。"],
+    ["Gymnasium", [],
+     "强化学习环境的通用接口约定（reset / step 与固定的返回五元组），使算法实现可以与具体环境解耦。"],
+    ["dtype", [],
+     "数值的数据类型与位宽，例如 float32、uint8。协议的数据面对每个字段的 dtype 都有明确约定。"],
+    ["TCP", [],
+     "面向连接的可靠字节流传输协议。本项目在本机回环地址上用它连接 Python 训练进程与 UE 仿真进程。"],
+    ["JSON", [],
+     "通用的文本数据格式。本项目用于协议的控制面：初始化、schema 协商与描述信息。"],
+    ["帧头", ["header"],
+     "每条协议消息开头的固定长度字段区，携带魔数、版本、消息类型、载荷长度、序号与会话标识等元信息。"],
+    ["Ground frame", ["地面参考系"],
+     "一个 Slot 的局部地面参考系。机器人的位姿与速度都以它为参考，因此策略看不到 UE 世界坐标，换地图也不影响观测分布。"],
+    ["Slot isolation", ["Slot 隔离"],
+     "不同 Slot 的机器人碰撞与接触不能互相影响的运行不变量。空间上摆得远本身不构成隔离，必须由碰撞通道或碰撞分组保证。"],
+    ["碰撞通道", ["collision channel"],
+     "UE 中用于划分「谁与谁发生碰撞、谁能被射线检测到」的分类标签。本项目用它实现 Slot 之间的物理与查询隔离。"],
+    ["高度场", ["heightfield"],
+     "用规则网格上的高程值描述地形几何的方式，适合程序化生成连续起伏的地面。"],
+    ["反射", ["reflect"],
+     "运行时从资产中读出其真实结构（刚体、关节、限位、父子关系），而不是靠人工配置再描述一遍，从而避免两份事实不一致。"],
+    ["接触", ["contact"],
+     "刚体与地面发生支撑。本项目的接触观测是控制窗口末、最后一个已完成 solver step 的几何支撑，取值 0 或 1；不是窗口内支撑占比。"],
+    ["投影", ["projection", "Worker projection"],
+     "把训练侧已解析的机器人描述转换成仿真侧可直接消费的运行配置。它是内部运行产物，不是用户需要维护的第二份配置。"]
+  ];
+
+  var main = document.querySelector("main");
+  var tip = document.getElementById("gl-tip");
+  if (!main || !tip) { return; }
+
+  /* ---------- 目录跟随与章节高亮 ---------- */
+  var toc = document.querySelector("nav.toc");
+  var tocLinks = toc ? Array.prototype.slice.call(toc.querySelectorAll("a[href^='#']")) : [];
+  var headings = Array.prototype.slice.call(main.querySelectorAll("h2.sec, h3[id]"));
+  var headingLinks = Object.create(null);
+  tocLinks.forEach(function (link) {
+    var id = link.getAttribute("href").slice(1);
+    headingLinks[id] = link;
+  });
+
+  function updateToc() {
+    if (!toc || !headings.length) { return; }
+    var marker = window.scrollY + 150;
+    var current = headings[0];
+    headings.forEach(function (heading) {
+      var documentTop = heading.getBoundingClientRect().top + window.scrollY;
+      if (documentTop <= marker) { current = heading; }
+    });
+
+    var chapter = current.matches("h2.sec") ? current : current.previousElementSibling;
+    while (chapter && !chapter.matches("h2.sec")) { chapter = chapter.previousElementSibling; }
+    if (!chapter) {
+      var chapterIndex = headings.indexOf(current);
+      for (var i = chapterIndex; i >= 0; i -= 1) {
+        if (headings[i].matches("h2.sec")) { chapter = headings[i]; break; }
+      }
+    }
+
+    var active = headingLinks[current.id];
+    var chapterLink = chapter && headingLinks[chapter.id];
+    tocLinks.forEach(function (link) {
+      var isActive = link === active || link === chapterLink;
+      link.classList.toggle("active", isActive);
+      if (isActive) { link.setAttribute("aria-current", "location"); }
+      else { link.removeAttribute("aria-current"); }
+    });
+
+    var follow = active || chapterLink;
+    if (follow && toc.scrollHeight > toc.clientHeight) {
+      var rect = follow.getBoundingClientRect();
+      var tocRect = toc.getBoundingClientRect();
+      if (rect.top < tocRect.top + 42 || rect.bottom > tocRect.bottom - 18) {
+        toc.scrollTo({
+          top: Math.max(0, toc.scrollTop + rect.top - tocRect.top - 42),
+          behavior: "smooth"
+        });
+      }
+    }
+  }
+
+  var tocFrame = 0;
+  function scheduleTocUpdate() {
+    if (tocFrame) { return; }
+    tocFrame = window.requestAnimationFrame(function () {
+      tocFrame = 0;
+      updateToc();
+    });
+  }
+  window.addEventListener("scroll", scheduleTocUpdate, { passive: true });
+  window.addEventListener("resize", scheduleTocUpdate);
+  updateToc();
+
+  /* 建立「匹配文本 -> 词条」映射，并按长度降序，保证长词优先匹配 */
+  var lookup = Object.create(null);
+  var patterns = [];
+  GLOSSARY.forEach(function (entry) {
+    var key = entry[0], aliases = entry[1] || [], desc = entry[2];
+    [key].concat(aliases).forEach(function (word) {
+      lookup[word.toLowerCase()] = { key: key, desc: desc };
+      patterns.push(word);
+    });
+  });
+  patterns.sort(function (a, b) { return b.length - a.length; });
+
+  var re = new RegExp("(" + patterns.map(function (p) {
+    return p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }).join("|") + ")", "gi");
+
+  var WORDY = /[A-Za-z0-9_]/;
+  function boundaryOk(text, start, end) {
+    // 仅对 ASCII 词要求词边界，避免 "Slot" 命中 "Slots" 之外的部分单词
+    var first = text.charAt(start), last = text.charAt(end - 1);
+    if (WORDY.test(first) && start > 0 && WORDY.test(text.charAt(start - 1))) { return false; }
+    if (WORDY.test(last) && end < text.length && WORDY.test(text.charAt(end))) { return false; }
+    return true;
+  }
+
+  /* 每个术语在每一章只标注首次出现，避免正文出现大面积虚线 */
+  var used = Object.create(null);
+  function firstTime(key, section) {
+    var id = section + "\u0000" + key;
+    if (used[id]) { return false; }
+    used[id] = true;
+    return true;
+  }
+
+  var SKIP_TAGS = { PRE: 1, CODE: 1, SCRIPT: 1, STYLE: 1, H2: 1, H3: 1, H4: 1, A: 1 };
+  function skipped(node) {
+    for (var el = node.parentNode; el && el !== main; el = el.parentNode) {
+      if (SKIP_TAGS[el.tagName]) { return true; }
+      if (el.classList && (el.classList.contains("gl") || el.classList.contains("no-gloss"))) { return true; }
+    }
+    return false;
+  }
+
+  function annotate(root, section) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var nodes = [], n;
+    while ((n = walker.nextNode())) {
+      if (n.nodeValue && n.nodeValue.trim() && !skipped(n)) { nodes.push(n); }
+    }
+    nodes.forEach(function (node) {
+      var text = node.nodeValue, m, cursor = 0, frag = null;
+      re.lastIndex = 0;
+      while ((m = re.exec(text)) !== null) {
+        var word = m[0], start = m.index, end = start + word.length;
+        var hit = lookup[word.toLowerCase()];
+        if (!hit || !boundaryOk(text, start, end) || !firstTime(hit.key, section)) { continue; }
+        frag = frag || document.createDocumentFragment();
+        if (start > cursor) { frag.appendChild(document.createTextNode(text.slice(cursor, start))); }
+        var span = document.createElement("span");
+        span.className = "gl";
+        span.setAttribute("tabindex", "0");
+        span.setAttribute("data-term", hit.key);
+        span.setAttribute("data-desc", hit.desc);
+        span.setAttribute("aria-label", hit.key + "：" + hit.desc);
+        span.textContent = word;
+        frag.appendChild(span);
+        cursor = end;
+      }
+      if (frag) {
+        if (cursor < text.length) { frag.appendChild(document.createTextNode(text.slice(cursor))); }
+        node.parentNode.replaceChild(frag, node);
+      }
+    });
+  }
+
+  var section = 0;
+  Array.prototype.forEach.call(main.children, function (child) {
+    if (child.matches("h2.sec")) { section += 1; return; }
+    if (child.matches("h3, h4") || child.classList.contains("no-gloss")) { return; }
+    annotate(child, section);
+  });
+
+  /* ---------- 气泡交互 ---------- */
+  var pinned = null;
+
+  function show(el) {
+    tip.innerHTML = "";
+    var head = document.createElement("div");
+    head.className = "gt";
+    head.textContent = el.getAttribute("data-term");
+    var body = document.createElement("div");
+    body.textContent = el.getAttribute("data-desc");
+    tip.appendChild(head);
+    tip.appendChild(body);
+    tip.classList.add("on");
+    tip.setAttribute("aria-hidden", "false");
+    place(el);
+  }
+
+  function place(el) {
+    var r = el.getBoundingClientRect();
+    var w = tip.offsetWidth, h = tip.offsetHeight, pad = 12;
+    var left = r.left + r.width / 2 - w / 2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - w - pad));
+    var top = r.top - h - 10;
+    if (top < pad) { top = r.bottom + 10; }
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+
+  function hide() {
+    if (pinned) { return; }
+    tip.classList.remove("on");
+    tip.setAttribute("aria-hidden", "true");
+  }
+
+  function unpin() {
+    if (pinned) { pinned.classList.remove("pinned"); pinned = null; }
+    tip.classList.remove("on");
+    tip.setAttribute("aria-hidden", "true");
+  }
+
+  main.addEventListener("mouseover", function (e) {
+    var el = e.target.closest(".gl");
+    if (el && !pinned) { show(el); }
+  });
+  main.addEventListener("mouseout", function (e) {
+    if (e.target.closest(".gl")) { hide(); }
+  });
+  main.addEventListener("focusin", function (e) {
+    var el = e.target.closest(".gl");
+    if (el) { show(el); }
+  });
+  main.addEventListener("focusout", function (e) {
+    if (e.target.closest(".gl")) { hide(); }
+  });
+  main.addEventListener("click", function (e) {
+    var el = e.target.closest(".gl");
+    if (!el) { return; }
+    e.preventDefault();
+    if (pinned === el) { unpin(); return; }
+    unpin();
+    pinned = el;
+    el.classList.add("pinned");
+    show(el);
+  });
+  main.addEventListener("keydown", function (e) {
+    var el = e.target.closest(".gl");
+    if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); el.click(); }
+  });
+  document.addEventListener("click", function (e) {
+    if (pinned && !e.target.closest(".gl") && !e.target.closest("#gl-tip")) { unpin(); }
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { unpin(); } });
+  window.addEventListener("scroll", function () { if (pinned) { place(pinned); } else { hide(); } }, true);
+  window.addEventListener("resize", function () { if (pinned) { place(pinned); } });
+})();
+</script>
+</body>
+</html>

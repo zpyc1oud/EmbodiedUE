@@ -1,0 +1,39 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.joint.positions"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "joint_pos",
+        "width": 2,
+        "params": {"field": "robot.joint.positions"}
+      },
+      {
+        "op": "joint_pos_rel",
+        "inputs": ["joint_pos"],
+        "output": "joint_pos_rel",
+        "width": 2,
+        "params": {"default": [0.0, 0.1, -0.2]}
+      }
+    ],
+    "groups": {
+      "policy": ["joint_pos_rel"]
+    },
+    "group_widths": {
+      "policy": 2
+    }
+  },
+  "state_layout": [
+    {"name": "robot.joint.positions", "width": 2}
+  ],
+  "raw_state": [0.0, 0.0],
+  "expected_error": {
+    "phase": "compile",
+    "contains": "default has 3 entries but its input is 2"
+  },
+  "notes": "AC_PARITY_OP_010: default length ≠ input width must fail at Compile (not Execute); message includes both widths."
+}

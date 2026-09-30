@@ -1,0 +1,29 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.body.base_link.body_pose"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "pose",
+        "width": 7,
+        "params": {"field": "robot.body.base_link.body_pose"}
+      }
+    ],
+    "groups": {
+      "policy": ["pose"]
+    },
+    "group_widths": {
+      "policy": 7
+    }
+  },
+  "state_layout": [
+    {"name": "robot.body.base_link.body_pose", "width": 7}
+  ],
+  "raw_state": [0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 1.0],
+  "expected": [0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 1.0],
+  "tolerance": 2.0e-5
+}

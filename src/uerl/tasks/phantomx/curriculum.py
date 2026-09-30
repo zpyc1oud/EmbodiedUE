@@ -1,0 +1,158 @@
+"""Define PhantomX command progression behind the generic curriculum seam."""
+
+from __future__ import annotations
+
+from collections import deque
+from collections.abc import Mapping
+
+import torch
+
+from ...core.direct.curriculum import CurriculumManager, CurriculumStep, CurriculumTerm
+from .config import PhantomXCommandConfig, PhantomXCurriculumConfig
+
+
+class PhantomXCommandCurriculum(CurriculumTerm):
+    """Promote new episodes from straight walking to one commanded turn."""
+
+    def __init__(
+        self,
+        curriculum: PhantomXCurriculumConfig,
+        commands: PhantomXCommandConfig,
+        *,
+        num_envs: int,
+        device: str | torch.device,
+        run_seed: int,
+    ) -> None:
+        if num_envs < 1:
+            raise ValueError("num_envs must be positive")
+        self.config = curriculum
+        self.command_config = commands
+        self.device = torch.device(device)
+        self.run_seed = run_seed
+        self._stage = 0
+        self._turn_enabled = torch.zeros(num_envs, dtype=torch.bool, device=self.device)
+        self._error_sum = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
+        self._valid_steps = torch.zeros(num_envs, dtype=torch.long, device=self.device)
+        self._straight_history: deque[bool] = deque(maxlen=curriculum.window_episodes)
+        self._turn_history: deque[bool] = deque(maxlen=curriculum.window_episodes)
+
+    @property
+    def turn_enabled(self) -> torch.Tensor:
+        """Whether each Slot's next reset should sample a turn command."""
+
+        return self._turn_enabled
+
+    def update(self, step: CurriculumStep) -> Mapping[str, torch.Tensor | float]:
+        """Update rolling episode success and latch promotion at reset boundaries."""
+
+        valid = step.state_valid
+        if bool(valid.any()):
+            error = step.metrics["phantomx/linear_velocity_error"]
+            if not isinstance(error, torch.Tensor):
+                raise TypeError("phantomx linear velocity error metric must be a tensor")
+            self._error_sum[valid] += error[valid].to(device=self.device, dtype=torch.float32)
+            self._valid_steps[valid] += 1
+
+        completed = step.terminated | step.truncated
+        for slot_id in torch.nonzero(completed, as_tuple=False).flatten().tolist():
+            mean_error = self._error_sum[slot_id] / self._valid_steps[slot_id].clamp_min(1)
+            # Only a pure timeout is a successful curriculum episode; a
+            # physical failure must not be upgraded by an overlapping timeout.
+            succeeded = (
+                bool(step.truncated[slot_id])
+                and not bool(step.terminated[slot_id])
+                and bool(mean_error < self.config.velocity_error_threshold)
+            )
+            history = self._turn_history if bool(self._turn_enabled[slot_id]) else self._straight_history
+            history.append(succeeded)
+
+        if (
+            self._stage == 0
+            and len(self._straight_history) >= self.config.minimum_episodes
+            and _success_rate(self._straight_history) >= self.config.promotion_success_rate
+        ):
+            self._stage = 1
+
+        history = self._turn_history if self._stage == 1 else self._straight_history
+        projected_turn_enabled = self._turn_enabled.clone()
+        projected_turn_enabled[completed] = self._stage == 1
+        return {
+            "stage": float(self._stage),
+            "success_rate": _success_rate(history),
+            "completed_episodes": float(len(history)),
+            "turn_slot_fraction": float(projected_turn_enabled.float().mean().item()),
+        }
+
+    def reset(
+        self,
+        reset_mask: torch.Tensor,
+        post_reset_state: Mapping[str, torch.Tensor],
+    ) -> None:
+        """Apply the promoted stage to resetting Slots. Sampling belongs to the command item."""
+
+        del post_reset_state
+        self._turn_enabled[reset_mask] = self._stage == 1
+        self._error_sum[reset_mask] = 0.0
+        self._valid_steps[reset_mask] = 0
+
+    def state_dict(self) -> Mapping[str, object]:
+        """Persist global stage and rolling promotion evidence."""
+
+        return {
+            "stage": self._stage,
+            "straight_history": list(self._straight_history),
+            "turn_history": list(self._turn_history),
+        }
+
+    def load_state_dict(self, state: Mapping[str, object]) -> None:
+        """Restore promotion state while the new Session owns fresh episodes."""
+
+        if set(state) != {"stage", "straight_history", "turn_history"}:
+            raise ValueError("PhantomX command curriculum checkpoint fields are invalid")
+        stage = state["stage"]
+        straight_history = state["straight_history"]
+        turn_history = state["turn_history"]
+        if stage not in (0, 1):
+            raise ValueError("PhantomX command curriculum stage must be zero or one")
+        if not isinstance(straight_history, list) or not isinstance(turn_history, list):
+            raise ValueError("PhantomX command curriculum histories must be lists")
+        if len(straight_history) > self.config.window_episodes or len(turn_history) > self.config.window_episodes:
+            raise ValueError("PhantomX command curriculum history exceeds its configured window")
+        if any(type(item) is not bool for item in (*straight_history, *turn_history)):
+            raise ValueError("PhantomX command curriculum history values must be booleans")
+        self._stage = int(stage)
+        self._straight_history = deque(straight_history, maxlen=self.config.window_episodes)
+        self._turn_history = deque(turn_history, maxlen=self.config.window_episodes)
+        self._turn_enabled.fill_(self._stage == 1)
+        self._error_sum.zero_()
+        self._valid_steps.zero_()
+
+
+def create_phantomx_curriculum(
+    curriculum: PhantomXCurriculumConfig,
+    commands: PhantomXCommandConfig,
+    *,
+    num_envs: int,
+    device: str | torch.device,
+    run_seed: int,
+) -> CurriculumManager:
+    """Build the task's named terms behind the generic manager interface."""
+
+    return CurriculumManager(
+        {
+            "command": PhantomXCommandCurriculum(
+                curriculum,
+                commands,
+                num_envs=num_envs,
+                device=device,
+                run_seed=run_seed,
+            )
+        }
+    )
+
+
+def _success_rate(history: deque[bool]) -> float:
+    return sum(history) / len(history) if history else 0.0
+
+
+__all__ = ["PhantomXCommandCurriculum", "create_phantomx_curriculum"]

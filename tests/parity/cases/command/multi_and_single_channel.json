@@ -1,0 +1,47 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [],
+    "ops": [
+      {
+        "op": "command",
+        "inputs": [],
+        "output": "velocity",
+        "width": 3,
+        "params": {"channel": "velocity", "width": 3}
+      },
+      {
+        "op": "command",
+        "inputs": [],
+        "output": "yaw_rate",
+        "width": 1,
+        "params": {"channel": "yaw_rate", "width": 1}
+      },
+      {
+        "op": "concat",
+        "inputs": ["velocity", "yaw_rate"],
+        "output": "cmd_vec",
+        "width": 4,
+        "params": {}
+      }
+    ],
+    "groups": {
+      "policy": ["cmd_vec"]
+    },
+    "group_widths": {
+      "policy": 4
+    }
+  },
+  "state_layout": [],
+  "raw_state": [],
+  "command_layout": [
+    {"name": "velocity", "width": 3},
+    {"name": "yaw_rate", "width": 1}
+  ],
+  "commands": {
+    "velocity": [0.4, 0.0, 0.1],
+    "yaw_rate": [-0.25]
+  },
+  "expected": [0.4, 0.0, 0.1, -0.25],
+  "tolerance": 2.0e-5
+}

@@ -1,0 +1,37 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.joint.cart.joint_position"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "joint_pos",
+        "width": 1,
+        "params": {"field": "robot.joint.cart.joint_position"}
+      },
+      {
+        "op": "joint_pos_rel",
+        "inputs": ["joint_pos"],
+        "output": "joint_pos_rel",
+        "width": 1,
+        "params": {"default": [0.12]}
+      }
+    ],
+    "groups": {
+      "policy": ["joint_pos_rel"]
+    },
+    "group_widths": {
+      "policy": 1
+    }
+  },
+  "state_layout": [
+    {"name": "robot.joint.cart.joint_position", "width": 1}
+  ],
+  "raw_state": [0.37],
+  "expected": [0.25],
+  "tolerance": 2.0e-5,
+  "notes": "AC_PARITY_OP_009: single-joint width-1 case."
+}

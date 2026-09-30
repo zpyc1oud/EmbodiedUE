@@ -1,0 +1,37 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.joint.positions"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "joint_pos",
+        "width": 4,
+        "params": {"field": "robot.joint.positions"}
+      },
+      {
+        "op": "joint_pos_rel",
+        "inputs": ["joint_pos"],
+        "output": "joint_pos_rel",
+        "width": 4,
+        "params": {"default": [0.1, -0.2, 0.35, -0.45]}
+      }
+    ],
+    "groups": {
+      "policy": ["joint_pos_rel"]
+    },
+    "group_widths": {
+      "policy": 4
+    }
+  },
+  "state_layout": [
+    {"name": "robot.joint.positions", "width": 4}
+  ],
+  "raw_state": [0.5, 0.1, 0.0, -0.05],
+  "expected": [0.4, 0.3, -0.35, 0.4],
+  "tolerance": 2.0e-5,
+  "notes": "AC_PARITY_OP_009: nonuniform default — all four default values mutually unequal (catches scalar-broadcast / %3 structure bugs)."
+}

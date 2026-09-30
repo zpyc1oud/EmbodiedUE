@@ -1,0 +1,1034 @@
+{
+  "artifact": "engine/Content/UERLHost/Policies/PhantomXContinuousSmooth.uerlpol2",
+  "steps": [
+    {
+      "raw_state": {
+        "robot.body.base_link.body_pose": [
+          0.0,
+          -1.1021821838702633e-17,
+          0.18000000715255737,
+          3.0616171314629196e-17,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "robot.body.base_link.body_linear_velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "robot.body.base_link.body_angular_velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "robot.body.base_link.terrain_height": [
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15
+        ],
+        "robot.body.base_link.ground_clearance": [
+          0.18000000715255737
+        ],
+        "robot.body.tibia_rf.contact": [
+          0.0
+        ],
+        "robot.body.tibia_rm.contact": [
+          0.0
+        ],
+        "robot.body.tibia_rr.contact": [
+          0.0
+        ],
+        "robot.body.tibia_lf.contact": [
+          0.0
+        ],
+        "robot.body.tibia_lm.contact": [
+          0.0
+        ],
+        "robot.body.tibia_lr.contact": [
+          0.0
+        ],
+        "robot.body.base_link.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rr.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lr.contact_force": [
+          0.0
+        ],
+        "robot.joint.c1_rf.joint_position": [
+          4.489953298048022e-08
+        ],
+        "robot.joint.thigh_rf.joint_position": [
+          0.14999999105930328
+        ],
+        "robot.joint.tibia_rf.joint_position": [
+          -0.30000001192092896
+        ],
+        "robot.joint.c1_rm.joint_position": [
+          8.20413847968382e-10
+        ],
+        "robot.joint.thigh_rm.joint_position": [
+          0.14999999105930328
+        ],
+        "robot.joint.tibia_rm.joint_position": [
+          -0.30000001192092896
+        ],
+        "robot.joint.c1_rr.joint_position": [
+          -4.490080485197723e-08
+        ],
+        "robot.joint.thigh_rr.joint_position": [
+          0.14999999105930328
+        ],
+        "robot.joint.tibia_rr.joint_position": [
+          -0.30000001192092896
+        ],
+        "robot.joint.c1_lf.joint_position": [
+          -4.490037497362209e-08
+        ],
+        "robot.joint.thigh_lf.joint_position": [
+          0.14999999105930328
+        ],
+        "robot.joint.tibia_lf.joint_position": [
+          -0.30000001192092896
+        ],
+        "robot.joint.c1_lm.joint_position": [
+          5.8833418137282933e-08
+        ],
+        "robot.joint.thigh_lm.joint_position": [
+          0.15000002086162567
+        ],
+        "robot.joint.tibia_lm.joint_position": [
+          -0.30000001192092896
+        ],
+        "robot.joint.c1_lr.joint_position": [
+          4.490037497362209e-08
+        ],
+        "robot.joint.thigh_lr.joint_position": [
+          0.15000002086162567
+        ],
+        "robot.joint.tibia_lr.joint_position": [
+          -0.30000001192092896
+        ],
+        "robot.joint.c1_rf.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.thigh_rf.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.tibia_rf.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.c1_rm.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.thigh_rm.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.tibia_rm.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.c1_rr.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.thigh_rr.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.tibia_rr.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.c1_lf.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.thigh_lf.joint_velocity": [
+          -0.0
+        ],
+        "robot.joint.tibia_lf.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.c1_lm.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.thigh_lm.joint_velocity": [
+          -0.0
+        ],
+        "robot.joint.tibia_lm.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.c1_lr.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.thigh_lr.joint_velocity": [
+          0.0
+        ],
+        "robot.joint.tibia_lr.joint_velocity": [
+          0.0
+        ]
+      },
+      "commands": {
+        "velocity": [
+          0.4,
+          0.0,
+          0.1
+        ]
+      },
+      "expected_action": [
+        -0.28775539994239807,
+        0.765257716178894,
+        -0.3737397789955139,
+        0.8743770718574524,
+        -0.2606481909751892,
+        0.500579833984375,
+        0.058865804225206375,
+        -0.6416879892349243,
+        0.27381569147109985,
+        0.17209838330745697,
+        0.7051238417625427,
+        -0.08022039383649826,
+        -0.8497032523155212,
+        0.595344066619873,
+        0.0843222439289093,
+        -0.25840291380882263,
+        0.07360018789768219,
+        -0.11748839914798737
+      ],
+      "expected_targets": [
+        -0.05755108222365379,
+        0.30305153131484985,
+        -0.37474796175956726,
+        0.1748754233121872,
+        0.0978703647851944,
+        -0.19988404214382172,
+        0.01177316065877676,
+        0.021662399172782898,
+        -0.24523687362670898,
+        0.03441967815160751,
+        0.291024774312973,
+        -0.3160440921783447,
+        -0.16994065046310425,
+        0.2690688371658325,
+        -0.2831355631351471,
+        -0.051680583506822586,
+        0.16472004354000092,
+        -0.3234976828098297
+      ]
+    },
+    {
+      "raw_state": {
+        "robot.body.base_link.body_pose": [
+          -7.755807107656665e-10,
+          1.9739900825044288e-09,
+          0.17755025625228882,
+          3.0616171314629196e-17,
+          5.342660980289793e-09,
+          2.078951055750622e-08,
+          1.0
+        ],
+        "robot.body.base_link.body_linear_velocity": [
+          -5.6677553317285856e-08,
+          -2.2165554725006587e-08,
+          -0.19597536325454712
+        ],
+        "robot.body.base_link.body_angular_velocity": [
+          -2.4776486498012673e-06,
+          -2.0316079485382943e-08,
+          -1.562851139169652e-06
+        ],
+        "robot.body.base_link.terrain_height": [
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15
+        ],
+        "robot.body.base_link.ground_clearance": [
+          0.17755025625228882
+        ],
+        "robot.body.tibia_rf.contact": [
+          1.0
+        ],
+        "robot.body.tibia_rm.contact": [
+          1.0
+        ],
+        "robot.body.tibia_rr.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lf.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lm.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lr.contact": [
+          1.0
+        ],
+        "robot.body.base_link.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rr.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lr.contact_force": [
+          0.0
+        ],
+        "robot.joint.c1_rf.joint_position": [
+          -2.8934501017374714e-08
+        ],
+        "robot.joint.thigh_rf.joint_position": [
+          0.15000012516975403
+        ],
+        "robot.joint.tibia_rf.joint_position": [
+          -0.2999998927116394
+        ],
+        "robot.joint.c1_rm.joint_position": [
+          1.8848689720130096e-08
+        ],
+        "robot.joint.thigh_rm.joint_position": [
+          0.15000008046627045
+        ],
+        "robot.joint.tibia_rm.joint_position": [
+          -0.29999998211860657
+        ],
+        "robot.joint.c1_rr.joint_position": [
+          -1.6435637917311396e-07
+        ],
+        "robot.joint.thigh_rr.joint_position": [
+          0.15000008046627045
+        ],
+        "robot.joint.tibia_rr.joint_position": [
+          -0.2999998927116394
+        ],
+        "robot.joint.c1_lf.joint_position": [
+          -5.42257296842763e-08
+        ],
+        "robot.joint.thigh_lf.joint_position": [
+          0.14999999105930328
+        ],
+        "robot.joint.tibia_lf.joint_position": [
+          -0.29999983310699463
+        ],
+        "robot.joint.c1_lm.joint_position": [
+          1.7254071948968885e-08
+        ],
+        "robot.joint.thigh_lm.joint_position": [
+          0.15000005066394806
+        ],
+        "robot.joint.tibia_lm.joint_position": [
+          -0.2999999225139618
+        ],
+        "robot.joint.c1_lr.joint_position": [
+          -2.8939243890135913e-08
+        ],
+        "robot.joint.thigh_lr.joint_position": [
+          0.1499999463558197
+        ],
+        "robot.joint.tibia_lr.joint_position": [
+          -0.29999977350234985
+        ],
+        "robot.joint.c1_rf.joint_velocity": [
+          4.4112916839367244e-06
+        ],
+        "robot.joint.thigh_rf.joint_velocity": [
+          -5.88051250360877e-07
+        ],
+        "robot.joint.tibia_rf.joint_velocity": [
+          -1.2675566722464282e-05
+        ],
+        "robot.joint.c1_rm.joint_velocity": [
+          4.936252025800059e-06
+        ],
+        "robot.joint.thigh_rm.joint_velocity": [
+          -1.3623516679217573e-05
+        ],
+        "robot.joint.tibia_rm.joint_velocity": [
+          -9.346699698653538e-06
+        ],
+        "robot.joint.c1_rr.joint_velocity": [
+          -1.1140047035951284e-06
+        ],
+        "robot.joint.thigh_rr.joint_velocity": [
+          6.500947620224906e-06
+        ],
+        "robot.joint.tibia_rr.joint_velocity": [
+          2.926630713773193e-06
+        ],
+        "robot.joint.c1_lf.joint_velocity": [
+          3.0181242891558213e-06
+        ],
+        "robot.joint.thigh_lf.joint_velocity": [
+          -1.4769094377697911e-05
+        ],
+        "robot.joint.tibia_lf.joint_velocity": [
+          -7.763174835417885e-06
+        ],
+        "robot.joint.c1_lm.joint_velocity": [
+          4.331808668212034e-06
+        ],
+        "robot.joint.thigh_lm.joint_velocity": [
+          -1.9129978682030924e-05
+        ],
+        "robot.joint.tibia_lm.joint_velocity": [
+          -7.123921932361554e-06
+        ],
+        "robot.joint.c1_lr.joint_velocity": [
+          2.8490437671280233e-06
+        ],
+        "robot.joint.thigh_lr.joint_velocity": [
+          -1.433285251550842e-05
+        ],
+        "robot.joint.tibia_lr.joint_velocity": [
+          -2.6688910566008417e-06
+        ]
+      },
+      "commands": {
+        "velocity": [
+          0.4,
+          0.0,
+          0.1
+        ]
+      },
+      "expected_action": [
+        -0.07241889089345932,
+        0.9199486970901489,
+        -0.19868355989456177,
+        0.6558035612106323,
+        0.15552480518817902,
+        0.39876845479011536,
+        0.21985968947410583,
+        -0.6327934265136719,
+        0.44235241413116455,
+        -0.17814195156097412,
+        0.4380955398082733,
+        0.4019824266433716,
+        -0.8517529368400574,
+        0.7775195240974426,
+        0.024969030171632767,
+        -0.34735405445098877,
+        0.09688232839107513,
+        0.007764920592308044
+      ],
+      "expected_targets": [
+        -0.014483778737485409,
+        0.3339897394180298,
+        -0.3397367298603058,
+        0.13116072118282318,
+        0.18110497295856476,
+        -0.2202463150024414,
+        0.04397193714976311,
+        0.023441314697265625,
+        -0.21152952313423157,
+        -0.035628389567136765,
+        0.23761911690235138,
+        -0.2196035236120224,
+        -0.1703505963087082,
+        0.3055039048194885,
+        -0.2950062155723572,
+        -0.06947081536054611,
+        0.16937647759914398,
+        -0.29844701290130615
+      ]
+    },
+    {
+      "raw_state": {
+        "robot.body.base_link.body_pose": [
+          -2.776864738152085e-09,
+          -2.56591293351649e-11,
+          0.17118148505687714,
+          3.0616171314629196e-17,
+          2.2981656577769627e-09,
+          3.435782858218772e-08,
+          1.0
+        ],
+        "robot.body.base_link.body_linear_velocity": [
+          -2.309556279556091e-08,
+          -3.225700240250262e-08,
+          -0.39191189408302307
+        ],
+        "robot.body.base_link.body_angular_velocity": [
+          -7.164964586081624e-07,
+          -5.061004912931821e-07,
+          -9.198949442179583e-07
+        ],
+        "robot.body.base_link.terrain_height": [
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15
+        ],
+        "robot.body.base_link.ground_clearance": [
+          0.17118148505687714
+        ],
+        "robot.body.tibia_rf.contact": [
+          1.0
+        ],
+        "robot.body.tibia_rm.contact": [
+          1.0
+        ],
+        "robot.body.tibia_rr.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lf.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lm.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lr.contact": [
+          1.0
+        ],
+        "robot.body.base_link.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rr.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lr.contact_force": [
+          0.0
+        ],
+        "robot.joint.c1_rf.joint_position": [
+          -5.607075337366041e-08
+        ],
+        "robot.joint.thigh_rf.joint_position": [
+          0.15000014007091522
+        ],
+        "robot.joint.tibia_rf.joint_position": [
+          -0.29999998211860657
+        ],
+        "robot.joint.c1_rm.joint_position": [
+          -8.28794544105449e-09
+        ],
+        "robot.joint.thigh_rm.joint_position": [
+          0.15000008046627045
+        ],
+        "robot.joint.tibia_rm.joint_position": [
+          -0.29999998211860657
+        ],
+        "robot.joint.c1_rr.joint_position": [
+          -2.3043271824008116e-07
+        ],
+        "robot.joint.thigh_rr.joint_position": [
+          0.15000006556510925
+        ],
+        "robot.joint.tibia_rr.joint_position": [
+          -0.30000001192092896
+        ],
+        "robot.joint.c1_lf.joint_position": [
+          -8.1361982040562e-08
+        ],
+        "robot.joint.thigh_lf.joint_position": [
+          0.14999999105930328
+        ],
+        "robot.joint.tibia_lf.joint_position": [
+          -0.29999977350234985
+        ],
+        "robot.joint.c1_lm.joint_position": [
+          1.9918472204949467e-08
+        ],
+        "robot.joint.thigh_lm.joint_position": [
+          0.15000002086162567
+        ],
+        "robot.joint.tibia_lm.joint_position": [
+          -0.299999862909317
+        ],
+        "robot.joint.c1_lr.joint_position": [
+          -5.606933228818889e-08
+        ],
+        "robot.joint.thigh_lr.joint_position": [
+          0.15000003576278687
+        ],
+        "robot.joint.tibia_lr.joint_position": [
+          -0.29999974370002747
+        ],
+        "robot.joint.c1_rf.joint_velocity": [
+          2.9932202778581996e-06
+        ],
+        "robot.joint.thigh_rf.joint_velocity": [
+          8.098078978946432e-06
+        ],
+        "robot.joint.tibia_rf.joint_velocity": [
+          2.263229816890089e-06
+        ],
+        "robot.joint.c1_rm.joint_velocity": [
+          3.6047849789611064e-06
+        ],
+        "robot.joint.thigh_rm.joint_velocity": [
+          1.291221110477636e-06
+        ],
+        "robot.joint.tibia_rm.joint_velocity": [
+          -5.577876891038613e-06
+        ],
+        "robot.joint.c1_rr.joint_velocity": [
+          9.914590464177309e-07
+        ],
+        "robot.joint.thigh_rr.joint_velocity": [
+          1.4886364624544512e-05
+        ],
+        "robot.joint.tibia_rr.joint_velocity": [
+          4.773529326485004e-06
+        ],
+        "robot.joint.c1_lf.joint_velocity": [
+          1.5508088608839898e-06
+        ],
+        "robot.joint.thigh_lf.joint_velocity": [
+          3.559749188752903e-07
+        ],
+        "robot.joint.tibia_lf.joint_velocity": [
+          7.759324034850579e-06
+        ],
+        "robot.joint.c1_lm.joint_velocity": [
+          3.4770298498187913e-06
+        ],
+        "robot.joint.thigh_lm.joint_velocity": [
+          -5.789704573544441e-06
+        ],
+        "robot.joint.tibia_lm.joint_velocity": [
+          -5.289587079460034e-06
+        ],
+        "robot.joint.c1_lr.joint_velocity": [
+          3.610307658163947e-06
+        ],
+        "robot.joint.thigh_lr.joint_velocity": [
+          -5.568542292166967e-06
+        ],
+        "robot.joint.tibia_lr.joint_velocity": [
+          -7.419051144097466e-06
+        ]
+      },
+      "commands": {
+        "velocity": [
+          0.4,
+          0.0,
+          0.1
+        ]
+      },
+      "expected_action": [
+        0.0439118817448616,
+        0.9334633350372314,
+        -0.05494548752903938,
+        0.5555464625358582,
+        0.3331676721572876,
+        0.33642393350601196,
+        0.27544111013412476,
+        -0.6923377513885498,
+        0.47295328974723816,
+        -0.3965156674385071,
+        0.3362831473350525,
+        0.5962321162223816,
+        -0.6988837122917175,
+        0.8846766948699951,
+        -0.11611006408929825,
+        -0.3656266927719116,
+        -0.04604775086045265,
+        0.009974410757422447
+      ],
+      "expected_targets": [
+        0.008782376535236835,
+        0.3366926908493042,
+        -0.310989111661911,
+        0.11110929399728775,
+        0.21663354337215424,
+        -0.23271521925926208,
+        0.05508822202682495,
+        0.011532455682754517,
+        -0.20540934801101685,
+        -0.07930313795804977,
+        0.21725663542747498,
+        -0.18075358867645264,
+        -0.13977675139904022,
+        0.326935350894928,
+        -0.32322201132774353,
+        -0.07312534004449844,
+        0.14079046249389648,
+        -0.2980051338672638
+      ]
+    },
+    {
+      "raw_state": {
+        "robot.body.base_link.body_pose": [
+          -4.38940350733219e-09,
+          -1.5014893772757887e-09,
+          0.1608944684267044,
+          3.0616171314629196e-17,
+          -4.9624193643182934e-09,
+          4.954681642743708e-08,
+          1.0
+        ],
+        "robot.body.base_link.body_linear_velocity": [
+          -2.744015148437029e-08,
+          3.17707424812852e-08,
+          -0.5878089070320129
+        ],
+        "robot.body.base_link.body_angular_velocity": [
+          7.96260451352282e-07,
+          -2.3194893117306492e-07,
+          -7.520313261011324e-07
+        ],
+        "robot.body.base_link.terrain_height": [
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15,
+          -2.3104761224227886e-15,
+          -2.2921065188956846e-15,
+          -2.2737367036103438e-15,
+          -2.2553671000832397e-15,
+          -2.236997284797899e-15
+        ],
+        "robot.body.base_link.ground_clearance": [
+          0.1608944684267044
+        ],
+        "robot.body.tibia_rf.contact": [
+          1.0
+        ],
+        "robot.body.tibia_rm.contact": [
+          1.0
+        ],
+        "robot.body.tibia_rr.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lf.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lm.contact": [
+          1.0
+        ],
+        "robot.body.tibia_lr.contact": [
+          1.0
+        ],
+        "robot.body.base_link.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_rr.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lf.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lm.contact_force": [
+          0.0
+        ],
+        "robot.body.tibia_lr.contact_force": [
+          0.0
+        ],
+        "robot.joint.c1_rf.joint_position": [
+          -8.644781246403e-08
+        ],
+        "robot.joint.thigh_rf.joint_position": [
+          0.15000014007091522
+        ],
+        "robot.joint.tibia_rf.joint_position": [
+          -0.3000001013278961
+        ],
+        "robot.joint.c1_rm.joint_position": [
+          2.0936072431254615e-08
+        ],
+        "robot.joint.thigh_rm.joint_position": [
+          0.15000002086162567
+        ],
+        "robot.joint.tibia_rm.joint_position": [
+          -0.3000001013278961
+        ],
+        "robot.joint.c1_rr.joint_position": [
+          -2.6081161763613636e-07
+        ],
+        "robot.joint.thigh_rr.joint_position": [
+          0.15000006556510925
+        ],
+        "robot.joint.tibia_rr.joint_position": [
+          -0.30000007152557373
+        ],
+        "robot.joint.c1_lf.joint_position": [
+          -1.1173904113093158e-07
+        ],
+        "robot.joint.thigh_lf.joint_position": [
+          0.14999982714653015
+        ],
+        "robot.joint.tibia_lf.joint_position": [
+          -0.2999999225139618
+        ],
+        "robot.joint.c1_lm.joint_position": [
+          -1.045950170919241e-08
+        ],
+        "robot.joint.thigh_lm.joint_position": [
+          0.15000002086162567
+        ],
+        "robot.joint.tibia_lm.joint_position": [
+          -0.299999862909317
+        ],
+        "robot.joint.c1_lr.joint_position": [
+          -8.644821747338938e-08
+        ],
+        "robot.joint.thigh_lr.joint_position": [
+          0.15000011026859283
+        ],
+        "robot.joint.tibia_lr.joint_position": [
+          -0.29999977350234985
+        ],
+        "robot.joint.c1_rf.joint_velocity": [
+          2.4627181574032875e-06
+        ],
+        "robot.joint.thigh_rf.joint_velocity": [
+          1.4207104868546594e-05
+        ],
+        "robot.joint.tibia_rf.joint_velocity": [
+          1.0962093256239314e-05
+        ],
+        "robot.joint.c1_rm.joint_velocity": [
+          4.187477770756232e-06
+        ],
+        "robot.joint.thigh_rm.joint_velocity": [
+          8.195469490601681e-06
+        ],
+        "robot.joint.tibia_rm.joint_velocity": [
+          3.477977315924363e-06
+        ],
+        "robot.joint.c1_rr.joint_velocity": [
+          1.781900778041745e-06
+        ],
+        "robot.joint.thigh_rr.joint_velocity": [
+          5.503277861862443e-06
+        ],
+        "robot.joint.tibia_rr.joint_velocity": [
+          2.286151357111521e-06
+        ],
+        "robot.joint.c1_lf.joint_velocity": [
+          1.1230883245616496e-07
+        ],
+        "robot.joint.thigh_lf.joint_velocity": [
+          -8.656434147269465e-06
+        ],
+        "robot.joint.tibia_lf.joint_velocity": [
+          -7.233153155539185e-06
+        ],
+        "robot.joint.c1_lm.joint_velocity": [
+          2.063333568003145e-06
+        ],
+        "robot.joint.thigh_lm.joint_velocity": [
+          -5.555961706704693e-06
+        ],
+        "robot.joint.tibia_lm.joint_velocity": [
+          -6.0170914366608486e-06
+        ],
+        "robot.joint.c1_lr.joint_velocity": [
+          3.2648699743731413e-06
+        ],
+        "robot.joint.thigh_lr.joint_velocity": [
+          -1.8643792145667248e-06
+        ],
+        "robot.joint.tibia_lr.joint_velocity": [
+          -1.3904101251682732e-05
+        ]
+      },
+      "commands": {
+        "velocity": [
+          0.4,
+          0.0,
+          0.1
+        ]
+      },
+      "expected_action": [
+        0.1823120266199112,
+        0.906335175037384,
+        0.0709119662642479,
+        0.528427243232727,
+        0.41569626331329346,
+        0.29559412598609924,
+        0.2711852788925171,
+        -0.7379415035247803,
+        0.43268394470214844,
+        -0.5822091102600098,
+        0.30580320954322815,
+        0.720240592956543,
+        -0.5501660704612732,
+        0.9846469759941101,
+        -0.2312879115343094,
+        -0.39665859937667847,
+        -0.22087357938289642,
+        0.02150467038154602
+      ],
+      "expected_targets": [
+        0.03646240755915642,
+        0.3312670588493347,
+        -0.28581762313842773,
+        0.10568545013666153,
+        0.2331392616033554,
+        -0.24088118970394135,
+        0.05423705652356148,
+        0.0024117082357406616,
+        -0.2134632170200348,
+        -0.11644182354211807,
+        0.21116064488887787,
+        -0.15595188736915588,
+        -0.11003321409225464,
+        0.3469294011592865,
+        -0.34625759720802307,
+        -0.07933171838521957,
+        0.10582529008388519,
+        -0.2956990897655487
+      ]
+    }
+  ],
+  "tolerance": 2e-05
+}

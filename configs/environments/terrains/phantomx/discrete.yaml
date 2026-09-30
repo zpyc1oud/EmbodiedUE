@@ -1,0 +1,81 @@
+num_levels: 6
+cell_size: [12.0, 12.0]
+# Isaac Lab random_grid_terrain adapted to UE: every grid cell remains a
+# separate box and receives one deterministic uniform sample from the same
+# difficulty-dependent height interval. This is a discrete raster, not a
+# continuous heightfield mesh and not a Perlin/OpenSimplex surface.
+#
+# difficulty is the only terrain difficulty control: it scales the relief and
+# therefore the adjacent-cell slope. grid_height_range is the absolute top
+# height envelope above the patch datum, not a per-level difficulty knob.
+# platform_width is only the reset-height sampling window; no physical centre
+# platform is inserted.
+# Use 0.4 m blocks for the PhantomX discrete profile so each generated step is
+# large enough to be represented as a deliberate terrain feature; the sampling
+# algorithm remains Isaac-style random-grid semantics.
+# The settled PhantomX body height is about 0.129 m.  The 0.10 m cap follows
+# the local Isaac Lab small-quadruped rough-terrain profiles and leaves a
+# clearance margin below the robot body.
+# The 12 m patch gives the robot a full walking area at every curriculum level.
+border_width: 1.0
+tiers:
+  - level: 0
+    primitive: boxes
+    seed: "20260828"
+    platform_width: 0.8
+    params:
+      grid_width: 0.4
+      grid_height_range: [0.01, 0.10]
+      holes: false
+      generator: random_grid
+      difficulty: 0.0
+  - level: 1
+    primitive: boxes
+    seed: "20260829"
+    platform_width: 0.8
+    params:
+      grid_width: 0.4
+      grid_height_range: [0.01, 0.10]
+      holes: false
+      generator: random_grid
+      difficulty: 0.15
+  - level: 2
+    primitive: boxes
+    seed: "20260830"
+    platform_width: 0.8
+    params:
+      grid_width: 0.4
+      grid_height_range: [0.01, 0.10]
+      holes: false
+      generator: random_grid
+      difficulty: 0.35
+  - level: 3
+    primitive: boxes
+    seed: "20260831"
+    platform_width: 0.8
+    params:
+      grid_width: 0.4
+      grid_height_range: [0.01, 0.10]
+      holes: false
+      generator: random_grid
+      difficulty: 0.55
+  - level: 4
+    primitive: boxes
+    seed: "20260901"
+    platform_width: 0.8
+    params:
+      grid_width: 0.4
+      grid_height_range: [0.01, 0.10]
+      holes: false
+      generator: random_grid
+      difficulty: 0.78
+  - level: 5
+    primitive: boxes
+    seed: "20260902"
+    platform_width: 0.8
+    params:
+      grid_width: 0.4
+      grid_height_range: [0.01, 0.10]
+      holes: false
+      generator: random_grid
+      difficulty: 1.0

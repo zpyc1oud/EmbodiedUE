@@ -1,0 +1,46 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.body.base_link.body_quat",
+      "robot.body.base_link.body_linear_velocity"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "quat",
+        "width": 4,
+        "params": {"field": "robot.body.base_link.body_quat"}
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "vec",
+        "width": 3,
+        "params": {"field": "robot.body.base_link.body_linear_velocity"}
+      },
+      {
+        "op": "rotate_inverse",
+        "inputs": ["quat", "vec"],
+        "output": "body_vec",
+        "width": 3,
+        "params": {}
+      }
+    ],
+    "groups": {
+      "policy": ["body_vec"]
+    },
+    "group_widths": {
+      "policy": 3
+    }
+  },
+  "state_layout": [
+    {"name": "robot.body.base_link.body_quat", "width": 4},
+    {"name": "robot.body.base_link.body_linear_velocity", "width": 3}
+  ],
+  "raw_state": [0.0, 0.0, 1.0, 0.0, 1.0, 2.0, 3.0],
+  "expected": [-1.0, -2.0, 3.0],
+  "tolerance": 2.0e-5,
+  "notes": "AC_PARITY_OP_004: 180° yaw (quat xyzw = 0,0,1,0) flips X/Y and keeps Z."
+}

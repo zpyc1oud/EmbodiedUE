@@ -1,0 +1,73 @@
+# ===== Repository-local generated reports =====
+temp/ue_rl_engine_architecture.layout.json
+
+# ===== Agentic 过程文档（本地状态，不进 git）=====
+.agenticdoc/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ===== UE 工程产物 =====
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+Build/
+.dist/
+*.VC.db
+*.opensdf
+*.sdf
+*.sln
+*.slnx
+*.suo
+*.xcodeproj/
+.vs/
+*.generated.h
+*.generated.cpp
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 日志 =====
+*.log
+
+# ===== Scratch：仅保留 Markdown 和 Python 文件 =====
+.scratch/**
+!.scratch/
+!.scratch/**/
+!.scratch/**/*.md
+!.scratch/**/*.py
+
+# ===== 训练目录 =====
+runs/
+tmp/
+
+# ===== Agent runtime state =====
+.codebuddy/teams/
+
+# Reference sources stay local and are not part of the published repository.
+references/
+.gitmodules

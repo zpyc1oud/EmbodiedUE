@@ -1,0 +1,95 @@
+num_levels: 8
+cell_size: [30.0, 10.0]
+# Each level uses Isaac Lab random_uniform_terrain semantics: deterministic
+# quantised heights on a coarse lattice are interpolated onto the final
+# heightfield grid. Local uphill and downhill sections occur naturally;
+# amplitude and spatial frequency increase with the level. The final level is
+# capped at +/-0.12 m, below the observed settled PhantomX body height of about
+# 0.129 m. The generated border fades the surface back to zero so adjacent
+# Slot maps do not form cliffs.
+border_width: 4.0
+tiers:
+  - level: 0
+    primitive: heightfield
+    seed: "20260824"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.015, 0.015]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.90
+  - level: 1
+    primitive: heightfield
+    seed: "20260825"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.030, 0.030]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.82
+  - level: 2
+    primitive: heightfield
+    seed: "20260826"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.045, 0.045]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.74
+  - level: 3
+    primitive: heightfield
+    seed: "20260827"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.060, 0.060]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.66
+
+  - level: 4
+    primitive: heightfield
+    seed: "20260828"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.075, 0.075]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.58
+
+  - level: 5
+    primitive: heightfield
+    seed: "20260829"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.090, 0.090]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.50
+
+  - level: 6
+    primitive: heightfield
+    seed: "20260830"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.105, 0.105]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.45
+
+  - level: 7
+    primitive: heightfield
+    seed: "20260831"
+    platform_width: 0.8
+    params:
+      noise_range: [-0.120, 0.120]
+      noise_step: 0.005
+      horizontal_scale: 0.4
+      vertical_scale: 0.005
+      downsampled_scale: 0.40

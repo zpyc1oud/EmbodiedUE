@@ -1,0 +1,48 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.body.base_link.body_pose",
+      "robot.joint.left_c1.joint_position"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "pose",
+        "width": 7,
+        "params": {"field": "robot.body.base_link.body_pose"}
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "joint",
+        "width": 1,
+        "params": {"field": "robot.joint.left_c1.joint_position"}
+      },
+      {
+        "op": "concat",
+        "inputs": ["pose", "joint"],
+        "output": "policy_vec",
+        "width": 8,
+        "params": {}
+      }
+    ],
+    "groups": {
+      "policy": ["pose", "joint"],
+      "debug": ["policy_vec"]
+    },
+    "group_widths": {
+      "policy": 8,
+      "debug": 8
+    }
+  },
+  "expected": {
+    "ops": ["select", "select", "concat"],
+    "widths": [7, 1, 8],
+    "groups": {
+      "policy": ["pose", "joint"],
+      "debug": ["policy_vec"]
+    }
+  }
+}

@@ -1,0 +1,462 @@
+"""Generate reviewable skeletons for new Robot declarations and Tasks."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from textwrap import dedent
+from typing import cast
+
+
+@dataclass(frozen=True, slots=True)
+class _TaskTemplate:
+    """Describe the small set of supported task scaffold starting points."""
+
+    name: str
+    summary: str
+    default_environment_id: str
+    default_map_path: str
+    required_semantics: tuple[str, ...]
+
+
+_TASK_TEMPLATES = {
+    "cartpole": _TaskTemplate(
+        name="cartpole",
+        summary="Direct CartPole-style balance task",
+        default_environment_id="uerl.environment.shared_world",
+        default_map_path="/Engine/Maps/Entry",
+        required_semantics=("joint_position", "joint_velocity"),
+    ),
+    "phantomx-walk": _TaskTemplate(
+        name="phantomx-walk",
+        summary="Direct PhantomX-style locomotion task",
+        default_environment_id="uerl.environment.shared_world",
+        default_map_path="/Engine/Maps/Entry",
+        required_semantics=("root_pose", "root_velocity", "joint_position", "joint_velocity"),
+    ),
+}
+
+
+class _ScaffoldError(ValueError):
+    """Report invalid scaffold input before any output is written."""
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Generate UE-RL Robot and Task skeletons.")
+    subparsers = parser.add_subparsers(dest="kind", required=True)
+
+    robot_parser = subparsers.add_parser("robot", help="generate a Robot declaration skeleton")
+    robot_parser.add_argument("name", help="Python Robot declaration name, such as phantomx2.")
+    robot_parser.add_argument("--asset", required=True, help="UE Skeletal Mesh object path.")
+    robot_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("."),
+        help="Project root where src/ and docs/ are created (default: current directory).",
+    )
+    robot_parser.add_argument("--json", action="store_true", help="Print a machine-readable result.")
+
+    task_parser = subparsers.add_parser("task", help="generate a DirectTask skeleton")
+    task_parser.add_argument("name", help="Python Task package name, such as walk2.")
+    task_parser.add_argument("--robot", required=True, help="Robot declaration name or slug.")
+    task_parser.add_argument(
+        "--template",
+        required=True,
+        choices=tuple(sorted(_TASK_TEMPLATES)),
+        help="Supported starting point for the Task math and config draft.",
+    )
+    task_parser.add_argument("--task-id", help="Stable Task ID (default: UERL-<Name>-v0).")
+    task_parser.add_argument(
+        "--environment-id",
+        help="UE Environment ID (default comes from the selected template).",
+    )
+    task_parser.add_argument(
+        "--robot-id",
+        default="uerl.robot.skeletal_mesh",
+        help="UE Robot ID used by the Task registration draft.",
+    )
+    task_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("."),
+        help="Project root where src/, configs/, and docs/ are created (default: current directory).",
+    )
+    task_parser.add_argument("--json", action="store_true", help="Print a machine-readable result.")
+    return parser
+
+
+def _slug(value: str, *, label: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9]+", "_", value).strip("_").lower()
+    if not normalized or not re.fullmatch(r"[a-z][a-z0-9_]*", normalized):
+        raise _ScaffoldError(f"{label} must start with a letter and contain only letters, digits, or '_'")
+    return normalized
+
+
+def _class_name(slug: str) -> str:
+    return "".join(part.capitalize() for part in slug.split("_"))
+
+
+def _task_id(slug: str) -> str:
+    return f"UERL-{_class_name(slug)}-v0"
+
+
+def _write_files(files: dict[Path, str]) -> tuple[Path, ...]:
+    """Write a complete scaffold only after every destination is confirmed free."""
+
+    conflicts = sorted(path for path in files if path.exists())
+    if conflicts:
+        rendered = ", ".join(str(path) for path in conflicts)
+        raise _ScaffoldError(f"refusing to overwrite existing scaffold file(s): {rendered}")
+    for path, content in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8", newline="\n")
+    return tuple(files)
+
+
+def _robot_files(root: Path, slug: str, asset_path: str) -> dict[Path, str]:
+    class_name = _class_name(slug)
+    asset_ref = f"robots/{slug}/robot.yaml"
+    declaration = dedent(
+        f'''\
+        """Robot declaration scaffold for {class_name}.
+
+        TODO: replace every placeholder selector with names from the UE topology
+        before adding this declaration to ``ROBOT_ASSETS``.
+        """
+
+        from __future__ import annotations
+
+        from ...core.config.robot import ObsType, ResetTargetType
+        from .base import ActuatorGroupCfg, ObsSelectorCfg, ResetTargetCfg, RobotAssetCfg, RobotInitStateCfg
+
+        {class_name.upper()}_ASSET_REF = "{asset_ref}"
+        {class_name.upper()}_ASSET_PATH = "{asset_path}"
+
+        {class_name.upper()}_CFG = RobotAssetCfg(
+            name="{slug}",
+            asset_path={class_name.upper()}_ASSET_PATH,
+            # TODO: replace placeholders with reflected joint names.
+            joint_names=("TODO_joint",),
+            # TODO: replace placeholders with reflected body names.
+            body_names=("TODO_body",),
+            init_state=RobotInitStateCfg(joint_pos={{"TODO_joint": 0.0}}),
+            actuators=(
+                # TODO: set gains and effort limits from the intended controller.
+                ActuatorGroupCfg(
+                    joint_names="TODO_joint",
+                    target_mode="effort",
+                    stiffness=0.0,
+                    damping=1.0,
+                    effort_limit=1.0,
+                    action_scale=1.0,
+                ),
+            ),
+            observations=(
+                # TODO: declare every raw state field consumed by the Task.
+                ObsSelectorCfg(ObsType.JOINT_POSITION, joint_names="TODO_joint"),
+            ),
+            reset=(
+                # TODO: add reset distributions for all controlled joints and root state.
+                ResetTargetCfg(
+                    target_type=ResetTargetType.JOINT_POSITION,
+                    joint_names="TODO_joint",
+                    stream_id="reset.TODO_joint.position",
+                ),
+            ),
+        )
+
+        __all__ = ["{class_name.upper()}_ASSET_PATH", "{class_name.upper()}_ASSET_REF", "{class_name.upper()}_CFG"]
+        '''
+    )
+    readme = dedent(
+        f'''\
+        # Robot scaffold: `{slug}`
+
+        UE asset path: `{asset_path}`
+        Python declaration ref: `{asset_ref}`
+
+        This file is intentionally not registered yet. Before adding it to
+        `src/uerl/assets/robots/__init__.py`:
+
+        1. Replace `TODO_*` joint/body selectors with names from UE topology.
+        2. Set actuator gains, effort limits, action scales, observations, and reset streams.
+        3. Add `{class_name.upper()}_ASSET_REF` / `{class_name.upper()}_CFG` to `ROBOT_ASSETS`.
+        4. Add a Task that consumes the declaration and run `uerl check task <TaskID>`.
+
+        The declaration is a reviewable starting point; it does not claim that
+        the placeholder topology matches the Skeletal Mesh.
+        '''
+    )
+    return {
+        root / "src" / "uerl" / "assets" / "robots" / f"{slug}.py": declaration,
+        root / "src" / "uerl" / "assets" / "robots" / f"{slug}.md": readme,
+    }
+
+
+def _task_files(
+    root: Path,
+    slug: str,
+    robot_slug: str,
+    template: _TaskTemplate,
+    task_id: str,
+    environment_id: str,
+    robot_id: str,
+) -> dict[Path, str]:
+    class_name = _class_name(slug)
+    constant_prefix = slug.upper()
+    robot_ref = f"robots/{robot_slug}/robot.yaml"
+    package = dedent(
+        f'''\
+        """Scaffold package for the `{task_id}` DirectTask."""
+
+        from .config import {constant_prefix}_TASK_ID, {constant_prefix}_TASK_VERSION, {class_name}TaskConfig
+
+        __all__ = ["{constant_prefix}_TASK_ID", "{constant_prefix}_TASK_VERSION", "{class_name}TaskConfig"]
+        '''
+    )
+    config = dedent(
+        f'''\
+        """Typed Task config scaffold generated from the `{template.name}` template."""
+
+        from __future__ import annotations
+
+        from dataclasses import dataclass
+
+        from ...core.config.models import DirectTaskConfig
+
+        {constant_prefix}_TASK_ID = "{task_id}"
+        {constant_prefix}_TASK_VERSION = "1.0.0"
+        {constant_prefix}_ENVIRONMENT_ID = "{environment_id}"
+        {constant_prefix}_ROBOT_ID = "{robot_id}"
+        {constant_prefix}_ROBOT_CONFIG_PATH = "{robot_ref}"
+
+
+        @dataclass(frozen=True, slots=True)
+        class {class_name}TaskConfig(DirectTaskConfig):
+            """TODO: replace the placeholder State/Action contract and parameters."""
+
+            state_requirements: tuple[str, ...] = {template.required_semantics!r}
+            action_schema: tuple[str, ...] = ("TODO_action",)
+            max_episode_steps: int = 1000
+            slot_fault_reward: float = -1.0
+
+
+        __all__ = [
+            "{constant_prefix}_ENVIRONMENT_ID",
+            "{constant_prefix}_ROBOT_CONFIG_PATH",
+            "{constant_prefix}_ROBOT_ID",
+            "{constant_prefix}_TASK_ID",
+            "{constant_prefix}_TASK_VERSION",
+            "{class_name}TaskConfig",
+        ]
+        '''
+    )
+    registration = dedent(
+        f'''\
+        """Explicit registration scaffold for the `{task_id}` DirectTask."""
+
+        from __future__ import annotations
+
+        from pathlib import Path
+
+        from ...core.config import LoggingConfig, RslRlRunnerConfig, SessionConfig, WorkerConfig
+        from ...core.config.models import DirectTaskConfig
+        from ...core.direct.task import DirectTask
+        from ..registry.models import TaskRegistration
+        from ..registry.tasks import TaskRegistry
+        from .config import (
+            {constant_prefix}_ENVIRONMENT_ID,
+            {constant_prefix}_ROBOT_ID,
+            {constant_prefix}_TASK_ID,
+            {constant_prefix}_TASK_VERSION,
+            {class_name}TaskConfig,
+        )
+
+
+        def create_{slug}_task_config() -> {class_name}TaskConfig:
+            return {class_name}TaskConfig()
+
+
+        def create_{slug}_worker_config() -> WorkerConfig:
+            # TODO: copy the environment-owned defaults from a real Task template.
+            return WorkerConfig(
+                slot_count=1,
+                physics_dt=1.0 / 60.0,
+                decimation=(1, 1),
+                environment_id={constant_prefix}_ENVIRONMENT_ID,
+                robot_id={constant_prefix}_ROBOT_ID,
+                robot_config_path=Path("{robot_ref}"),
+                robot_asset_path="TODO_REPLACE_WITH_UE_ROBOT_ASSET_PATH",
+            )
+
+
+        def create_{slug}_runner_config() -> RslRlRunnerConfig:
+            return RslRlRunnerConfig(rollout_length=16, max_iterations=1, device="cpu")
+
+
+        def create_{slug}_task(config: DirectTaskConfig, *, robot_spec=None) -> DirectTask:
+            raise NotImplementedError(
+                "Implement Task math and composed config before registering this scaffold"
+            )
+
+
+        def create_{slug}_registration() -> TaskRegistration:
+            return TaskRegistration(
+                task_id={constant_prefix}_TASK_ID,
+                task_version={constant_prefix}_TASK_VERSION,
+                environment_id={constant_prefix}_ENVIRONMENT_ID,
+                robot_id={constant_prefix}_ROBOT_ID,
+                task_factory=create_{slug}_task,
+                worker_config_factory=create_{slug}_worker_config,
+                task_config_factory=create_{slug}_task_config,
+                runner_config_factory=create_{slug}_runner_config,
+                session_config=SessionConfig(map_path="{template.default_map_path}"),
+                logging_config=LoggingConfig(),
+            )
+
+
+        def register_{slug}(registry: TaskRegistry) -> None:
+            registry.register(create_{slug}_registration())
+
+
+        __all__ = ["create_{slug}_registration", "register_{slug}"]
+        '''
+    )
+    yaml = dedent(
+        f'''\
+        # Draft training contract for `{task_id}`.
+        # TODO: make the typed loader for this Task consume this document.
+        identity:
+          task_id: {task_id}
+          task_version: 1.0.0
+          environment_id: {environment_id}
+          robot_id: {robot_id}
+
+        robot:
+          asset_path: TODO_REPLACE_WITH_UE_ROBOT_ASSET_PATH
+          config_path: {robot_ref}
+
+        task:
+          max_episode_steps: 1000
+          slot_fault_reward: -1.0
+          state_requirements: {list(template.required_semantics)!r}
+          action_schema: ['TODO_action']
+
+        worker:
+          slot_count: 1
+          physics_dt: 0.0166666666666667
+          decimation: [1, 1]
+          environment:
+            id: {environment_id}
+          run_seed: 0
+
+        runner:
+          rollout_length: 16
+          max_iterations: 1
+          device: cpu
+        '''
+    )
+    readme = dedent(
+        f'''\
+        # Task scaffold: `{slug}`
+
+        - Task ID: `{task_id}`
+        - Robot declaration: `{robot_slug}` (`{robot_ref}`)
+        - Template: `{template.name}` — {template.summary}
+        - Environment: `{environment_id}`
+        - Robot ID: `{robot_id}`
+
+        Generated files are deliberately unregistered until the contract is
+        implemented. Complete these steps in order:
+
+        1. Replace `TODO_*` State/Action fields and parameters in `config.py`.
+        2. Implement the DirectTask builder and composed terms in `registration.py`.
+        3. Replace the draft YAML with a typed loader/configspec for this Task.
+        4. Register the Robot declaration in `ROBOT_ASSETS` and this Task in
+           `src/uerl/tasks/registry/defaults.py`.
+        5. Add focused unit tests, then run `uerl check task {task_id}`.
+
+        The generator does not edit either registry or overwrite existing files.
+        '''
+    )
+    return {
+        root / "src" / "uerl" / "tasks" / slug / "__init__.py": package,
+        root / "src" / "uerl" / "tasks" / slug / "config.py": config,
+        root / "src" / "uerl" / "tasks" / slug / "registration.py": registration,
+        root / "configs" / "tasks" / slug / "training.yaml": yaml,
+        root / "src" / "uerl" / "tasks" / slug / "README.md": readme,
+    }
+
+
+def _emit(result: dict[str, object], *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        return
+    print(f"[PASS] generated {result['kind']} scaffold: {result['name']}")
+    for path in cast(tuple[Path, ...], result["files"]):
+        print(f"[WRITE] {path}")
+    print(f"[NEXT] {result['next_step']}")
+
+
+def _generate_robot(args: argparse.Namespace) -> dict[str, object]:
+    slug = _slug(args.name, label="robot name")
+    if not args.asset.startswith("/") or "\\" in args.asset:
+        raise _ScaffoldError("--asset must be a UE object path beginning with '/' and must not contain '\\'")
+    files = _write_files(_robot_files(args.output_dir, slug, args.asset))
+    return {
+        "kind": "robot",
+        "name": slug,
+        "files": [str(path) for path in files],
+        "next_step": "replace TODO selectors, then add the declaration to ROBOT_ASSETS",
+    }
+
+
+def _generate_task(args: argparse.Namespace) -> dict[str, object]:
+    slug = _slug(args.name, label="task name")
+    robot_slug = _slug(args.robot, label="robot name")
+    template = _TASK_TEMPLATES[args.template]
+    task_id = args.task_id or _task_id(slug)
+    if not re.fullmatch(r"UERL-[A-Za-z0-9][A-Za-z0-9._-]*-v\d+", task_id):
+        raise _ScaffoldError("--task-id must look like UERL-Name-v0")
+    environment_id = args.environment_id or template.default_environment_id
+    if not environment_id or " " in environment_id:
+        raise _ScaffoldError("--environment-id must be a non-empty identifier")
+    if not args.robot_id or " " in args.robot_id:
+        raise _ScaffoldError("--robot-id must be a non-empty identifier")
+    files = _write_files(
+        _task_files(
+            args.output_dir,
+            slug,
+            robot_slug,
+            template,
+            task_id,
+            environment_id,
+            args.robot_id,
+        )
+    )
+    return {
+        "kind": "task",
+        "name": slug,
+        "task_id": task_id,
+        "template": template.name,
+        "files": [str(path) for path in files],
+        "next_step": f"implement and register the Task, then run `uerl check task {task_id}`",
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        result = _generate_robot(args) if args.kind == "robot" else _generate_task(args)
+    except (_ScaffoldError, OSError) as exc:
+        print(f"[FAIL] scaffold: {exc}")
+        return 1
+    _emit(result, as_json=args.json)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

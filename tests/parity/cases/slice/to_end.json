@@ -1,0 +1,29 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": ["robot.joint.positions"],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "joints",
+        "width": 5,
+        "params": {"field": "robot.joint.positions"}
+      },
+      {
+        "op": "slice",
+        "inputs": ["joints"],
+        "output": "tail",
+        "width": 2,
+        "params": {"start": 3, "width": 2}
+      }
+    ],
+    "groups": {"policy": ["tail"]},
+    "group_widths": {"policy": 2}
+  },
+  "state_layout": [{"name": "robot.joint.positions", "width": 5}],
+  "raw_state": [0.0, 0.1, 0.2, 0.3, 0.4],
+  "expected": [0.3, 0.4],
+  "tolerance": 1.0e-6,
+  "notes": "slice that reaches the end of the input"
+}

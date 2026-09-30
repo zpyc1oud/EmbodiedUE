@@ -1,0 +1,20 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [],
+    "ops": [
+      {
+        "op": "control_frame_dt",
+        "inputs": [],
+        "output": "dt",
+        "width": 1,
+        "params": {"scale": 0.0}
+      }
+    ],
+    "groups": {"policy": ["dt"]},
+    "group_widths": {"policy": 1}
+  },
+  "state_layout": [],
+  "raw_state": [],
+  "expected_error": {"phase": "compile", "contains": "scale"}
+}

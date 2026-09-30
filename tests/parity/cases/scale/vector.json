@@ -1,0 +1,37 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.joint.positions"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "joint_pos",
+        "width": 4,
+        "params": {"field": "robot.joint.positions"}
+      },
+      {
+        "op": "scale",
+        "inputs": ["joint_pos"],
+        "output": "scaled",
+        "width": 4,
+        "params": {"factor": [0.5, -1.0, 2.0, 0.25]}
+      }
+    ],
+    "groups": {
+      "policy": ["scaled"]
+    },
+    "group_widths": {
+      "policy": 4
+    }
+  },
+  "state_layout": [
+    {"name": "robot.joint.positions", "width": 4}
+  ],
+  "raw_state": [1.0, 2.0, 3.0, 4.0],
+  "expected": [0.5, -2.0, 6.0, 1.0],
+  "tolerance": 2.0e-5,
+  "notes": "AC_PARITY_OP_011: scale with per-component factor — all four components mutually unequal (catches scalar-broadcast-of-first-element bugs)."
+}

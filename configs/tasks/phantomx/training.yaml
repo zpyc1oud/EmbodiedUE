@@ -1,0 +1,119 @@
+identity:
+  task_id: UERL-PhantomX-Walk-v0
+  task_version: 2.0.0
+  environment_id: uerl.environment.shared_world
+  robot_id: uerl.robot.skeletal_mesh
+
+robot:
+  asset_path: /Game/Robots/PhantomX/SK_PhantomX.SK_PhantomX
+  config_path: robots/phantomx/robot.yaml
+
+task:
+  max_episode_duration_s: 20.0
+  reference_dt_s: 0.02
+  slot_fault_reward: -10.0
+  action_clip: 1.0
+  velocity_tracking_std: 0.20
+  yaw_rate_tracking_std: 0.5
+  heading_control_stiffness: 0.5
+  max_yaw_rate: 1.0
+  turn_start_distance: 0.5
+  turn_completion_tolerance: 0.1
+  command:
+    initial_speed_min: 0.4
+    initial_speed_max: 0.5
+    post_turn_speed_min: 0.4
+    post_turn_speed_max: 0.5
+    heading_delta_min: -3.141592653589793
+    heading_delta_max: 3.141592653589793
+    resampling_time_min_s: 5.0
+    resampling_time_max_s: 10.0
+    standing_probability: 0.1
+  curriculum:
+    window_episodes: 512
+    minimum_episodes: 128
+    promotion_success_rate: 0.6
+    velocity_error_threshold: 0.20
+  observation_noise:
+    lin_vel_b: 0.05
+    ang_vel_b: 0.1
+    gravity_b: 0.025
+    joint_pos_rel: 0.01
+    joint_vel: 0.05
+  events:
+    static_friction_min: 0.7
+    static_friction_max: 1.1
+    dynamic_friction_min: 0.5
+    dynamic_friction_max: 0.9
+    push_velocity_min_mps: -0.2
+    push_velocity_max_mps: 0.2
+    push_interval_min_s: 1.0
+    push_interval_max_s: 1.5
+  moving_command_threshold: 0.1
+  body_clearance_penalty_threshold: 0.12
+  base_contact_force_threshold: 1.0
+  reward:
+    linear_velocity_tracking: 1.5
+    linear_velocity_progress: 1.0
+    yaw_rate_tracking: 0.75
+    yaw_rate_progress: 0.75
+    vertical_velocity: 2.0
+    body_angular_velocity: 0.05
+    upright: 2.5
+    body_clearance: 200.0
+    # Penalizes ||a_k-a_(k-1)||² over the 18 normalized actions per 0.02 s
+    # reference frame. Isaac Lab velocity tasks weigh it 0.01 against 1.0
+    # linear tracking at action scale 0.5, i.e. 0.04 per rad² of joint-target
+    # change; at PhantomX scale 0.2 and tracking 1.5 that is
+    # 1.5*0.04*0.2² = 2.4e-3. Exploration noise sigma costs 2.4e-3*36*sigma²
+    # per frame: 21.6 per 20 s episode at sigma=0.5, about 1.4% of the
+    # 1500 lin_vel_tracking ceiling.
+    action_rate: 2.4e-3
+    joint_velocity: 0.005
+    fall: 1.0
+
+worker:
+  slot_count: 512
+  physics_dt: 0.005
+  decimation: [1, 7]
+  environment:
+    id: uerl.environment.shared_world
+    scalars:
+      environment.spacing_x_m: 1.5
+      environment.spacing_y_m: 1.5
+      environment.columns: 32
+      environment.origin_x_m: -23.25
+      environment.origin_y_m: -11.25
+      environment.trace_start_z_m: 10.0
+      environment.trace_depth_m: 20.0
+  run_seed: 0
+
+runner:
+  rollout_length: 40
+  max_iterations: 1000
+  # PhantomX PPO trains on the GPU; the UE-facing environment stays on CPU.
+  device: cuda:0
+  parameters:
+    experiment_name: phantomx_walk
+    run_name: phantomx_flat
+    hidden_dims: [128, 128, 128]
+    activation: elu
+    learning_rate: 0.0003
+    gamma: 0.993987975909269
+    lam: 0.969692783213135
+    save_interval: 50
+    init_std: 0.5
+    num_learning_epochs: 5
+    num_mini_batches: 4
+    clip_param: 0.2
+    entropy_coef: 0.001
+    obs_normalization: true
+    obs_groups:
+      actor: [policy]
+      critic: [critic]
+    actor_class_name: rsl_rl.models.mlp_model:MLPModel
+    critic_class_name: rsl_rl.models.mlp_model:MLPModel
+    algorithm_class_name: uerl.training.rsl_rl.time_aware_ppo:TimeAwarePPO
+    check_for_nan: true
+    rnd_cfg: null
+    symmetry_cfg: null

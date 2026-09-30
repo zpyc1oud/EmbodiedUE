@@ -1,0 +1,71 @@
+# Canonical Python training configuration for UERL CartPole.
+# UE keeps the physical execution boundary; Python owns task and runner math.
+identity:
+  task_id: UERL-CartPole-Direct-v0
+  task_version: 1.0.0
+  environment_id: uerl.environment.shared_world
+  robot_id: uerl.robot.skeletal_mesh
+
+robot:
+  asset_path: /Game/Robots/CartPole/SKM_CartPole
+  config_path: robots/cartpole/robot.yaml
+
+task:
+  max_episode_steps: 300
+  slot_fault_reward: -2.0
+  max_cart_position: 3.0
+  pole_angle_limit: 1.5707963267948966
+  action_clip: 1.0
+  reward:
+    alive: 1.0
+    terminated: -2.0
+    pole_position: -1.0
+    cart_velocity: -0.01
+    pole_velocity: -0.005
+
+# YAML spacing/origin are placeholders; assemble derives the lattice from the
+# flat plane terrain so Entry needs no authored WorldStatic floor.
+worker:
+  slot_count: 64
+  physics_dt: 0.00833333333333333
+  decimation: [2, 2]
+  environment:
+    id: uerl.environment.shared_world
+    scalars:
+      environment.spacing_x_m: 1.5
+      environment.spacing_y_m: 1.5
+      environment.columns: 8
+      environment.origin_x_m: 0.0
+      environment.origin_y_m: 0.0
+      environment.trace_start_z_m: 10.0
+      environment.trace_depth_m: 20.0
+  run_seed: 0
+
+runner:
+  rollout_length: 16
+  max_iterations: 150
+  device: cpu
+  parameters:
+    experiment_name: cartpole_direct
+    run_name: cartpole
+    hidden_dims: [32, 32]
+    activation: elu
+    learning_rate: 0.001
+    gamma: 0.99
+    lam: 0.95
+    save_interval: 50
+    init_std: 1.0
+    num_learning_epochs: 5
+    num_mini_batches: 4
+    clip_param: 0.2
+    entropy_coef: 0.01
+    obs_normalization: false
+    obs_groups:
+      actor: [policy]
+      critic: [policy]
+    actor_class_name: rsl_rl.models.mlp_model:MLPModel
+    critic_class_name: rsl_rl.models.mlp_model:MLPModel
+    algorithm_class_name: rsl_rl.algorithms.ppo:PPO
+    check_for_nan: true
+    rnd_cfg: null
+    symmetry_cfg: null

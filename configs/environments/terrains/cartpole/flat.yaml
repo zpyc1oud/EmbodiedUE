@@ -1,0 +1,13 @@
+# Flat plane under CartPole slots on shared_world (no authored Entry floor needed).
+# physics_collision=false: prismatic cart rail is the PhysicsAsset constraint;
+# a colliding plane freezes the cart (matches the deleted cartpole_track QueryOnly).
+num_levels: 1
+cell_size: [24.0, 24.0]
+border_width: 1.0
+physics_collision: false
+tiers:
+  - level: 0
+    primitive: plane
+    seed: "0"
+    platform_width: 0.0
+    params: {}

@@ -1,0 +1,449 @@
+{
+  "variant": "walk",
+  "tolerance": 1e-06,
+  "raw_state": {
+    "robot.body.base_link.body_pose": [
+      0.4000000059604645,
+      0.0,
+      0.18000000715255737,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "robot.body.base_link.body_linear_velocity": [
+      0.3499999940395355,
+      0.0,
+      0.0
+    ],
+    "robot.body.base_link.body_angular_velocity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "robot.body.base_link.ground_clearance": [
+      0.18000000715255737
+    ],
+    "robot.body.base_link.terrain_height": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "robot.body.tibia_rf.contact": [
+      0.0
+    ],
+    "robot.body.tibia_rm.contact": [
+      0.0
+    ],
+    "robot.body.tibia_rr.contact": [
+      0.0
+    ],
+    "robot.body.tibia_lf.contact": [
+      0.0
+    ],
+    "robot.body.tibia_lm.contact": [
+      0.0
+    ],
+    "robot.body.tibia_lr.contact": [
+      0.0
+    ],
+    "robot.body.base_link.contact_force": [
+      0.0
+    ],
+    "robot.body.tibia_rf.contact_force": [
+      0.0
+    ],
+    "robot.body.tibia_rm.contact_force": [
+      0.0
+    ],
+    "robot.body.tibia_rr.contact_force": [
+      0.0
+    ],
+    "robot.body.tibia_lf.contact_force": [
+      0.0
+    ],
+    "robot.body.tibia_lm.contact_force": [
+      0.0
+    ],
+    "robot.body.tibia_lr.contact_force": [
+      0.0
+    ],
+    "robot.joint.c1_rf.joint_position": [
+      0.0
+    ],
+    "robot.joint.c1_rf.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.thigh_rf.joint_position": [
+      0.15000000596046448
+    ],
+    "robot.joint.thigh_rf.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.tibia_rf.joint_position": [
+      -0.30000001192092896
+    ],
+    "robot.joint.tibia_rf.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.c1_rm.joint_position": [
+      0.0
+    ],
+    "robot.joint.c1_rm.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.thigh_rm.joint_position": [
+      0.15000000596046448
+    ],
+    "robot.joint.thigh_rm.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.tibia_rm.joint_position": [
+      -0.30000001192092896
+    ],
+    "robot.joint.tibia_rm.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.c1_rr.joint_position": [
+      0.0
+    ],
+    "robot.joint.c1_rr.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.thigh_rr.joint_position": [
+      0.15000000596046448
+    ],
+    "robot.joint.thigh_rr.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.tibia_rr.joint_position": [
+      -0.30000001192092896
+    ],
+    "robot.joint.tibia_rr.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.c1_lf.joint_position": [
+      0.0
+    ],
+    "robot.joint.c1_lf.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.thigh_lf.joint_position": [
+      0.15000000596046448
+    ],
+    "robot.joint.thigh_lf.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.tibia_lf.joint_position": [
+      -0.30000001192092896
+    ],
+    "robot.joint.tibia_lf.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.c1_lm.joint_position": [
+      0.0
+    ],
+    "robot.joint.c1_lm.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.thigh_lm.joint_position": [
+      0.15000000596046448
+    ],
+    "robot.joint.thigh_lm.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.tibia_lm.joint_position": [
+      -0.30000001192092896
+    ],
+    "robot.joint.tibia_lm.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.c1_lr.joint_position": [
+      0.0
+    ],
+    "robot.joint.c1_lr.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.thigh_lr.joint_position": [
+      0.15000000596046448
+    ],
+    "robot.joint.thigh_lr.joint_velocity": [
+      0.0
+    ],
+    "robot.joint.tibia_lr.joint_position": [
+      -0.30000001192092896
+    ],
+    "robot.joint.tibia_lr.joint_velocity": [
+      0.0
+    ],
+    "task.command.initial_linear_velocity": [
+      0.4000000059604645,
+      0.0
+    ],
+    "task.command.heading": [
+      0.0
+    ],
+    "task.command.post_turn_linear_velocity": [
+      0.5,
+      0.0
+    ]
+  },
+  "previous_policy_actions": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "expected": {
+    "policy": [
+      0.3499999940395355,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -1.0,
+      0.4000000059604645,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.18000000715255737,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      2.0
+    ],
+    "action": [
+      0.0,
+      0.15000000596046448,
+      -0.30000001192092896,
+      0.0,
+      0.15000000596046448,
+      -0.30000001192092896,
+      0.0,
+      0.15000000596046448,
+      -0.30000001192092896,
+      0.0,
+      0.15000000596046448,
+      -0.30000001192092896,
+      0.0,
+      0.15000000596046448,
+      -0.30000001192092896,
+      0.0,
+      0.15000000596046448,
+      -0.30000001192092896
+    ],
+    "reward": [
+      2.256646156311035
+    ],
+    "reward_terms": {
+      "lin_vel_tracking": [
+        1.3816460371017456
+      ],
+      "lin_vel_progress": [
+        0.8749998807907104
+      ],
+      "yaw_rate_tracking": [
+        0.0
+      ],
+      "yaw_rate_progress": [
+        0.0
+      ],
+      "vertical_velocity": [
+        -0.0
+      ],
+      "body_angular_velocity": [
+        -0.0
+      ],
+      "upright": [
+        -0.0
+      ],
+      "body_clearance": [
+        -0.0
+      ],
+      "action_rate": [
+        -0.0
+      ],
+      "joint_velocity": [
+        -0.0
+      ],
+      "fall": [
+        -0.0
+      ]
+    },
+    "terminated": [
+      false
+    ],
+    "truncated": [
+      false
+    ],
+    "metric_keys": [
+      "phantomx/action_clip_fraction",
+      "phantomx/action_rate",
+      "phantomx/base_contact",
+      "phantomx/base_contact_force",
+      "phantomx/body_clearance",
+      "phantomx/body_height",
+      "phantomx/command_speed",
+      "phantomx/command_vx",
+      "phantomx/displacement",
+      "phantomx/foot_contact_fraction",
+      "phantomx/forward_velocity",
+      "phantomx/lateral_velocity",
+      "phantomx/linear_velocity_error",
+      "phantomx/linear_velocity_progress",
+      "phantomx/reset_age_steps",
+      "phantomx/reset_event",
+      "phantomx/reset_joint_error_max",
+      "phantomx/terrain_height_max",
+      "phantomx/terrain_height_min",
+      "phantomx/torque_clip_fraction",
+      "phantomx/torque_over_limit",
+      "phantomx/upright",
+      "phantomx/yaw_rate",
+      "phantomx/yaw_rate_error",
+      "phantomx/yaw_rate_progress"
+    ]
+  },
+  "notes": "walk/terrain: policy/action/termination/reward terms from manager-owned DirectTask",
+  "control_frame_dt": 0.02
+}

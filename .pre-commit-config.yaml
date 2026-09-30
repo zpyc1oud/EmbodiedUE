@@ -1,0 +1,43 @@
+repos:
+  - repo: local
+    hooks:
+      - id: task-archive
+        name: enforce dated task archive
+        entry: uv run python scripts/check_task_archive.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: ruff
+        name: run Ruff checks
+        entry: uv run ruff check
+        language: system
+        types: [python]
+        stages: [pre-commit]
+      - id: mypy
+        name: run Mypy checks
+        entry: uv run mypy
+        language: system
+        types: [python]
+        stages: [pre-commit]
+      - id: fast-tests
+        name: run fast tests for code changes
+        entry: uv run pytest -q
+        language: system
+        pass_filenames: false
+        files: ^(src|scripts|tests|configs)/|^pyproject\.toml$
+        stages: [pre-commit]
+      - id: mypy-push
+        name: run Mypy on src and tests
+        entry: uv run mypy src tests
+        language: system
+        pass_filenames: false
+        files: ^(src|tests|engine|configs)/|^pyproject\.toml$
+        stages: [pre-push]
+      - id: full-tests
+        name: run full test suite
+        entry: uv run python scripts/run_all_tests.py
+        language: system
+        pass_filenames: false
+        files: ^(src|tests|engine|configs)/|^pyproject\.toml$
+        stages: [pre-push]

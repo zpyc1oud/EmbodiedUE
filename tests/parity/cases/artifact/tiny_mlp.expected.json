@@ -1,0 +1,59 @@
+{
+  "task_id": "cartpole.balance",
+  "robot_id": "cartpole",
+  "observation": {
+    "ops": [
+      "select"
+    ],
+    "widths": [
+      4
+    ],
+    "groups": {
+      "policy": [
+        "joint"
+      ]
+    },
+    "group_widths": {
+      "policy": 4
+    }
+  },
+  "action": {
+    "ops": [
+      "policy_action",
+      "clip"
+    ],
+    "widths": [
+      2,
+      2
+    ],
+    "command_fields": [
+      "cmd"
+    ],
+    "policy_width": 2
+  },
+  "robot_runtime": {
+    "actuators": [
+      {
+        "joint": "joint_0",
+        "stiffness": 25.0,
+        "damping": 0.5,
+        "effort_limit": 10.0,
+        "default_position": 0.0
+      },
+      {
+        "joint": "joint_1",
+        "stiffness": 25.0,
+        "damping": 0.5,
+        "effort_limit": 10.0,
+        "default_position": 0.0
+      }
+    ]
+  },
+  "timing": {
+    "physics_dt": 0.016666666666666666,
+    "decimation_min": 1,
+    "decimation_max": 1
+  },
+  "onnx_nbytes": 313,
+  "onnx_sha256": "11dd76b83ced9851f3f45888bc2eb760e4ef1a76cd2b3074fe195262ea99b933"
+}

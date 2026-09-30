@@ -1,0 +1,29 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": ["robot.body.base_link.body_pose"],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "pose",
+        "width": 7,
+        "params": {"field": "robot.body.base_link.body_pose"}
+      },
+      {
+        "op": "slice",
+        "inputs": ["pose"],
+        "output": "pos",
+        "width": 3,
+        "params": {"start": 0, "width": 3}
+      }
+    ],
+    "groups": {"policy": ["pos"]},
+    "group_widths": {"policy": 3}
+  },
+  "state_layout": [{"name": "robot.body.base_link.body_pose", "width": 7}],
+  "raw_state": [1.0, 2.0, 3.0, 0.1, 0.2, 0.3, 0.4],
+  "expected": [1.0, 2.0, 3.0],
+  "tolerance": 1.0e-6,
+  "notes": "slice from start=0"
+}

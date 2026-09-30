@@ -1,0 +1,22 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [],
+    "ops": [
+      {
+        "op": "control_frame_dt",
+        "inputs": [],
+        "output": "dt",
+        "width": 1,
+        "params": {"scale": 2.0}
+      }
+    ],
+    "groups": {"policy": ["dt"]},
+    "group_widths": {"policy": 1}
+  },
+  "state_layout": [],
+  "raw_state": [],
+  "control_frame_dt": 0.035,
+  "expected": [0.07],
+  "tolerance": 2.0e-5
+}

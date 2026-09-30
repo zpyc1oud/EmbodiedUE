@@ -1,0 +1,31 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [],
+    "ops": [
+      {
+        "op": "command",
+        "inputs": [],
+        "output": "heading",
+        "width": 2,
+        "params": {"channel": "heading", "width": 2}
+      }
+    ],
+    "groups": {
+      "policy": ["heading"]
+    },
+    "group_widths": {
+      "policy": 2
+    }
+  },
+  "state_layout": [],
+  "raw_state": [],
+  "command_layout": [
+    {"name": "heading", "width": 2}
+  ],
+  "commands": {},
+  "expected_error": {
+    "phase": "execute",
+    "contains": "heading"
+  }
+}

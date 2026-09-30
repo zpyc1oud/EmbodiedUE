@@ -1,0 +1,45 @@
+{
+  "plan": {
+    "plan_version": 1,
+    "ops": [
+      {
+        "op": "policy_action",
+        "inputs": [],
+        "output": "raw",
+        "width": 4,
+        "params": {"width": 4}
+      },
+      {
+        "op": "clip",
+        "inputs": ["raw"],
+        "output": "clipped",
+        "width": 4,
+        "params": {"low": -1.0, "high": 1.0}
+      },
+      {
+        "op": "scale",
+        "inputs": ["clipped"],
+        "output": "scaled",
+        "width": 4,
+        "params": {"factor": 0.2}
+      },
+      {
+        "op": "offset",
+        "inputs": ["scaled"],
+        "output": "target",
+        "width": 4,
+        "params": {"bias": [0.0, 0.15, -0.3, 0.05]}
+      }
+    ],
+    "command_fields": ["target"],
+    "policy_width": 4
+  },
+  "command_layout": [
+    {"name": "target", "width": 2}
+  ],
+  "policy_action": [0.3, -0.5, 0.7, -0.2],
+  "expected_error": {
+    "phase": "compile",
+    "contains": "target"
+  }
+}

@@ -1,0 +1,1143 @@
+{
+  "notes": "AC_PARITY_PLAN: PhantomX 109-wide plan vs handwritten expected; source_step=31 label=contact_partial",
+  "plan": {
+    "plan_version": 1,
+    "state_requirements": [
+      "robot.body.base_link.body_pose",
+      "robot.body.base_link.body_linear_velocity",
+      "robot.body.base_link.body_angular_velocity",
+      "robot.body.base_link.terrain_height",
+      "robot.body.base_link.ground_clearance",
+      "robot.body.tibia_rf.contact",
+      "robot.body.tibia_rm.contact",
+      "robot.body.tibia_rr.contact",
+      "robot.body.tibia_lf.contact",
+      "robot.body.tibia_lm.contact",
+      "robot.body.tibia_lr.contact",
+      "robot.joint.c1_rf.joint_position",
+      "robot.joint.thigh_rf.joint_position",
+      "robot.joint.tibia_rf.joint_position",
+      "robot.joint.c1_rm.joint_position",
+      "robot.joint.thigh_rm.joint_position",
+      "robot.joint.tibia_rm.joint_position",
+      "robot.joint.c1_rr.joint_position",
+      "robot.joint.thigh_rr.joint_position",
+      "robot.joint.tibia_rr.joint_position",
+      "robot.joint.c1_lf.joint_position",
+      "robot.joint.thigh_lf.joint_position",
+      "robot.joint.tibia_lf.joint_position",
+      "robot.joint.c1_lm.joint_position",
+      "robot.joint.thigh_lm.joint_position",
+      "robot.joint.tibia_lm.joint_position",
+      "robot.joint.c1_lr.joint_position",
+      "robot.joint.thigh_lr.joint_position",
+      "robot.joint.tibia_lr.joint_position",
+      "robot.joint.c1_rf.joint_velocity",
+      "robot.joint.thigh_rf.joint_velocity",
+      "robot.joint.tibia_rf.joint_velocity",
+      "robot.joint.c1_rm.joint_velocity",
+      "robot.joint.thigh_rm.joint_velocity",
+      "robot.joint.tibia_rm.joint_velocity",
+      "robot.joint.c1_rr.joint_velocity",
+      "robot.joint.thigh_rr.joint_velocity",
+      "robot.joint.tibia_rr.joint_velocity",
+      "robot.joint.c1_lf.joint_velocity",
+      "robot.joint.thigh_lf.joint_velocity",
+      "robot.joint.tibia_lf.joint_velocity",
+      "robot.joint.c1_lm.joint_velocity",
+      "robot.joint.thigh_lm.joint_velocity",
+      "robot.joint.tibia_lm.joint_velocity",
+      "robot.joint.c1_lr.joint_velocity",
+      "robot.joint.thigh_lr.joint_velocity",
+      "robot.joint.tibia_lr.joint_velocity"
+    ],
+    "ops": [
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "pose",
+        "width": 7,
+        "params": {
+          "field": "robot.body.base_link.body_pose"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "lin_vel_w",
+        "width": 3,
+        "params": {
+          "field": "robot.body.base_link.body_linear_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "ang_vel_w",
+        "width": 3,
+        "params": {
+          "field": "robot.body.base_link.body_angular_velocity"
+        }
+      },
+      {
+        "op": "slice",
+        "inputs": [
+          "pose"
+        ],
+        "output": "quat",
+        "width": 4,
+        "params": {
+          "start": 3,
+          "width": 4
+        }
+      },
+      {
+        "op": "rotate_inverse",
+        "inputs": [
+          "quat",
+          "lin_vel_w"
+        ],
+        "output": "lin_vel_b",
+        "width": 3,
+        "params": {}
+      },
+      {
+        "op": "rotate_inverse",
+        "inputs": [
+          "quat",
+          "ang_vel_w"
+        ],
+        "output": "ang_vel_b",
+        "width": 3,
+        "params": {}
+      },
+      {
+        "op": "projected_gravity",
+        "inputs": [
+          "quat"
+        ],
+        "output": "gravity_b",
+        "width": 3,
+        "params": {
+          "gravity": [
+            0.0,
+            0.0,
+            -1.0
+          ]
+        }
+      },
+      {
+        "op": "command",
+        "inputs": [],
+        "output": "velocity_cmd",
+        "width": 3,
+        "params": {
+          "channel": "velocity",
+          "width": 3
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "terrain",
+        "width": 35,
+        "params": {
+          "field": "robot.body.base_link.terrain_height"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "clearance",
+        "width": 1,
+        "params": {
+          "field": "robot.body.base_link.ground_clearance"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "contact_tibia_rf",
+        "width": 1,
+        "params": {
+          "field": "robot.body.tibia_rf.contact"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "contact_tibia_rm",
+        "width": 1,
+        "params": {
+          "field": "robot.body.tibia_rm.contact"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "contact_tibia_rr",
+        "width": 1,
+        "params": {
+          "field": "robot.body.tibia_rr.contact"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "contact_tibia_lf",
+        "width": 1,
+        "params": {
+          "field": "robot.body.tibia_lf.contact"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "contact_tibia_lm",
+        "width": 1,
+        "params": {
+          "field": "robot.body.tibia_lm.contact"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "contact_tibia_lr",
+        "width": 1,
+        "params": {
+          "field": "robot.body.tibia_lr.contact"
+        }
+      },
+      {
+        "op": "concat",
+        "inputs": [
+          "contact_tibia_rf",
+          "contact_tibia_rm",
+          "contact_tibia_rr",
+          "contact_tibia_lf",
+          "contact_tibia_lm",
+          "contact_tibia_lr"
+        ],
+        "output": "contacts",
+        "width": 6,
+        "params": {}
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_c1_rf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_rf.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_c1_rf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_rf.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_thigh_rf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_rf.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_thigh_rf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_rf.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_tibia_rf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_rf.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_tibia_rf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_rf.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_c1_rm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_rm.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_c1_rm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_rm.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_thigh_rm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_rm.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_thigh_rm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_rm.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_tibia_rm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_rm.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_tibia_rm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_rm.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_c1_rr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_rr.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_c1_rr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_rr.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_thigh_rr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_rr.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_thigh_rr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_rr.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_tibia_rr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_rr.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_tibia_rr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_rr.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_c1_lf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_lf.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_c1_lf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_lf.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_thigh_lf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_lf.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_thigh_lf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_lf.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_tibia_lf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_lf.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_tibia_lf",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_lf.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_c1_lm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_lm.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_c1_lm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_lm.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_thigh_lm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_lm.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_thigh_lm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_lm.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_tibia_lm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_lm.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_tibia_lm",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_lm.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_c1_lr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_lr.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_c1_lr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.c1_lr.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_thigh_lr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_lr.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_thigh_lr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.thigh_lr.joint_velocity"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jp_tibia_lr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_lr.joint_position"
+        }
+      },
+      {
+        "op": "select",
+        "inputs": [],
+        "output": "jv_tibia_lr",
+        "width": 1,
+        "params": {
+          "field": "robot.joint.tibia_lr.joint_velocity"
+        }
+      },
+      {
+        "op": "concat",
+        "inputs": [
+          "jp_c1_rf",
+          "jp_thigh_rf",
+          "jp_tibia_rf",
+          "jp_c1_rm",
+          "jp_thigh_rm",
+          "jp_tibia_rm",
+          "jp_c1_rr",
+          "jp_thigh_rr",
+          "jp_tibia_rr",
+          "jp_c1_lf",
+          "jp_thigh_lf",
+          "jp_tibia_lf",
+          "jp_c1_lm",
+          "jp_thigh_lm",
+          "jp_tibia_lm",
+          "jp_c1_lr",
+          "jp_thigh_lr",
+          "jp_tibia_lr"
+        ],
+        "output": "joint_pos",
+        "width": 18,
+        "params": {}
+      },
+      {
+        "op": "joint_pos_rel",
+        "inputs": [
+          "joint_pos"
+        ],
+        "output": "joint_pos_rel",
+        "width": 18,
+        "params": {
+          "default": [
+            0.0,
+            0.15,
+            -0.3,
+            0.0,
+            0.15,
+            -0.3,
+            0.0,
+            0.15,
+            -0.3,
+            0.0,
+            0.15,
+            -0.3,
+            0.0,
+            0.15,
+            -0.3,
+            0.0,
+            0.15,
+            -0.3
+          ]
+        }
+      },
+      {
+        "op": "concat",
+        "inputs": [
+          "jv_c1_rf",
+          "jv_thigh_rf",
+          "jv_tibia_rf",
+          "jv_c1_rm",
+          "jv_thigh_rm",
+          "jv_tibia_rm",
+          "jv_c1_rr",
+          "jv_thigh_rr",
+          "jv_tibia_rr",
+          "jv_c1_lf",
+          "jv_thigh_lf",
+          "jv_tibia_lf",
+          "jv_c1_lm",
+          "jv_thigh_lm",
+          "jv_tibia_lm",
+          "jv_c1_lr",
+          "jv_thigh_lr",
+          "jv_tibia_lr"
+        ],
+        "output": "joint_vel",
+        "width": 18,
+        "params": {}
+      },
+      {
+        "op": "previous_action",
+        "inputs": [],
+        "output": "prev_action",
+        "width": 18,
+        "params": {
+          "width": 18
+        }
+      },
+      {
+        "op": "control_frame_dt",
+        "inputs": [],
+        "output": "control_frame_dt",
+        "width": 1,
+        "params": {
+          "scale": 100.0
+        }
+      }
+    ],
+    "groups": {
+      "policy": [
+        "lin_vel_b",
+        "ang_vel_b",
+        "gravity_b",
+        "velocity_cmd",
+        "terrain",
+        "clearance",
+        "contacts",
+        "joint_pos_rel",
+        "joint_vel",
+        "prev_action",
+        "control_frame_dt"
+      ]
+    },
+    "group_widths": {
+      "policy": 109
+    }
+  },
+  "state_layout": [
+    {
+      "name": "robot.body.base_link.body_pose",
+      "width": 7
+    },
+    {
+      "name": "robot.body.base_link.body_linear_velocity",
+      "width": 3
+    },
+    {
+      "name": "robot.body.base_link.body_angular_velocity",
+      "width": 3
+    },
+    {
+      "name": "robot.body.base_link.terrain_height",
+      "width": 35
+    },
+    {
+      "name": "robot.body.base_link.ground_clearance",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_rf.contact",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_rm.contact",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_rr.contact",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_lf.contact",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_lm.contact",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_lr.contact",
+      "width": 1
+    },
+    {
+      "name": "robot.body.base_link.contact_force",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_rf.contact_force",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_rm.contact_force",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_rr.contact_force",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_lf.contact_force",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_lm.contact_force",
+      "width": 1
+    },
+    {
+      "name": "robot.body.tibia_lr.contact_force",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_rf.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_rf.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_rf.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_rm.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_rm.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_rm.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_rr.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_rr.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_rr.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_lf.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_lf.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_lf.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_lm.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_lm.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_lm.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_lr.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_lr.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_lr.joint_position",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_rf.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_rf.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_rf.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_rm.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_rm.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_rm.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_rr.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_rr.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_rr.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_lf.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_lf.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_lf.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_lm.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_lm.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_lm.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.c1_lr.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.thigh_lr.joint_velocity",
+      "width": 1
+    },
+    {
+      "name": "robot.joint.tibia_lr.joint_velocity",
+      "width": 1
+    }
+  ],
+  "command_layout": [
+    {
+      "name": "velocity",
+      "width": 3
+    }
+  ],
+  "raw_state": [
+    0.23793405294418335,
+    0.017844628542661667,
+    0.14791573584079742,
+    -0.006999116390943527,
+    -0.08708741515874863,
+    0.017894281074404716,
+    0.9960153698921204,
+    0.47514766454696655,
+    0.02447931095957756,
+    0.04296408221125603,
+    0.04607749357819557,
+    -0.24910478293895721,
+    0.015184225514531136,
+    -2.3116496865712094e-15,
+    -2.293293000296551e-15,
+    -2.274936102263656e-15,
+    -2.2565792042307607e-15,
+    -2.2382225179561023e-15,
+    -2.3105036509935744e-15,
+    -2.292146964718916e-15,
+    -2.2737900666860208e-15,
+    -2.2554333804113624e-15,
+    -2.2370764823784672e-15,
+    -2.309357827174176e-15,
+    -2.291000929141281e-15,
+    -2.2726440311083857e-15,
+    -2.2542873448337273e-15,
+    -2.235930446800832e-15,
+    -2.308211791596541e-15,
+    -2.289854893563646e-15,
+    -2.2714979955307506e-15,
+    -2.2531413092560923e-15,
+    -2.234784411223197e-15,
+    -2.307065756018906e-15,
+    -2.2887088579860108e-15,
+    -2.2703521717113524e-15,
+    -2.251995273678457e-15,
+    -2.233638375645562e-15,
+    -2.305919720441271e-15,
+    -2.2875628224083757e-15,
+    -2.2692061361337173e-15,
+    -2.250849238100822e-15,
+    -2.2324925518261637e-15,
+    -2.304773684863636e-15,
+    -2.2864169985889774e-15,
+    -2.2680601005560823e-15,
+    -2.249703202523187e-15,
+    -2.2313465162485287e-15,
+    0.14791573584079742,
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.08731719106435776,
+    -0.05438325181603432,
+    -0.3474023938179016,
+    0.0815657526254654,
+    0.1193724125623703,
+    -0.22152207791805267,
+    -0.20345716178417206,
+    0.33598923683166504,
+    -0.47971847653388977,
+    -0.0667194202542305,
+    0.19911205768585205,
+    -0.4917193055152893,
+    -0.002645145170390606,
+    0.06292206048965454,
+    -0.13228724896907806,
+    -0.18693409860134125,
+    0.31728896498680115,
+    -0.38966453075408936,
+    -4.161870956420898,
+    1.2121518850326538,
+    -3.143018960952759,
+    2.2822515964508057,
+    -0.7338745594024658,
+    -0.41201725602149963,
+    0.20614998042583466,
+    -0.16625060141086578,
+    0.3313405215740204,
+    4.897236347198486,
+    2.555107355117798,
+    -0.6282300353050232,
+    -3.7728967666625977,
+    0.3103227913379669,
+    0.7328230738639832,
+    -0.8977408409118652,
+    1.1439415216445923,
+    1.0887986421585083
+  ],
+  "commands": {
+    "velocity": [
+      0.4380788803100586,
+      0.0,
+      0.0
+    ]
+  },
+  "control_frame_dt": 0.035,
+  "previous_action": [
+    0.0586002878844738,
+    -0.8933379054069519,
+    -0.502905011177063,
+    0.6856924295425415,
+    -2.1675209999084473,
+    0.586724579334259,
+    -1.3715006113052368,
+    1.1843677759170532,
+    -0.8490898609161377,
+    0.22870826721191406,
+    0.4961503744125366,
+    -1.429972529411316,
+    -0.5054790377616882,
+    -1.0690494775772095,
+    1.4493701457977295,
+    -1.3949530124664307,
+    0.6738553047180176,
+    -0.1642317771911621
+  ],
+  "expected": [
+    0.4759812355041504,
+    0.00737044820562005,
+    -0.03997483476996422,
+    0.03879617154598236,
+    -0.25076618790626526,
+    0.004250574856996536,
+    -0.17323032021522522,
+    0.017059188336133957,
+    -0.9847335815429688,
+    0.4380788803100586,
+    0.0,
+    0.0,
+    -2.3116496865712094e-15,
+    -2.293293000296551e-15,
+    -2.274936102263656e-15,
+    -2.2565792042307607e-15,
+    -2.2382225179561023e-15,
+    -2.3105036509935744e-15,
+    -2.292146964718916e-15,
+    -2.2737900666860208e-15,
+    -2.2554333804113624e-15,
+    -2.2370764823784672e-15,
+    -2.309357827174176e-15,
+    -2.291000929141281e-15,
+    -2.2726440311083857e-15,
+    -2.2542873448337273e-15,
+    -2.235930446800832e-15,
+    -2.308211791596541e-15,
+    -2.289854893563646e-15,
+    -2.2714979955307506e-15,
+    -2.2531413092560923e-15,
+    -2.234784411223197e-15,
+    -2.307065756018906e-15,
+    -2.2887088579860108e-15,
+    -2.2703521717113524e-15,
+    -2.251995273678457e-15,
+    -2.233638375645562e-15,
+    -2.305919720441271e-15,
+    -2.2875628224083757e-15,
+    -2.2692061361337173e-15,
+    -2.250849238100822e-15,
+    -2.2324925518261637e-15,
+    -2.304773684863636e-15,
+    -2.2864169985889774e-15,
+    -2.2680601005560823e-15,
+    -2.249703202523187e-15,
+    -2.2313465162485287e-15,
+    0.14791573584079742,
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    0.08731719106435776,
+    -0.2043832540512085,
+    -0.047402381896972656,
+    0.0815657526254654,
+    -0.030627593398094177,
+    0.07847793400287628,
+    -0.20345716178417206,
+    0.18598923087120056,
+    -0.17971846461296082,
+    -0.0667194202542305,
+    0.04911205172538757,
+    -0.19171929359436035,
+    -0.002645145170390606,
+    -0.08707794547080994,
+    0.1677127629518509,
+    -0.18693409860134125,
+    0.16728895902633667,
+    -0.0896645188331604,
+    -4.161870956420898,
+    1.2121518850326538,
+    -3.143018960952759,
+    2.2822515964508057,
+    -0.7338745594024658,
+    -0.41201725602149963,
+    0.20614998042583466,
+    -0.16625060141086578,
+    0.3313405215740204,
+    4.897236347198486,
+    2.555107355117798,
+    -0.6282300353050232,
+    -3.7728967666625977,
+    0.3103227913379669,
+    0.7328230738639832,
+    -0.8977408409118652,
+    1.1439415216445923,
+    1.0887986421585083,
+    0.0586002878844738,
+    -0.8933379054069519,
+    -0.502905011177063,
+    0.6856924295425415,
+    -2.1675209999084473,
+    0.586724579334259,
+    -1.3715006113052368,
+    1.1843677759170532,
+    -0.8490898609161377,
+    0.22870826721191406,
+    0.4961503744125366,
+    -1.429972529411316,
+    -0.5054790377616882,
+    -1.0690494775772095,
+    1.4493701457977295,
+    -1.3949530124664307,
+    0.6738553047180176,
+    -0.1642317771911621,
+    3.5
+  ],
+  "tolerance": 2e-05,
+  "source_step": 31,
+  "contact_label": "contact_partial",
+  "contacts": [
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0
+  ]
+}
