@@ -1,13 +1,14 @@
-"""Generate PhantomXContinuousSmooth.uerlpol2 deploy artifact (ticket 17).
+"""Convert the legacy 115-input PhantomX policy to a deploy artifact.
 
-Binds the real PhantomX observation/action plans + robot_runtime to ONNX
-converted from the legacy UERLMLP1 weights (same path as policynet fixtures).
+Preserves the historical contact-force inputs and timing of the bundled policy.
+New training runs should use the standard ``uerl export`` workflow.
 """
 
 from __future__ import annotations
 
 import struct
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -18,15 +19,16 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from uerl import ObservationShapeTable, ObsType  # noqa: E402
-from uerl.core.mdp.plan import PLAN_VERSION, ActionPlan, PlanOp  # noqa: E402
+from uerl.core.mdp.plan import PLAN_VERSION, ActionPlan, ObservationPlan, PlanOp  # noqa: E402
 from uerl.policy.artifact import (  # noqa: E402
     ARTIFACT_FORMAT_VERSION,
     ArtifactMetadata,
+    ArtifactTiming,
     PolicyArtifact,
     RobotRuntime,
     RobotRuntimeActuator,
 )
-from uerl.tasks.phantomx.config import PHANTOMX_JOINTS  # noqa: E402
+from uerl.tasks.phantomx.config import PHANTOMX_FEET, PHANTOMX_JOINTS  # noqa: E402
 from uerl.tasks.phantomx.observation_plan import (  # noqa: E402
     PHANTOMX_JOINT_DEFAULTS,
     build_phantomx_observation_plan,
@@ -112,6 +114,29 @@ class _PhantomXOnnx(nn.Module):
         return out
 
 
+def _legacy_observation_plan() -> ObservationPlan:
+    plan = build_phantomx_observation_plan(_LEGACY_SHAPES)
+    ops = [op for op in plan.ops if op.output != "control_frame_dt"]
+    force_bodies = ("base_link", *PHANTOMX_FEET)
+    force_slots = ("force_base", *(f"force_{foot}" for foot in PHANTOMX_FEET))
+    force_fields = tuple(f"robot.body.{body}.contact_force" for body in force_bodies)
+    ops.extend(
+        PlanOp("select", (), slot, 1, {"field": field})
+        for slot, field in zip(force_slots, force_fields, strict=True)
+    )
+    ops.append(PlanOp("concat", force_slots, "contact_forces", 7, {}))
+    group = tuple(member for member in plan.groups["policy"] if member != "control_frame_dt")
+    contact_index = group.index("contacts") + 1
+    group = (*group[:contact_index], "contact_forces", *group[contact_index:])
+    return replace(
+        plan,
+        ops=tuple(ops),
+        state_requirements=(*plan.state_requirements, *force_fields),
+        groups={"policy": group},
+        group_widths={"policy": 115},
+    )
+
+
 def _action_plan() -> ActionPlan:
     return ActionPlan(
         ops=(
@@ -163,10 +188,11 @@ def main() -> None:
         format_version=ARTIFACT_FORMAT_VERSION,
         task_id="phantomx.pursuit",
         robot_id="phantomx",
-        observation_plan=build_phantomx_observation_plan(_LEGACY_SHAPES),
+        observation_plan=_legacy_observation_plan(),
         action_plan=_action_plan(),
         robot_runtime=_robot_runtime(),
         onnx=onnx_bytes,
+        timing=ArtifactTiming(0.005, 1, 7),
         metadata=ArtifactMetadata(
             run_hash="0" * 64,
             git_identity={"commit": "deploy", "ref": "local", "dirty": True},

@@ -271,6 +271,8 @@ def run_training(
                 )
 
     resume_checkpoint = config.runner.checkpoint
+    if resume_checkpoint is not None and not resume_checkpoint.is_file():
+        raise FileNotFoundError(resume_checkpoint)
     if (
         resume_checkpoint is not None
         and resume_checkpoint.is_file()

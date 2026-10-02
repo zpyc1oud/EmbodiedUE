@@ -3,7 +3,7 @@
 	"Version": 1,
 	"VersionName": "1.0.0",
 	"FriendlyName": "UERLEngine",
-	"Description": "UE RL Engine：Transport、通用 Worker、策略组件与可注册物理实例。",
+	"Description": "UE RL Engine: transport, generic Worker, policy components, and registered robot physics.",
 	"Category": "RL",
 	"CreatedBy": "",
 	"CreatedByURL": "",

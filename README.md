@@ -1,97 +1,130 @@
-# UE RL Engine
+# EmbodiedUE · UE RL Engine
+
+Train robot control policies in **Unreal Engine 5.8 / Chaos**, then run the exported policies on Skeletal Mesh robots in a UE game. Python owns the task and PPO training; the UE plugin owns physics, observations, and in-game inference.
+
+The project includes CartPole and PhantomX hexapod tasks. It uses **rsl-rl**, with observation and action plans shared between Python training and C++ deployment. Isaac Sim and Isaac Lab are not runtime dependencies.
 
 <video src="docs/media/phantomx-walk.mp4" controls muted playsinline width="720"></video>
 
-[![Unreal](https://img.shields.io/badge/Unreal-5.8-black.svg)](https://www.unrealengine.com/)
-[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
-[![Windows](https://img.shields.io/badge/platform-windows--64-orange.svg)](https://www.microsoft.com/en-us/)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
+[Watch the walking demo](docs/media/phantomx-walk.mp4) · [Terrain demo](docs/media/phantomx-terrain.mp4)
 
-UE RL Engine 用 Unreal Engine 5.8 的 Chaos 物理训练机器人，再把训练好的策略放进 UE 游戏里运行。训练和游戏使用同一套机器人资产与策略格式。目前提供 CartPole 和 PhantomX 六足机器人。
+These videos illustrate sample policies, not a performance guarantee for newly trained models.
 
-上方视频展示 PhantomX 在地形上的一次回放。视频来自历史模型；当前训练效果以[评测报告](docs/diagnostics/phantomx-terrain-ablation-2026-09-24.md)为准。
+## What is included
 
-## 能做什么
+- Request-driven physics stepping and batched robot instances in a UE world.
+- CartPole balancing and PhantomX walking, terrain, and pursuit tasks.
+- Fixed physics steps with variable control intervals for PhantomX: 5 ms physics steps and 1–7 steps per action.
+- Training, checkpoint inspection, playback, recording, export, and deployment through `uerl`.
+- `.uerlpol2` artifacts containing observation/action plans, timing, robot metadata, and an ONNX policy for UE NNE inference.
+- Python, protocol, cross-language parity, UE Automation, and end-to-end tests.
 
-- **训练**：用 Python 定义任务，在 UE 里同时运行多台机器人，用 rsl-rl 训练策略。
-- **回放**：选一个训练结果，在 UE 视口看机器人行走、用键盘控制，或录制 MP4。
-- **部署**：把策略导出为 `.uerlpol2`，导入另一份 UE 5.8 工程，在游戏里的 Skeletal Mesh 上运行。
-- **扩展**：增加新机器人时，添加 UE 资产、Python 机器人与任务声明，无需编写机器人专用的 UE 运行时代码。
+## Getting started
 
-## 快速开始
+### Prerequisites
 
-以下命令在仓库根目录的 PowerShell 中运行。需要 Windows、Unreal Engine 5.8、Python 3.11 和 [uv](https://docs.astral.sh/uv/)。PhantomX 默认使用 NVIDIA GPU 训练；没有 GPU 时可以给训练命令加 `--device cpu`。
+The integrated training and deployment workflow targets **Windows x64 and UE 5.8**. Other UE versions and Linux/macOS UE execution are not validated by this repository's documented workflow. Python-only inspection and tests can run separately from UE.
 
-### 1. 安装并选择任务
+Install these tools before using the commands below:
+
+| Requirement | Purpose |
+|---|---|
+| Git and Git LFS | Check out source and retrieve `.uasset` / `.umap` content |
+| Unreal Engine 5.8 and its Windows C++ build toolchain | Build `UERLHostEditor Win64 Development` and run the Chaos Worker |
+| Python 3.11 and `uv` | Install the Python package and locked dependencies |
+| NVIDIA GPU with a driver compatible with the pinned CUDA 12.8 PyTorch build | Default PhantomX policy training on `cuda:0`; `--device cpu` selects CPU policy execution |
+
+Chaos simulation runs in UE; selecting CPU policy execution does not remove the UE requirement. Use the C++ compiler and Windows SDK accepted by your UE 5.8 installation; this repository does not pin their versions. The project pins `torch==2.11.0+cu128`, `torchvision==0.26.0+cu128`, and `rsl-rl-lib==5.4.2`. No minimum RAM, GPU memory, or throughput guarantee has been established here.
+
+The host enables the bundled `UERLEngine` plugin and its engine dependencies, `ProceduralMeshComponent` and `NNERuntimeORT`. Confirm those engine plugins are available before building; see [troubleshooting](docs/troubleshooting.md).
+
+### Install and build
+
+Run these commands in **PowerShell**, from your checkout root. Replace placeholder paths with your own paths.
 
 ```powershell
-uv sync
-uv run uerl tasks --filter PhantomX
+git lfs install
+git lfs pull
+uv sync --locked
+
+$ueRoot = 'C:\Program Files\Epic Games\UE_5.8'
+$project = (Resolve-Path 'engine/UERLHost.uproject').Path
+& "$ueRoot\Engine\Build\BatchFiles\Build.bat" UERLHostEditor Win64 Development $project -WaitMutex
 ```
 
-`tasks` 会列出可用任务。这里选用 `UERL-PhantomX-ContinuousTerrain-v0`：让 PhantomX 在逐渐变难的连续地形上学习行走。想先检查一条较短的训练链路，可选 CartPole（任务列表见下方）。
+An LFS pointer is not a usable UE asset. Confirm LFS access and complete the Editor build before training. Unreal Engine is obtained separately; this repository does not grant rights to redistribute it or third-party content.
 
-### 2. 训练
+### Inspect tasks without starting UE
+
+```powershell
+uv run uerl tasks
+uv run uerl config --task UERL-PhantomX-ContinuousTerrain-v0
+uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
+```
+
+The task check validates Python declarations, not the installed UE binary, content loading, or GPU readiness.
+
+### Run a small training smoke test
+
+After the Editor build succeeds:
+
+```powershell
+uv run uerl train --task UERL-CartPole-Direct-v0 --num-envs 2 --max-iterations 1 --device cpu --run-name smoke
+```
+
+For a non-default engine path, pass `--ue-executable "$ueRoot\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"` to `train`, `play`, and `export`. These commands do not read `UE_ROOT` automatically. This smoke test starts UE and trains a policy; it is not a configuration-only check.
+
+### Train PhantomX
 
 ```powershell
 uv run uerl train --task UERL-PhantomX-ContinuousTerrain-v0 --run-name terrain
 ```
 
-启动时会看到 `[RUN] directory=...`。把等号后面的路径记下来：那里存放本次训练的配置、日志和模型。`runs/` 是本机生成的目录，不随仓库分发；已有训练结果可用 `uv run uerl runs` 查找。
+The command prints `[RUN] directory=...`. Keep that directory: it contains the resolved configuration, logs, and checkpoints. `runs/` is local generated output and is not distributed with the source. Continuous-terrain training defaults to 64 Slots; flat-ground walking defaults to 512. See [training and evaluation](docs/how-to/phantomx-robust-training.md) before changing parallelism or resuming an older checkpoint.
 
-### 3. 回放或手动控制
-
-先把上一条命令打印的目录填入 `$runDir`。训练时默认同时运行 64 台机器人；回放只有一台，因此用 `--terrain-level 0` 固定它所在的地形等级。
+### Evaluate and record
 
 ```powershell
-$runDir = '<把 [RUN] directory= 后面的路径粘贴到这里>'
-uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terrain-level 0
+$runDir = 'runs/UERL-PhantomX-ContinuousTerrain-v0/<run-directory>'
+uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terrain-level 0 --steps 4000 --presentation none
+uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terrain-level 0 --record artifacts/walk.mp4
 ```
 
-这条命令让任务自动发出行走指令，所以不按键，机器人也会往前走。要自己控制，改用：
+Playback uses one robot. Explicitly select a terrain level to avoid restoring a multi-Slot terrain curriculum into a single-Slot evaluation. A control-step count is not a fixed duration when decimation varies. For keyboard control, recording options, and interpretation of results, see [recording and playback](docs/how-to/record-video.md).
 
-```powershell
-uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terrain-level 0 --controller player --steps 20000
-```
-
-按住 **W** 前进；前进时按 **A/D** 或 **Q/E** 转向；松开 W 或按 **S** 会切换到默认站姿。当前模型不能可靠地倒车、横移或原地转向。更多说明见[回放与录屏指南](docs/how-to/record-video.md)。
-
-### 4. 导出到游戏
+### Export and deploy
 
 ```powershell
 uv run uerl export --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir
-uv run uerl deploy --project <目标工程目录> --demo phantomx --task UERL-PhantomX-ContinuousTerrain-v0 --artifact $runDir
+uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task UERL-PhantomX-ContinuousTerrain-v0 --artifact $runDir
 ```
 
-第一条命令生成策略文件；第二条把通用运行时和 PhantomX 演示资产接入目标工程，并打印导入策略的命令。给 `deploy` 加 `--import` 才会启动 UE Editor 完成策略资产导入。放置机器人、检查工程和打包的步骤见[游戏部署指南](docs/in-game-deployment-guide.md)。
+Export initializes a UE Session; it is not an offline checkpoint conversion. Deployment copies the runtime, updates target project settings, and prints an import command. Add `--import` to execute the Editor import after the target Editor build succeeds. Use `deploy --check` for a read-only preflight. Follow the [deployment guide](docs/in-game-deployment-guide.md) for Blueprint setup, physics settings, and packaging.
 
-## PhantomX 现在训练到什么程度
+## Tasks
 
-2026-09-24 完成的连续地形基线共训练 1000 次迭代。在每级 3 个 episode 的固定地形评测中，等级 0–6 能持续前进，平均速度为 0.51–0.63 m/s；等级 7 约为 0.06 m/s，基本停在原地。扩大动作幅度或驱动力的完整对照训练没有解决等级 7。数据和实验条件见[训练与消融报告](docs/diagnostics/phantomx-terrain-ablation-2026-09-24.md)。
+| Task ID | Purpose | Default Slots |
+|---|---|---:|
+| `UERL-CartPole-Direct-v0` | CartPole balance and training smoke test | 64 |
+| `UERL-PhantomX-Walk-v0` | Flat-ground locomotion | 512 |
+| `UERL-PhantomX-ContinuousTerrain-v0` | Eight levels of continuous terrain | 64 |
+| `UERL-PhantomX-DiscreteTerrain-v0` | Six levels of discrete obstacles | 64 |
+| `UERL-PhantomX-Pursuit-v0` | Pursuit in an authored map | 1 |
 
-地形配置只有一份。默认的 64 指同时训练的机器人数量；每台机器人根据同一份配置生成自己的地形。修改机器人数量不会把地形定义变成 64 份。细节与逐级评测命令见[PhantomX 训练指南](docs/how-to/phantomx-robust-training.md)。
+Use `uerl config --task <TaskID>` for the resolved defaults. Robot declarations live in `src/uerl/assets/robots/`; task factories can override base YAML settings. See [configuration](docs/configuration.md).
 
-## 可用任务
+## Documentation and development
 
-| Task ID | 做什么 |
-|---|---|
-| `UERL-CartPole-Direct-v0` | 用倒立摆检查训练链路 |
-| `UERL-PhantomX-Walk-v0` | 在平地上行走 |
-| `UERL-PhantomX-ContinuousTerrain-v0` | 在连续起伏地形上行走 |
-| `UERL-PhantomX-DiscreteTerrain-v0` | 在离散障碍地形上行走 |
-| `UERL-PhantomX-Pursuit-v0` | 在美术地图里追逐玩家 |
+[Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
-可用 `uv run uerl config --task <TaskID>` 查看任务默认配置；`uv run uerl --help` 查看所有命令与选项。
+For Python-only development after installation:
 
-## 更多文档
+```powershell
+uv run pytest -q
+```
 
-| 你想做什么 | 从这里开始 |
-|---|---|
-| 续训、固定地形等级评测 PhantomX | [PhantomX 训练指南](docs/how-to/phantomx-robust-training.md) |
-| 手动控制或录制视频 | [回放与录屏指南](docs/how-to/record-video.md) |
-| 接入新机器人 | [新机器人接入指南](docs/how-to/add-a-robot.md) |
-| 把策略放进另一份游戏工程 | [游戏部署指南](docs/in-game-deployment-guide.md) |
-| 理解系统结构和术语 | [项目说明](docs/UE-RL-Engine-项目说明文档.html) · [术语表](CONTEXT.md) |
-| 查看测试方式或全部文档 | [测试说明](tests/README.md) · [文档目录](docs/README.md) |
+UE Automation, end-to-end training, recording, and packaging require the Windows/UE host. These Windows/UE workflows have not been rerun during this documentation update. Python-only validation does not establish runtime compatibility or policy performance.
 
-源代码在 `src/uerl/`，UE 宿主工程和插件在 `engine/`。
+## License and publication status
+
+**A project license has not yet been selected or included.** This documentation update does not grant an open-source license. Source licensing, third-party notices, content redistribution rights, and a security reporting channel remain owner decisions before publication. See the [release-readiness inventory](docs/release-readiness.md).

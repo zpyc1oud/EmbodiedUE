@@ -103,6 +103,24 @@ namespace
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLPolicyControllerResetBuffersTest,
+	"UERL.Unit.Policy.Controller.ResetClearsPreviousAction",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPolicyControllerResetBuffersTest::RunTest(const FString& Parameters)
+{
+	FUERLPolicyController Controller;
+	Controller.PreviousAction = {0.75f, -0.25f};
+
+	Controller.Reset();
+
+	TestEqual(TEXT("Reset preserves previous-action width"), Controller.PreviousAction.Num(), 2);
+	TestEqual(TEXT("Reset clears positive previous action"), Controller.PreviousAction[0], 0.0f);
+	TestEqual(TEXT("Reset clears negative previous action"), Controller.PreviousAction[1], 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FUERLPolicyControllerInitializeFromArtifactTest,
 	"UERL.Integration.Policy.Controller.AC_UE_INT_POLICY_001.InitializeDerivesRuntimeFromArtifact",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

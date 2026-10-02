@@ -21,7 +21,8 @@ from uerl.tasks.cartpole import CARTPOLE_TASK_ID, create_cartpole_task
 from uerl.training import WORKER_LOCKSTEP_PHYSICS_ARGS, build_launch_overrides, build_run_config
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-UE_CMD = r"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+UE_ROOT = Path(os.environ.get("UE_ROOT") or os.environ.get("UE_58_ROOT") or r"C:\Program Files\Epic Games\UE_5.8")
+UE_CMD = str(UE_ROOT / "Engine" / "Binaries" / "Win64" / "UnrealEditor-Cmd.exe")
 UPROJECT = os.path.join(REPO_ROOT, "engine", "UERLHost.uproject")
 TRAIN_MAP = "/Engine/Maps/Entry"
 

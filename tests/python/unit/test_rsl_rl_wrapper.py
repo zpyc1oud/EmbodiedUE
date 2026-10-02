@@ -103,3 +103,20 @@ def test_wrapper_forwards_episode_buffer_explicit_reset_and_close() -> None:
     assert reset_info["episode_index"].shape == (2,)
     assert fake.reset_seeds == [17]
     assert fake.close_reasons == ["test_close"]
+
+
+def test_wrapper_bootstraps_only_timeouts_without_physical_termination() -> None:
+    """A fall on the time limit remains terminal for PPO value targets."""
+
+    class _OverlappingTerminationEnv(_FakeDirectEnv):
+        def step(
+            self, actions: torch.Tensor
+        ) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, dict[str, Any]]:
+            observations, rewards, terminated, _truncated, info = super().step(actions)
+            return observations, rewards, terminated, torch.tensor([True, True]), info
+
+    wrapper = UERLVecEnvWrapper(cast(UERLDirectEnv, _OverlappingTerminationEnv()))
+    _observations, _rewards, dones, extras = wrapper.step(torch.zeros(2, 1))
+
+    assert dones.tolist() == [True, True]
+    assert extras["time_outs"].tolist() == [False, True]

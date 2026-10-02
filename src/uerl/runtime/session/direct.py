@@ -317,6 +317,8 @@ class UERLSessionAdapter:
             indices, and close the raw Session on a reset-mask contract failure.
         """
 
+        if reset_mask.shape != (self.num_slots,):
+            raise SessionError("reset mask must be a vector with one value per Slot")
         reset_start = time.perf_counter()
         layout = self._layouts["reset_request"]
         encoded_levels = self._terrain_levels if terrain_levels is None else terrain_levels

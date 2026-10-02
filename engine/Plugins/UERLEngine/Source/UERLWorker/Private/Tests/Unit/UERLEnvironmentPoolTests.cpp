@@ -571,7 +571,27 @@ bool FUERLEnvironmentPoolSharedGroundFrictionTest::RunTest(const FString& Parame
 		TestTrue(TEXT("contact dynamic friction equals the declared Slot value"),
 			FMath::IsNearlyEqual(Dynamic, SlotFriction[SlotId].Y, 1.0e-5));
 	}
+	// Repeated events must not replace the saved original with the transient material.
+	TestTrue(TEXT("repeated ground friction applies"), Pool.ApplyEvent(Event, Error));
 	Pool.Destroy();
+	TestNull(TEXT("shutdown restores an absent authored material override"), Ground->GetPhysicsMaterialOverride());
+
+	UPhysicalMaterial* AuthoredMaterial = NewObject<UPhysicalMaterial>(GroundOwner);
+	AuthoredMaterial->Friction = 0.4f;
+	Ground->SetPhysMaterialOverride(AuthoredMaterial);
+	if (!Pool.Create(
+			World, 2, EnvironmentFactory, EnvironmentConfig,
+			RobotFactory.ToSharedRef(), RobotConfig, {}, EmptyTerrain, Error)
+		|| !Pool.InitializeSlots({}, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	TestTrue(TEXT("friction replaces an authored override"), Pool.ApplyEvent(Event, Error));
+	TestTrue(TEXT("repeated friction preserves the original override"), Pool.ApplyEvent(Event, Error));
+	Pool.Destroy();
+	TestTrue(TEXT("shutdown restores the original authored material override"),
+		Ground->GetPhysicsMaterialOverride() == AuthoredMaterial);
 	AddInfo(TEXT("[VERIFY] AC-UE-INTEGRATION-ENV-POOL-006: SharedWorld Slots keep distinct Chaos contact friction on one ground"));
 	return true;
 }

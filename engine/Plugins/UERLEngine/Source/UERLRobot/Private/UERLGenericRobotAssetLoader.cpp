@@ -324,7 +324,7 @@ bool SpawnGenericRobotSlots(
 		Slot.bClaimedSimulatePhysics = bClaimedSimulatePhysics;
 		Slot.ClaimedAttachParent = ClaimedAttachParent;
 		Slot.ClaimedRelativeTransform = ClaimedRelativeTransform;
-		Slot.ClaimedPhysMaterialOverride = bOwnsActor ? nullptr : Component->GetPhysicsMaterialOverride();
+		Slot.ClaimedPhysMaterialOverride.Reset(bOwnsActor ? nullptr : Component->GetPhysicsMaterialOverride());
 		for (const FName BodyName : Topology.BodyNames)
 		{
 			FBodyInstance* Body = Component->GetBodyInstance(BodyName);

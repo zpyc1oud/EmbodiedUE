@@ -274,7 +274,7 @@ def test_run_training_keeps_environment_cpu_when_runner_uses_cuda(
     import uerl.training.runner as runner_module
 
     config = _config(tmp_path / "run")
-    config = replace(config, runner=replace(config.runner, device="cuda:0"))
+    config = replace(config, runner=replace(config.runner, device="cuda:0", checkpoint=None))
     raw_session = Mock()
     registry = Mock()
     registry.create_task.return_value = Mock()
@@ -383,7 +383,8 @@ def test_run_training_closes_raw_session_when_env_setup_fails(
     monkeypatch.setattr(runner_module, "UERLDirectEnv", Mock(side_effect=RuntimeError("env setup")))
 
     with pytest.raises(RuntimeError, match="env setup"):
-        run_training(_config(tmp_path / "run"))
+        config = _config(tmp_path / "run")
+        run_training(replace(config, runner=replace(config.runner, checkpoint=None)))
 
     raw_session.close.assert_called_once_with("training_setup_failed")
     print("[VERIFY] VC-008: failure_cleanup=PASS")
@@ -574,3 +575,23 @@ def test_ac_py_unit_eval_001_gait_frequency_uses_actual_variable_sample_times() 
 
     frequency = _dominant_frequency_hz(heights, sample_hz=1.0 / 0.035, sample_dts=durations)
     assert frequency == pytest.approx(2.0, abs=0.15)
+
+
+def test_run_training_rejects_missing_resume_before_opening_session(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """An explicit resume path must never silently start a fresh training run."""
+    import uerl.training.runner as runner_module
+
+    config = build_run_config(
+        CARTPOLE_TASK_ID,
+        overrides={"runner.checkpoint": str(tmp_path / "missing.pt")},
+    )
+    open_session = Mock(side_effect=AssertionError("must not launch UE"))
+    monkeypatch.setattr(cast(Any, runner_module).UERLSession, "open", open_session)
+
+    with pytest.raises(FileNotFoundError, match="missing.pt"):
+        run_training(config)
+
+    open_session.assert_not_called()

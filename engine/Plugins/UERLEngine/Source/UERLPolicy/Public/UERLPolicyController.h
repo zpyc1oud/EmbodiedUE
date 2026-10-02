@@ -122,6 +122,10 @@ public:
 	bool IsInitialized() const { return bInitialized; }
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FUERLPolicyControllerResetBuffersTest;
+#endif
+
 	bool bInitialized = false;
 	FUERLControlTiming LastTiming;
 

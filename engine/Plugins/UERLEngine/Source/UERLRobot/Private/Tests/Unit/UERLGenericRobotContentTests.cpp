@@ -18,6 +18,7 @@
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "PreviewScene.h"
 #include "UObject/UObjectGlobals.h"
+#include "UObject/GarbageCollection.h"
 
 #include "UERLBatchBinding.h"
 #include "UERLGenericRobotCommandApplier.h"
@@ -1463,6 +1464,8 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 		}
 		return Count;
 	};
+	TWeakObjectPtr<UPhysicalMaterial> AuthoredMaterial = NewObject<UPhysicalMaterial>(GetTransientPackage());
+	AuthoredMesh->SetPhysMaterialOverride(AuthoredMaterial.Get());
 	FUERLSkeletalMeshRobotRuntimeConfig ClaimConfig = PhantomXRuntimeConfig(FVector(300.0, 0.0, -25.0));
 	ClaimConfig.Observations = Config.Observations;
 	ClaimConfig.bClaimAuthoredActor = true;
@@ -1475,7 +1478,14 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("claimed robot has physics bodies"), AuthoredMesh->Bodies.Num() > 0);
 	TestEqual(TEXT("claimed robot bodies never sleep while controlled"),
 		CountBodiesWithSleepType(Chaos::ESleepType::NeverSleep), AuthoredMesh->Bodies.Num());
+	// Material replacement uses the same component API as ground-friction events.
+	// The original must survive GC while it is no longer referenced by the mesh.
+	AuthoredMesh->SetPhysMaterialOverride(NewObject<UPhysicalMaterial>(GetTransientPackage()));
+	CollectGarbage(RF_NoFlags);
+	TestTrue(TEXT("claimed original material survives garbage collection"), AuthoredMaterial.IsValid());
 	Runtime.Reset();
+	TestTrue(TEXT("claim release restores the original material after garbage collection"),
+		AuthoredMaterial.IsValid() && AuthoredMesh->GetPhysicsMaterialOverride() == AuthoredMaterial.Get());
 	TestEqual(TEXT("release restores the authored material sleep type"),
 		CountBodiesWithSleepType(Chaos::ESleepType::MaterialSleep), AuthoredMesh->Bodies.Num());
 

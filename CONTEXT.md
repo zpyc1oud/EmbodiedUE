@@ -1,193 +1,187 @@
 # UE RL Engine Context
 
-本上下文统一 UE RL Engine 的领域语言，描述 Session、Environment、Robot、资产、语义和训练/仿真边界；实现细节留在稳定设计、规格说明与架构决策中。
+The domain vocabulary for UE RL Engine: Sessions, Environments, Robots, assets, semantics, and the training/simulation boundary. Implementation detail belongs in the architecture and source code.
 
-## 机器人领域
+## Robot domain
 
 **Robot**:
-一个可被训练任务驱动、观测并重置的模拟实体。
+A simulated entity that a training Task can control, observe, and reset.
 _Avoid_: Actor, Model, Agent
 
 **Robot asset**:
-定义机器人可模拟结构的资产集合，包括实体层级、身体和关节关系。
+The assets defining a robot’s simulated structure, including the entity hierarchy and body/joint relationships.
 _Avoid_: robot model, scene object
 
 **Topology**:
-机器人资产中可被稳定引用的身体、关节、父子关系及关节结构限制。
+The stable body and joint references, parent/child relationships, and structural joint constraints reflected from a Robot asset.
 _Avoid_: semantics, configuration
 
 **Robot semantics**:
-说明哪些结构参与驱动、观测和重置，以及这些行为如何解释的领域声明。
+Declarations specifying which structures participate in control, observation, and reset, and how those operations are interpreted.
 _Avoid_: topology, asset metadata
 
 **Robot Interface**:
-训练侧与仿真侧之间交换机器人结构、动作、观测和重置信息的契约。
+The contract for exchanging robot structure, actions, observations, and reset information between training and simulation.
 _Avoid_: CartPole-specific protocol
 
-## 配置与运行描述
+## Configuration and runtime descriptions
 
 **RobotConfig**:
-声明机器人语义的配置，包含执行器、观测清单和重置分布。
+Robot semantics configuration, including actuators, observation selection, and reset distributions.
 _Avoid_: asset description
 
 **RobotSpec**:
-将资产 Topology 与 RobotConfig 合并后的可运行机器人描述，包含稳定的动作和观测索引关系。
+The executable robot description obtained by merging asset Topology with RobotConfig, with stable action and observation indices.
 _Avoid_: raw config, raw topology
 
 **SessionSpec**:
-Python 在初始化边界把 Robot、Environment、Slot、physics_dt、闭区间 decimation 和 wire projection 编译成的不可变 Session 契约。decimation 的 `[min,max]` 端点是正 int32，`[N,N]` 表示固定步进。
+The immutable Session contract compiled by Python at initialization from the Robot, Environment, Slots, physics_dt, inclusive decimation range, and wire projection. The [min,max] endpoints are positive int32 values; [N,N] denotes fixed decimation.
 _Avoid_: mutable runtime state, training source config
 
 **Execution plan**:
-仿真侧在 Initialize commit 时由 SessionSpec 编译出的不可变热路径计划；它缓存 body、constraint、column 和单位转换索引。
+The immutable simulation hot-path plan compiled from SessionSpec at Initialize commit. It caches body, constraint, column, and unit-conversion indices.
 _Avoid_: plugin framework, user configuration
 
 **Canonical default state**:
-Initialize 时为每个 Slot 捕获的完整机器人默认物理状态；reset 总是先恢复它，再应用本次覆盖值。
+The complete default physical state captured for each Slot at Initialize. Reset restores this state before applying the requested overrides.
 _Avoid_: current state, partial reset fallback
 
 **Initial episode state**:
-Session Ready 后由训练侧对全部 Slot 执行一次正常 reset 得到的 Post-Reset State；它应用与后续 episode 相同的 Reset distribution，并且是策略可见的第一份状态。Initialize 返回的 Canonical default state 只完成运行时建立与协议验收，不能直接作为首个 episode。
+The Post-Reset State produced by a normal reset of every Slot after Session Ready. It uses the same reset distribution as later episodes and is the first policy-visible state. The canonical state returned during initialization establishes the runtime and validates the protocol; it does not begin the first episode.
 _Avoid_: asset spawn pose, startup grace period
 
 **Actuator**:
-把一个动作维度转换为某个可驱动关节物理作用的机器人部件。
+A robot component that converts an action dimension into a physical effect on a controllable joint.
 _Avoid_: action, controller
 
 **Action target**:
-某个 Actuator 在当前控制时刻收到的数值目标；它不携带关节名称。
+The numeric target received by an Actuator at the current control instant. It carries no joint name.
 _Avoid_: policy output
 
 **Observation**:
-训练任务从机器人当前物理状态读取的一项有明确类型、单位和顺序的值。
+A value read by the training Task from current robot physics, with explicit type, units, and ordering.
 _Avoid_: sensor plugin
 
 **Terrain-height scan**:
-以 Robot root 为参考、沿世界水平面建立 footprint 的固定 7x5 地形高程 primitive；每个值是射线命中点 Z 减 root.Z 的米制高度 `(hit.Z-root.Z)/100`。它由 Robot Runtime 在 Observation 采集边界计算，供 Task 作为外感知输入使用，不复制 terrain 配置，也不暴露 UE 世界坐标。训练 Shared World 通过 Environment 记录的 terrain owner 白名单限定射线命中，Slot-isolated 使用所属 Slot 的碰撞 query channel；部署显式使用 blocking WorldStatic 查询。成功命中会缓存世界命中点，短暂失联时按当前 root/body 重新计算；初始或 reset 没有命中则返回可诊断错误。
+A fixed 7×5 terrain-height primitive with a world-horizontal footprint referenced to the Robot root. Each sample is (hit.Z-root.Z)/100 in meters. Robot Runtime computes it at observation collection; it neither copies terrain configuration nor exposes UE world coordinates. Shared World training restricts ray hits to the Environment terrain-owner whitelist; Slot-isolated training uses the Slot collision query channel. Deployment explicitly queries blocking WorldStatic geometry. Successful hits cache world-space hit points and recompute root-relative values during brief query loss. Missing initial or reset hits produce a diagnostic error.
 _Avoid_: terrain seed, heightfield mesh, world-space elevation
 
 **Reset distribution**:
-描述机器人每次重置时初始状态如何采样的规则。
+Rules for sampling a robot’s initial state on each reset.
 _Avoid_: terrain curriculum
 
 **Contact observation**:
-表示指定身体在控制窗口末、最后一个已完成 solver step 的几何支撑状态，
-取值为 `0/1`。它只在窗口末查询，不累计窗口早期的支撑或 `OnComponentHit` 事件。
-Slot-isolated 只计所属 Environment，Shared World 计 `WorldStatic` 地面；地形高度扫描
-的 owner 白名单不限制 contact。
+Binary geometric support (0/1) for a selected body at the last completed solver step of a control window. It is queried at the window end and does not accumulate earlier support or OnComponentHit events. Slot-isolated contact counts only the owning Environment; Shared World contact counts WorldStatic ground. The terrain-scan owner whitelist does not restrict contact.
 _Avoid_: contact force, collision manifold
 
 **Contact-force observation**:
-表示指定身体在同一个窗口末已完成 solver step 的净冲量按该 solver step 秒数换算
-得到的牛顿值，即 `|I| / (100 * SolverStepSeconds)`。它不是控制窗口内的峰值，
-也不使用游戏 DeltaTime、控制窗口时长或 clamp 后的 observation dt；没有新的物理
-结果时不复用旧冲量。
+The magnitude of the net impulse from that same final completed solver step, converted to newtons as |I| / (100 * SolverStepSeconds). It is neither a window maximum nor a value divided by game DeltaTime, the whole control window, or clamped observation dt. Old impulses are not reused when there is no new physics result.
 _Avoid_: window force maximum, control-frame impulse
 
-## 运行边界
+## Runtime boundaries
 
 **Slot**:
-一次并行仿真中的单个机器人实例及其对应的任务状态。
+One robot instance and its task state within a parallel simulation.
 _Avoid_: world, environment process
 
 **Session**:
-一个 Worker bridge 在一个 UWorld 中运行的一次不可变训练连接，拥有固定数量的 Slot、execution plans、physics_dt 和 decimation 范围；每个 Step 额外携带一个由该范围约束的 `step_decimation` 标量。
+An immutable training connection served by one Worker bridge in one UWorld. Slot count, execution plans, physics_dt, and decimation range are fixed; each Step carries one step_decimation scalar within that range.
 _Avoid_: episode, task
 
 **Environment**:
-为 Slot 提供放置、地面和地形条件的仿真上下文；它不拥有 Robot semantics、机器人控制或训练任务数学。
+The simulation context providing placement, ground, and terrain to Slots. It does not own Robot semantics, robot control, or task mathematics.
 _Avoid_: robot, task
 
 **Collision scope**:
-Environment 声明其碰撞几何属于各自 Slot，还是由所有 Slot 共享的 Session 级边界。
+The Environment declaration of whether collision geometry belongs to individual Slots or is shared at Session scope.
 _Avoid_: collision mode, spacing policy
 
 **Slot-isolated Environment**:
-每个 Slot 各自拥有碰撞几何的 Environment；该几何只与同 Slot Robot 交互。
+An Environment where each Slot owns collision geometry that interacts only with its own Robot.
 _Avoid_: cloned world, private scene
 
 **Shared World Environment**:
-多个 Slot Robot 共享同一份 Environment 地形几何、但彼此保持 Slot isolation 的 Environment；共享几何可以来自已加载的 World Map，也可以在该 World 中程序化生成。
+An Environment where several Slot Robots share terrain geometry while preserving robot-to-robot Slot isolation. Geometry can come from a loaded World Map or be generated procedurally in that World.
 _Avoid_: Shared Map Environment, global environment, multi-agent environment
 
 **Terrain source**:
-Environment 获得地形几何与 Ground frame 的来源；当前来源是 procedural terrain 或 authored World Map，来源不改变 Environment 的 collision scope。
+The source of Environment geometry and Ground frames: procedural terrain or an authored World Map. Changing the source does not change collision scope.
 _Avoid_: collision mode, map mode
 
 **Terrain curriculum**:
-Environment 在 Session 初始化时生成全部难度区域，训练侧只在 episode reset 时依据上一 episode 沿指令方向的累计前进量和累计指令距离调整难度；一般晋级或降级移动一级，最高级再次晋级时在全部等级中重新抽样。终止和超时遵循相同规则。它不在行走中途修改几何，也不重新生成地形。
+All difficulty regions are generated at Session initialization. At episode reset, training adjusts difficulty using accumulated progress along the command direction and accumulated commanded distance. Normal promotion/demotion moves one level; promotion past the highest level resamples across all levels. Terminations and timeouts use the same rule. Geometry is not modified or regenerated during walking.
 _Avoid_: Reset distribution, runtime terrain mutation
 
 **World Map identity**:
-一次 Session 实际加载的 UE World 长包名，是 resolved config、Worker projection 和 Run manifest 共同确认的运行身份。
+The long UE package name of the World actually loaded for a Session, confirmed jointly by the resolved configuration, Worker projection, and Run manifest.
 _Avoid_: launch argument, level filename
 
 **Ground frame**:
-一个 Slot 的局部地面参考系；root/body 的 Slot-local pose 和 velocity 以它为参考。
+A Slot-local ground reference frame used to express root/body poses and velocities.
 _Avoid_: world transform, terrain random seed
 
 **Slot isolation**:
-不同 Slot 的 robot collision 和 contact 不能互相影响的运行不变量；SlotIsolated 还隔离 terrain 和 query。空间错开放置本身不构成隔离。
+The invariant that robot collisions and contacts in one Slot cannot affect another. Slot-isolated Environments also isolate terrain and queries. Spatial separation alone is not isolation.
 _Avoid_: spacing heuristic
 
 **Task**:
-训练侧对动作、观测、奖励、终止和 episode 规则的定义。
+The training-side definition of actions, observations, rewards, termination, and episode rules.
 _Avoid_: Worker, Robot provider
 
 **Worker**:
-仿真侧编排 Slot 生命周期、初始化、固定步进、状态采集和重置的运行实体。
+The simulation-side runtime coordinating Slot lifecycle, initialization, fixed stepping, state collection, and reset.
 _Avoid_: trainer, task
 
 **Control frame**:
-训练侧提交一次 Action target 和本次 `step_decimation`，仿真侧在该数量物理子步内保持 target，随后返回一次 Observation 的完整控制周期。物理窗口为 `physics_dt × step_decimation`；制品的 `ArtifactTiming` 保存 physics_dt 与 decimation 范围，并派生最小/最大控制间隔。
+A complete control cycle: training submits an action target and step_decimation; simulation holds that target for the specified number of physics steps and returns one observation. The window is physics_dt × step_decimation. ArtifactTiming stores physics_dt and the decimation range and derives minimum/maximum control intervals.
 _Avoid_: physics substep
 
 **Control frame length**:
-第 `k` 个控制帧的实际长度为 `dt_k = physics_dt × d_k`，其中 `d_k` 是该 Step 携带的 `step_decimation`。时间序列按 `o_k → a_k → physics(d_k) → o_{k+1}` 解释，返回的观测间隔属于刚完成的帧；Initialize 和 Reset 后的首个观测使用 `DtMin` 作为起始约定。
+The actual duration of frame k is dt_k = physics_dt × d_k, where d_k is that Step’s step_decimation. The sequence is o_k → a_k → physics(d_k) → o_(k+1); the returned observation interval belongs to the completed frame. The first observation after Initialize or Reset uses DtMin by convention.
 _Avoid_: nominal control period, wall-clock latency
 
 **Slot fault**:
-只破坏一个 Slot 物理状态、可通过显式 sparse reset 尝试恢复的运行故障。
+A runtime fault affecting only one Slot’s physical state, for which an explicit sparse reset may attempt recovery.
 _Avoid_: terminated, truncated
 
 **Session-fatal fault**:
-破坏协议、资产、执行计划、固定帧关系或 Slot 隔离，必须停止整个 Session 的故障。
+A fault in protocol, assets, execution plans, fixed-frame relationships, or Slot isolation that requires stopping the entire Session.
 _Avoid_: automatic retry, task termination
 
 **Training side**:
-拥有 Robot semantics、动作映射、动作解算和 Reset distribution 的一侧。
+The side owning Robot semantics, action mapping and resolution, and reset distributions.
 _Avoid_: physics executor
 
 **Simulation side**:
-根据资产提供 Topology、执行数值动作、采集选定 Observation 并应用重置值的一侧。
+The side reflecting Topology from assets, executing numeric actions, collecting selected observations, and applying reset values.
 _Avoid_: robot owner
 
-## 配置归属与训练宿主
+## Configuration ownership and training host
 
 **Training configuration**:
-描述一次训练运行的任务、Worker、Environment、runner 参数，以及所使用的 Robot asset 和 semantics 配置引用。它不重复 Robot asset 的物理事实。
+The Task, Worker, Environment, runner parameters, and Robot asset/semantics references for a training run. It does not duplicate the physical facts in Robot assets.
 _Avoid_: robot definition
 
 **Robot semantics configuration**:
-描述训练如何使用 Robot，包括 actuator、控制增益、参考姿态、动作缩放、观测清单和 Robot reset 分布；它不描述质量、惯量、几何或关节限制。
+How training uses a Robot: actuators, gains, reference pose, action scaling, observations, and reset distributions. It excludes mass, inertia, geometry, and joint limits.
 _Avoid_: asset metadata
 
 **Worker projection**:
-由训练侧将已解析的 RobotSpec 投影成仿真侧可消费的运行配置。它是内部运行产物，不是用户维护的第二份 Robot 配置。
+The training-side projection of a resolved RobotSpec into simulation runtime configuration. This is an internal artifact, not a second user-maintained Robot configuration.
 _Avoid_: source configuration
 
 **Training UE host**:
-随 UERL 交付、承载 Worker 和项目级 Chaos 基线的专用 UE 工程。训练宿主拥有全局物理配置，插件负责读取和校验。
+The dedicated UE project containing the Worker and project-level Chaos baseline. The host owns global physics configuration; the plugin reads and validates it.
 _Avoid_: plugin installer
 
 **Chaos baseline**:
-训练宿主在物理场景创建前必须生效的固定步长相关全局物理设置。
+Global fixed-step-related physics settings that must be active before the training host creates its physics scene.
 _Avoid_: per-robot semantics
 
 **Deployment physics gate**:
-部署启动前对实际 World、Chaos solver、同步子步设置和 artifact timing 的只读判定；它要求同步子步有效，不复用训练侧关闭子步的 Worker gate，也不修改宿主设置。
+A read-only pre-start check of the actual World, Chaos solver, synchronous substep settings, and artifact timing. It requires valid synchronous substeps, does not reuse the training Worker’s substeps-disabled gate, and does not modify host settings.
 _Avoid_: training physics gate, configured time as completed time
 
 **Completed solver clock**:
-在同一 World 的安全完成点读取 Chaos solver 的 `GetSolverTime`、当前 frame 和 `GetLastDt`；只有 frame/time 实际推进才产生新的完成样本，暂停或未求解不伪造推进。
+Chaos GetSolverTime, current frame, and GetLastDt read at a safe completion point in the same World. Only actual frame/time advancement produces a new completed sample; pause or lack of a solve does not fabricate progress.
 _Avoid_: game DeltaTime, configured physics window

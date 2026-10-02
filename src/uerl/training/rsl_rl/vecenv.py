@@ -87,14 +87,14 @@ class UERLVecEnvWrapper(VecEnv):  # type: ignore[misc]
         Returns:
             A four-tuple containing the next observations, rewards, the combined
             ``terminated OR truncated`` done mask, and extras. ``extras`` carries
-            the Direct timeout mask under ``time_outs`` and task metrics under
+            pure timeouts (without physical termination) under ``time_outs`` and task metrics under
             ``log``.
         """
 
         observations, rewards, terminated, truncated, info = self._direct_env.step(actions)
         episode_metrics = info.get("episode_metrics", {})
         extras = {
-            "time_outs": truncated,
+            "time_outs": truncated & ~terminated,
             "transition_dt": info["transition_dt"],
             "terminal_episode_length": info["terminal_episode_length"],
             "log": dict(episode_metrics) if isinstance(episode_metrics, Mapping) else {},

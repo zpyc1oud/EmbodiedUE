@@ -1,13 +1,6 @@
 repos:
   - repo: local
     hooks:
-      - id: task-archive
-        name: enforce dated task archive
-        entry: uv run python scripts/check_task_archive.py
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
       - id: ruff
         name: run Ruff checks
         entry: uv run ruff check
