@@ -496,7 +496,10 @@ bool FUERLPolicyController::GetRobotTransform(FTransform& OutTransform, FString&
 void FUERLPolicyController::Reset()
 {
 	Robot.ClearObservationCaches();
-	PreviousAction.SetNumZeroed(PreviousAction.Num());
+	for (float& Value : PreviousAction)
+	{
+		Value = 0.0f;
+	}
 	for (float& Value : RawState)
 	{
 		Value = 0.0f;

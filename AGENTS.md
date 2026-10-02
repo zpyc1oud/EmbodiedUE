@@ -1,14 +1,14 @@
 # UE RL Engine
 
-在 Unreal Engine 5.8 Chaos 中训练机器人策略，并把同一份制品部署进游戏里的 Skeletal Mesh。
+Train robot policies in Unreal Engine 5.8 Chaos and deploy the same artifact on a game Skeletal Mesh.
 
-- 怎么跑、目录和命令：`README.md`
-- 领域术语：`CONTEXT.md`
-- 系统如何工作：`docs/UE-RL-Engine-项目说明文档.html`
-- 文档地图：`docs/README.md`
-- How-to（新机器人、录屏、接到其它工程）：`docs/how-to/README.md`
+- Read `README.md` for installation, commands, and the directory layout.
+- Read `CONTEXT.md` when changing domain contracts or timing semantics.
+- Read `docs/architecture.md` for system boundaries and design rationale.
+- Use `docs/README.md` to locate topic-specific documentation.
+- Read `docs/how-to/README.md` for robot integration, recording, and deployment workflows.
 
-接入一台新机器人只增加 UE 资产、Python 机器人/任务声明和训练制品，不增加机器人专用 UE runtime。产品机器人是 CartPole 与 PhantomX。训练、评测、导出和接到其它工程都走 `uerl`。Session 持有 `physics_dt` 与闭区间 `decimation`；每个 Step 另带该区间内的 `step_decimation`。接触观测是控制窗口末、最后一个已完成 solver step 的几何支撑 `0/1`。
+Integrating a robot adds UE assets, Python robot/task declarations, and a policy artifact; it does not add robot-specific UE runtime code. The product robots are CartPole and PhantomX. Training, evaluation, export, and deployment use `uerl`. A Session owns `physics_dt` and an inclusive `decimation` range; each Step carries a `step_decimation` inside that range. Contact observations are geometric support values (0/1) from the final completed solver step at the end of the control window.
 
 === SCOPE LIMITS (these bound what you PROPOSE, never what you look for) ===
 Report anything that is actually wrong here — including a rare-looking case, if

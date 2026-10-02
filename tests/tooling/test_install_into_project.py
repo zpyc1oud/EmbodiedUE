@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "install_into_project.py"
 
 
@@ -182,3 +184,84 @@ def test_preflight_reports_physics_and_artifact_failures(tmp_path: Path) -> None
 
     failed = {check.name for check in checks if not check.passed}
     assert {"physics", "artifact"} <= failed
+
+
+def test_force_install_into_source_host_preserves_plugin(tmp_path: Path) -> None:
+    installer = _load()
+    repo, _ = _layout(tmp_path)
+    host = repo / "engine"
+    _write(host / "Host.uproject", "{}")
+    descriptor = host / "Plugins" / "UERLEngine" / "UERLEngine.uplugin"
+    original = descriptor.read_bytes()
+    with pytest.raises(installer.InstallError, match="overlap"):
+        installer.install(project_dir=host, repo_root=repo, force=True)
+    assert descriptor.read_bytes() == original
+
+
+def test_missing_demo_asset_rejects_install_before_mutating_project(tmp_path: Path) -> None:
+    installer = _load()
+    repo, game = _layout(tmp_path)
+    (repo / "engine/Content/Robots/PhantomX/PA_PhantomX.uasset").unlink()
+    original = (game / "CleanGame.uproject").read_bytes()
+    with pytest.raises(installer.InstallError, match="missing"):
+        installer.install(project_dir=game, repo_root=repo, demo="phantomx")
+    assert list(game.iterdir()) == [game / "CleanGame.uproject"]
+    assert (game / "CleanGame.uproject").read_bytes() == original
+
+
+def test_force_install_rejects_invalid_package_without_removing_existing_plugin(tmp_path: Path) -> None:
+    installer = _load()
+    repo, game = _layout(tmp_path)
+    installer.install(project_dir=game, repo_root=repo)
+    descriptor = game / "Plugins/UERLEngine/UERLEngine.uplugin"
+    original = descriptor.read_bytes()
+    package = tmp_path / "wrong-package"
+    package.mkdir()
+    with pytest.raises(installer.InstallError, match="descriptor"):
+        installer.install(project_dir=game, repo_root=repo, from_package=package, force=True)
+    assert descriptor.read_bytes() == original
+
+
+@pytest.mark.parametrize("value", ["0", "-0.005", "nan", "inf"])
+def test_preflight_rejects_invalid_physics_step_and_install_repairs_it(tmp_path: Path, value: str) -> None:
+    installer = _load()
+    repo, game = _layout(tmp_path)
+    installer.install(project_dir=game, repo_root=repo)
+    ini = game / "Config/DefaultEngine.ini"
+    ini.write_text(ini.read_text().replace("MaxSubstepDeltaTime=0.005", f"MaxSubstepDeltaTime={value}"))
+    assert not next(check for check in installer.check_project(project_dir=game) if check.name == "physics").passed
+    installer.install(project_dir=game, repo_root=repo)
+    assert all(check.passed for check in installer.check_project(project_dir=game))
+    assert "MaxSubstepDeltaTime=0.005" in ini.read_text()
+
+
+@pytest.mark.parametrize(
+    "physics_dt,decimation,host_dt,correct_dt,correct_steps",
+    [(0.002, 7, 0.005, 0.002, 7), (0.005, 8, 0.005, 0.005, 8), (0.005, 7, 0.002, 0.002, 18)],
+)
+def test_preflight_checks_supplied_artifact_timing(
+    tmp_path: Path, physics_dt: float, decimation: int, host_dt: float, correct_dt: float, correct_steps: int,
+) -> None:
+    from dataclasses import replace
+
+    from uerl.policy.artifact import ArtifactTiming, PolicyArtifact
+
+    installer = _load()
+    repo, game = _layout(tmp_path)
+    installer.install(project_dir=game, repo_root=repo)
+    ini = game / "Config/DefaultEngine.ini"
+    ini.write_text(ini.read_text().replace("MaxSubstepDeltaTime=0.005", f"MaxSubstepDeltaTime={host_dt}"))
+    fixture = SCRIPT.parents[1] / "tests/parity/cases/artifact/tiny_mlp.uerlpol2"
+    policy = replace(PolicyArtifact.read(fixture), timing=ArtifactTiming(physics_dt, 1, decimation))
+    artifact = tmp_path / "policy.uerlpol2"
+    policy.write(artifact)
+    before = ini.read_bytes()
+    checks = installer.check_project(project_dir=game, artifact=artifact)
+    assert next(check for check in checks if check.name == "artifact").passed
+    assert not next(check for check in checks if check.name == "physics").passed
+    assert ini.read_bytes() == before
+    ini.write_text(
+        ini.read_text().replace(f"MaxSubstepDeltaTime={host_dt}", f"MaxSubstepDeltaTime={correct_dt}")
+        .replace("MaxSubsteps=7", f"MaxSubsteps={correct_steps}")
+    )
+    assert all(check.passed for check in installer.check_project(project_dir=game, artifact=artifact))

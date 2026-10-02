@@ -1,6 +1,6 @@
 # UE unit tests
 
-UE 原生单元 Automation 测试必须随 UBT module 编译，实际文件位于：
+Native UE Automation tests compile with their UBT modules. Their sources are located in:
 
 - `engine/Plugins/UERLEngine/Source/UERLInterface/Private/Tests/Unit/`
 - `engine/Plugins/UERLEngine/Source/UERLTransport/Private/Tests/Unit/`
@@ -9,6 +9,6 @@ UE 原生单元 Automation 测试必须随 UBT module 编译，实际文件位�
 - `engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/`
 - `engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/`
 
-`UERLRobot` 测试覆盖拓扑反射、观测计划、运动学、contact、provider 注册与配置拒绝，以及真实 CartPole 内容 smoke；真实内容 smoke 依赖仓库内 CartPole SkeletalMesh/PhysicsAsset，不应在缺失时静默跳过。
+`UERLRobot` cases cover topology reflection, observation plans, kinematics, contact, provider registration/configuration rejection, and real CartPole content smoke tests. The content smoke requires the repository Skeletal Mesh and PhysicsAsset and must not silently skip missing assets.
 
-本目录作为 UE 层测试索引，不复制一份无法被 UBT 编译的 C++ 测试。
+This directory indexes the tests; it does not duplicate C++ sources outside their compilable modules. See [the test guide](../../README.md) for commands.

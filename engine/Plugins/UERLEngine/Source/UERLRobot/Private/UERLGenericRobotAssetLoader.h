@@ -5,6 +5,7 @@
 #include "UERLInterfaceTypes.h"
 #include "UERLProvider.h"
 #include "UERLSlotCollisionPlan.h"
+#include "UObject/StrongObjectPtr.h"
 
 class AActor;
 class UPhysicalMaterial;
@@ -61,7 +62,7 @@ struct FUERLGenericRobotSpawnedSlot
 	FTransform ClaimedRelativeTransform = FTransform::Identity;
 	bool bClaimedSimulatePhysics = false;
 	TArray<TPair<FName, Chaos::ESleepType>> ClaimedSleepTypes;
-	TWeakObjectPtr<UPhysicalMaterial> ClaimedPhysMaterialOverride;
+	TStrongObjectPtr<UPhysicalMaterial> ClaimedPhysMaterialOverride;
 };
 
 /** Map each reflected joint to its runtime PhysicsAsset constraint index. */

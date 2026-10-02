@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock
@@ -127,6 +128,7 @@ def test_run_training_enables_noise_and_passes_the_registered_event_factory(
     from tests.python.unit.test_training_runner import _config
 
     config = _config(tmp_path / "run")
+    config = replace(config, runner=replace(config.runner, checkpoint=None))
     run_training(config)
 
     task.enable_observation_corruption.assert_called_once()

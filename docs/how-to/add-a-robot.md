@@ -1,42 +1,34 @@
 # Adding a robot
 
-接入一台新机器人 = **UE 资产 + 一份 Python 机器人声明 + 一个 Python Task**。不新增机器人专用引擎代码，不新增动作字段，不新增第二条 reset 路径。
+A new robot consists of **UE assets, a Python robot declaration, and a Python Task**. Robots within the supported topology and operator contracts share the existing UE runtime, action schema, and reset path. CartPole and PhantomX are the reference integrations; see [architecture](../architecture.md#robot-integration).
 
-现役例子是 CartPole 与 PhantomX。原则说明见 [项目说明文档 2.6](../UE-RL-Engine-项目说明文档.html#s2-6)。
-
-可以先用脚手架生成待审查文件：
+Generate starter files with:
 
 ```powershell
 uv run uerl new robot phantomx2 --asset /Game/Robots/PhantomX2/SK_PhantomX2
 uv run uerl new task walk2 --robot phantomx2 --template phantomx-walk
 ```
 
-脚手架拒绝覆盖已有文件，也不会偷偷修改显式 registry；生成的 `TODO` 拓扑和 Task math 必须完成后才能登记。脚手架中的 `max_episode_steps: 1000` 是占位值；若新 Task 使用 PhantomX 式变 decimation 训练，应按[连续地形指南](phantomx-robust-training.md)明确设计按物理时间计算的奖励、折扣和 episode。
+The scaffolder refuses to overwrite existing files and does not modify the explicit registry. Complete the generated `TODO` topology and task mathematics before registration. `max_episode_steps: 1000` is a placeholder. For variable-decimation locomotion, explicitly design rewards, discounts, and episode duration around physical time as described in the [PhantomX guide](phantomx-robust-training.md).
 
-## 1. UE 资产
+## 1. UE assets
 
-在宿主工程放入 Skeletal Mesh、Skeleton 和 PhysicsAsset。结构由资产反射，不在 Python 里复述质量、惯量或关节限位。
+Add a Skeletal Mesh, Skeleton, and PhysicsAsset to the host project. Structure is reflected from those assets; Python does not duplicate mass, inertia, geometry, or joint limits. The existing PhantomX mesh is `/Game/Robots/PhantomX/SK_PhantomX`.
 
-PhantomX 的网格路径是 `/Game/Robots/PhantomX/SK_PhantomX`。
+Verify that the asset meets the runtime's supported topology before writing task code. Confirm permission to distribute any new meshes, textures, and physics assets before contributing them.
 
-## 2. Python 机器人声明
+## 2. Python robot declaration
 
-在 `src/uerl/assets/robots/` 增加一份声明：资产路径、关节与刚体名、参考姿态、执行器组、观测选择、重置分布。把它登记进 `src/uerl/assets/robots/__init__.py` 的 `ROBOT_ASSETS`。
+Add a declaration under `src/uerl/assets/robots/`: asset path, joint/body names, reference pose, actuator groups, observation selection, and reset distributions. Register it in `ROBOT_ASSETS` in `src/uerl/assets/robots/__init__.py`.
 
-对照：
-
-- `src/uerl/assets/robots/cartpole.py`
-- `src/uerl/assets/robots/phantomx.py`
+Use [cartpole.py](../../src/uerl/assets/robots/cartpole.py) and [phantomx.py](../../src/uerl/assets/robots/phantomx.py) as examples.
 
 ## 3. Python Task
 
-在 `src/uerl/tasks/` 增加任务配置、builder 与 registration，并在 `src/uerl/tasks/registry/defaults.py` 里 `register_*`。Task ID 一经注册即可被 `uerl train`、`uerl play` 和 `uerl export` 使用。
+Add task configuration, a builder, and registration under `src/uerl/tasks/`. Register the task in `src/uerl/tasks/registry/defaults.py`. The registered ID then becomes available to `uerl train`, `uerl play`, and `uerl export`.
 
-对照：
+Inspect the existing [CartPole](../../src/uerl/tasks/cartpole/) and [PhantomX](../../src/uerl/tasks/phantomx/) implementations. Run `uerl tasks` and `uerl check task <TaskID>` before a real UE smoke test. A Python preflight cannot validate asset reflection or Chaos behavior.
 
-- `src/uerl/tasks/cartpole/`
-- `src/uerl/tasks/phantomx/`
+## 4. Train and deploy
 
-## 4. 训练制品
-
-用同一条 CLI 训练并导出 `.uerlpol2`。游戏内部署见 [In-Game Deployment](../in-game-deployment-guide.md)。
+Train through the same CLI and export a `.uerlpol2` artifact. Verify observation/action dimensions, robot topology, and timing against the intended deployment mesh. Follow [in-game deployment](../in-game-deployment-guide.md) and the relevant [test layers](../../tests/README.md).

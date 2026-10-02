@@ -125,14 +125,16 @@ class UERLSession:
             controller.attach(config.session)
         try:
             bridge = bridge_builder(config.session)
-        except Exception:
+        except BaseException:
             controller.close("bridge_connect_failed")
             raise
         try:
             bridge.connect()
-        except Exception:
-            bridge.close()
-            controller.close("bridge_connect_failed")
+        except BaseException:
+            try:
+                bridge.close()
+            finally:
+                controller.close("bridge_connect_failed")
             raise
         session = cls(config, controller, bridge, run_recorder)
         session._state = SessionState.OPEN
@@ -397,15 +399,21 @@ class UERLSession:
             if self._state in {SessionState.OPEN, SessionState.INITIALIZED, SessionState.READY}:
                 self._last_shutdown_response = self._bridge.shutdown(reason)
         finally:
-            self._bridge.close()
-            self._controller.close(reason)
-            if self._state is not SessionState.FAILED:
-                self._state = SessionState.CLOSED
+            try:
+                self._bridge.close()
+            finally:
+                try:
+                    self._controller.close(reason)
+                finally:
+                    if self._state is not SessionState.FAILED:
+                        self._state = SessionState.CLOSED
 
     def _fail(self, reason: str) -> None:
         self._state = SessionState.FAILED
-        self._bridge.close()
-        self._controller.close(reason)
+        try:
+            self._bridge.close()
+        finally:
+            self._controller.close(reason)
 
     def _ensure_state(self, *allowed: SessionState) -> None:
         if self._state not in allowed:

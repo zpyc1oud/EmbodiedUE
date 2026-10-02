@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 from uuid import UUID
@@ -25,6 +27,7 @@ from uerl import (
 from uerl.core.codec import FrameHeader, InitializeDescription, InitializeResult
 from uerl.core.config.robot import parse_robot_config
 from uerl.runtime.session import WorkerProcessController
+from uerl.runtime.session.process import PopenFactory
 
 
 class _FakeBridge:
@@ -315,3 +318,99 @@ def test_manifest_write_failure_fails_before_ready(tmp_path: Path) -> None:
     assert session.state is SessionState.FAILED
     assert "ready" not in bridge.events
     assert bridge.closed
+
+
+def test_open_interruption_closes_bridge_and_worker_ownership(tmp_path: Path) -> None:
+    """Cancelling Worker startup must release acquired resources before returning."""
+
+    class InterruptedBridge(_FakeBridge):
+        def connect(self) -> dict[str, object]:
+            raise KeyboardInterrupt
+
+    bridge = InterruptedBridge()
+    controller = WorkerProcessController()
+    with pytest.raises(KeyboardInterrupt):
+        UERLSession.open(
+            _config(tmp_path / "run"),
+            process_controller=controller,
+            bridge_factory=lambda _config: bridge,
+        )
+
+    assert bridge.closed
+    assert controller.handle is None
+
+
+def test_close_releases_worker_ownership_when_transport_close_fails(tmp_path: Path) -> None:
+    """An OS socket-close error must not skip the independent Worker cleanup."""
+
+    class CloseFailureBridge(_FakeBridge):
+        def close(self) -> None:
+            super().close()
+            raise OSError("socket close failed")
+
+    bridge = CloseFailureBridge()
+    controller = WorkerProcessController()
+    session = UERLSession.open(
+        _config(tmp_path / "run"),
+        process_controller=controller,
+        bridge_factory=lambda _config: bridge,
+    )
+    with pytest.raises(OSError, match="socket close failed"):
+        session.close()
+
+    assert controller.handle is None
+    assert session.state is SessionState.CLOSED
+    session.close()
+
+
+@pytest.mark.parametrize("failure", ["interrupt", "close"])
+def test_launch_failure_reclaims_owned_worker(tmp_path: Path, failure: str) -> None:
+    """Startup cancellation and socket-close errors both reclaim a launched Worker."""
+
+    class Process:
+        def __init__(self) -> None:
+            self.terminated = False
+            self.waits = 0
+
+        def poll(self) -> int | None:
+            return 0 if self.terminated else None
+
+        def wait(self, timeout: float | None = None) -> int:
+            self.waits += 1
+            if not self.terminated:
+                raise subprocess.TimeoutExpired("Worker.exe", timeout or 0.0)
+            return 0
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+    class FailingBridge(_FakeBridge):
+        def connect(self) -> dict[str, object]:
+            if failure == "interrupt":
+                raise KeyboardInterrupt
+            return super().connect()
+
+        def close(self) -> None:
+            super().close()
+            if failure == "close":
+                raise OSError("socket close failed")
+
+    process = Process()
+    controller = WorkerProcessController(
+        popen_factory=cast(PopenFactory, lambda _args, **_kwargs: process),
+    )
+    bridge = FailingBridge()
+    config = replace(
+        _config(tmp_path / "run"),
+        session=SessionConfig(mode=LaunchMode.LAUNCH, worker_executable=Path("Worker.exe")),
+    )
+    with pytest.raises(KeyboardInterrupt if failure == "interrupt" else OSError):
+        session = UERLSession.open(
+            config, process_controller=controller, bridge_factory=lambda _config: bridge,
+        )
+        session.close()
+
+    assert bridge.closed
+    assert controller.handle is None
+    assert process.terminated
+    assert process.waits == 2

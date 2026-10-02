@@ -392,3 +392,18 @@ def test_adapter_rejects_unused_reset_mask_bits() -> None:
     with pytest.raises(SessionError, match="unused"):
         adapter.reset(torch.tensor([True, False]))
     assert raw.close_calls == 1
+
+
+@pytest.mark.parametrize("mask", [torch.tensor([True]), torch.tensor([[True], [False]])])
+def test_adapter_rejects_wrong_reset_mask_shape_before_worker_mutation(mask: torch.Tensor) -> None:
+    """A mask must address the negotiated Slot vector before sending any Reset."""
+
+    raw = _RawSession()
+    adapter = UERLSessionAdapter(raw)
+    _initialize(adapter)
+
+    with pytest.raises(SessionError):
+        adapter.reset(mask)
+
+    assert raw.reset_payload is None
+    assert raw.close_calls == 0

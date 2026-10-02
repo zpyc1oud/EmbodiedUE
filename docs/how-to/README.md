@@ -1,10 +1,10 @@
-# How-to Guides
+# How-to guides
 
-这些指南帮助你使用已经接好的训练与部署路径。它们面向已经跑过 [Getting Started](../../README.md#getting-started) 的人。新用户请先看仓库 README。
+Complete [Getting started](../../README.md#getting-started) before following a runtime guide.
 
-| Guide | 用途 |
+| Guide | Purpose |
 |---|---|
-| [Record Video](record-video.md) | 从 UE 视口录制训练后推理 |
-| [PhantomX Robust Training](phantomx-robust-training.md) | 连续地形配置、物理时间目标、checkpoint 与分级评测 |
-| [Add a Robot](add-a-robot.md) | 接入一台新的 SkeletalMesh 机器人 |
-| [In-Game Deployment](../in-game-deployment-guide.md) | 把策略接到另一份 UE 5.8 工程 |
+| [PhantomX training and evaluation](phantomx-robust-training.md) | Terrain configuration, physical-time objectives, checkpoints, and per-level evaluation |
+| [Record video](record-video.md) | Record inference from the UE viewport and use keyboard commands |
+| [Add a robot](add-a-robot.md) | Integrate a Skeletal Mesh robot through assets and Python declarations |
+| [In-game deployment](../in-game-deployment-guide.md) | Import a policy into another UE 5.8 project and package it |

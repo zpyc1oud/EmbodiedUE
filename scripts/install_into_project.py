@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import shutil
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from uerl.policy.artifact import ArtifactTiming
 
 
 class InstallError(Exception):
@@ -59,6 +63,10 @@ def resolve_project(project_dir: Path) -> tuple[Path, Path]:
 
 
 def _copy_tree(source: Path, destination: Path, force: bool, ignore: set[str]) -> str:
+    source = source.resolve()
+    destination = destination.resolve()
+    if source == destination or source in destination.parents or destination in source.parents:
+        raise InstallError("plugin source and destination overlap")
     if not source.is_dir():
         raise InstallError(f"plugin source does not exist: {source}")
     if destination.exists() and not force:
@@ -71,6 +79,13 @@ def _copy_tree(source: Path, destination: Path, force: bool, ignore: set[str]) -
 
 def copy_plugin(*, repo_root: Path, project_root: Path, from_package: Path | None, force: bool) -> str:
     source = from_package.resolve() if from_package is not None else repo_root / "engine" / "Plugins" / PLUGIN_NAME
+    descriptor = source / f"{PLUGIN_NAME}.uplugin"
+    try:
+        data = json.loads(descriptor.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise InstallError(f"invalid plugin descriptor: {descriptor}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise InstallError(f"plugin descriptor must be a JSON object: {descriptor}")
     destination = project_root / "Plugins" / PLUGIN_NAME
     ignore = set() if from_package is not None else PLUGIN_COPY_IGNORE
     return _copy_tree(source, destination, force, ignore)
@@ -167,7 +182,7 @@ def upsert_physics_ini(ini_path: Path) -> str:
 
     existing_dt = _get_key(physics_lines, "MaxSubstepDeltaTime")
     try:
-        dt_ok = existing_dt is not None and float(existing_dt) <= DEFAULT_MAX_SUBSTEP_DELTA
+        dt_ok = existing_dt is not None and 0 < float(existing_dt) <= DEFAULT_MAX_SUBSTEP_DELTA
     except ValueError:
         dt_ok = False
     if not dt_ok:
@@ -175,7 +190,7 @@ def upsert_physics_ini(ini_path: Path) -> str:
 
     existing_steps = _get_key(physics_lines, "MaxSubsteps")
     try:
-        steps_ok = existing_steps is not None and int(float(existing_steps)) >= DEFAULT_MAX_SUBSTEPS
+        steps_ok = existing_steps is not None and int(existing_steps) >= DEFAULT_MAX_SUBSTEPS
     except ValueError:
         steps_ok = False
     if not steps_ok:
@@ -294,16 +309,16 @@ def _check(name: str, passed: bool, detail: str) -> PreflightCheck:
     return PreflightCheck(name=name, passed=passed, detail=detail)
 
 
-def _check_artifact(path: Path) -> PreflightCheck:
+def _check_artifact(path: Path) -> tuple[PreflightCheck, ArtifactTiming | None]:
     if not path.is_file():
-        return _check("artifact", False, f"missing artifact: {path}")
+        return _check("artifact", False, f"missing artifact: {path}"), None
     try:
         from uerl.policy.artifact import PolicyArtifact
 
-        PolicyArtifact.read(path)
+        timing = PolicyArtifact.read(path).timing
     except Exception as exc:  # noqa: BLE001 - report the artifact boundary failure to the operator.
-        return _check("artifact", False, f"invalid artifact {path}: {exc}")
-    return _check("artifact", True, str(path))
+        return _check("artifact", False, f"invalid artifact {path}: {exc}"), None
+    return _check("artifact", True, str(path)), timing
 
 
 def check_project(*, project_dir: Path, artifact: Path | None = None) -> tuple[PreflightCheck, ...]:
@@ -311,6 +326,7 @@ def check_project(*, project_dir: Path, artifact: Path | None = None) -> tuple[P
 
     project_root, uproject_path = resolve_project(project_dir)
     checks: list[PreflightCheck] = []
+    artifact_check, timing = _check_artifact(artifact.resolve()) if artifact is not None else (None, None)
     try:
         data = json.loads(uproject_path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -360,18 +376,25 @@ def check_project(*, project_dir: Path, artifact: Path | None = None) -> tuple[P
         for key, expected in PHYSICS_BOOLS.items():
             if _get_key(physics_lines, key) != expected:
                 failures.append(f"{key}={expected}")
+        dt_limit = timing.physics_dt if timing is not None else DEFAULT_MAX_SUBSTEP_DELTA
         dt = _get_key(physics_lines, "MaxSubstepDeltaTime")
         try:
-            if dt is None or float(dt) > DEFAULT_MAX_SUBSTEP_DELTA:
-                failures.append(f"MaxSubstepDeltaTime<={DEFAULT_MAX_SUBSTEP_DELTA}")
+            host_dt = float(dt) if dt is not None else math.nan
         except ValueError:
-            failures.append(f"MaxSubstepDeltaTime<={DEFAULT_MAX_SUBSTEP_DELTA}")
+            host_dt = math.nan
+        if not math.isfinite(host_dt) or not 0 < host_dt <= dt_limit + 1e-6:
+            failures.append(f"0<MaxSubstepDeltaTime<={dt_limit}")
+        required_steps = DEFAULT_MAX_SUBSTEPS
+        if timing is not None and math.isfinite(host_dt) and host_dt > 0:
+            # Match the deployment gate: a smaller host step needs more capacity.
+            ratio = timing.dt_max / host_dt
+            required_steps = max(2, math.ceil(ratio - max(1e-6, 8e-8 * max(1.0, abs(ratio)))))
         steps = _get_key(physics_lines, "MaxSubsteps")
         try:
-            if steps is None or int(float(steps)) < DEFAULT_MAX_SUBSTEPS:
-                failures.append(f"MaxSubsteps>={DEFAULT_MAX_SUBSTEPS}")
+            if steps is None or int(steps) < required_steps:
+                failures.append(f"MaxSubsteps>={required_steps}")
         except ValueError:
-            failures.append(f"MaxSubsteps>={DEFAULT_MAX_SUBSTEPS}")
+            failures.append(f"MaxSubsteps>={required_steps}")
         checks.append(
             _check(
                 "physics",
@@ -393,8 +416,8 @@ def check_project(*, project_dir: Path, artifact: Path | None = None) -> tuple[P
             str(target_path) if has_module_entry and target_path.is_file() else f"missing Game Target: {target_path}",
         )
     )
-    if artifact is not None:
-        checks.append(_check_artifact(artifact.resolve()))
+    if artifact_check is not None:
+        checks.append(artifact_check)
     return tuple(checks)
 
 
@@ -409,6 +432,18 @@ def install(
     if demo not in {None, "phantomx"}:
         raise InstallError(f"unknown demo: {demo}")
     project_root, uproject_path = resolve_project(project_dir)
+    # Reject known invalid inputs before replacing a working plugin or writing assets.
+    try:
+        project_data = json.loads(uproject_path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise InstallError(f"cannot parse {uproject_path}: {exc}") from exc
+    if not isinstance(project_data, dict):
+        raise InstallError(f"project descriptor must be a JSON object: {uproject_path}")
+    if demo == "phantomx":
+        for name in DEMO_ROBOT_ASSETS:
+            source = repo_root / "engine" / "Content" / "Robots" / "PhantomX" / name
+            if not source.is_file():
+                raise InstallError(f"repo demo asset is missing: {source}")
     reports = [copy_plugin(repo_root=repo_root, project_root=project_root, from_package=from_package, force=force)]
     if demo == "phantomx":
         reports.extend(copy_demo_robot(repo_root=repo_root, project_root=project_root, force=force))

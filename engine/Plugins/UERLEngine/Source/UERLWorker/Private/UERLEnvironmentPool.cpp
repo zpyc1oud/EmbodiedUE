@@ -121,6 +121,14 @@ bool FUERLEnvironmentPool::Create(
 
 void FUERLEnvironmentPool::Destroy()
 {
+	for (const auto& Entry : OriginalGroundMaterials)
+	{
+		if (UPrimitiveComponent* Ground = Entry.Key.Get())
+		{
+			Ground->SetPhysMaterialOverride(Entry.Value.Get());
+		}
+	}
+	OriginalGroundMaterials.Reset();
 	if (Robot)
 	{
 		Robot->DestroySlots();
@@ -232,6 +240,12 @@ bool FUERLEnvironmentPool::ApplyEvent(FUERLEventBatch& Event, FString& OutError)
 		}
 		for (UPrimitiveComponent* Ground : Grounds)
 		{
+			const TWeakObjectPtr<UPrimitiveComponent> GroundKey(Ground);
+			if (!OriginalGroundMaterials.Contains(GroundKey))
+			{
+				OriginalGroundMaterials.Add(
+					GroundKey, TStrongObjectPtr<UPhysicalMaterial>(Ground->GetPhysicsMaterialOverride()));
+			}
 			NeutralizeGroundFriction(*Ground);
 		}
 		return true;

@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"EngineAssociation": "5.8",
 	"Category": "",
-	"Description": "UE RL Engine 宿主工程。承载 UERLEngine 插件（Worker 内核）。",
+	"Description": "UE RL Engine host project with the UERLEngine Worker plugin.",
 	"Modules": [
 		{
 			"Name": "UERLHost",
@@ -21,18 +21,6 @@
 		},
 		{
 			"Name": "NNERuntimeORT",
-			"Enabled": true
-		},
-		{
-			"Name": "AIAssistant",
-			"Enabled": true
-		},
-		{
-			"Name": "AllToolsets",
-			"Enabled": true
-		},
-		{
-			"Name": "ModelContextProtocol",
 			"Enabled": true
 		}
 	]

@@ -1,8 +1,8 @@
-# UE5RL Engine —— Python (external training) side
+# UE RL Engine — Python training environment
 #
-# 说明：本pyproject 管理"外部训练进程"侧的 Python 环境（适配器 + RSL-RL）。
-# UE Worker（C++）不在此管理。references/ 只保存外部实现源码快照，运行时依赖
-# 必须从包索引解析，不能从 references/ 目录安装。
+# This file manages the external Python trainer, adapters, and RSL-RL.
+# Build the C++ UE Worker separately. Local references/ snapshots are not
+# runtime installation sources; resolve dependencies from package indexes.
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -11,11 +11,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ue-rl-engine"
 version = "1.0.0"
-description = "UE RL Engine：在 UE5 Chaos 中训练机器人策略，并部署进游戏。"
+description = "Train robot policies in Unreal Engine Chaos and deploy them in games."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
-    # RSL-RL runtime package；references/rsl_rl 仅供源码参考，不是安装源。
+    # RSL-RL runtime dependency; references/rsl_rl is for source inspection only.
     "rsl-rl-lib==5.4.2",
     # Keep the project environment on the CUDA 12.8 wheels used by the RTX 4060 host.
     # These are explicit project dependencies so uv cannot resolve the transitive
@@ -25,7 +25,7 @@ dependencies = [
     "numpy>=1.26",
     "imageio-ffmpeg>=0.6.0",
     "pillow>=11.2.0",
-    # 资产同目录 RobotConfig 文本文件解析（spec D12）：仅用 yaml.safe_load。
+    # Parse RobotConfig text with yaml.safe_load.
     "pyyaml>=6.0",
 ]
 
@@ -59,7 +59,7 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# 代码规范；项目约束入口见 AGENTS.md。
+# Code conventions and project constraints: see AGENTS.md.
 [tool.ruff]
 line-length = 120
 target-version = "py311"

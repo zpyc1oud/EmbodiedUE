@@ -3,8 +3,11 @@
 #include "CoreMinimal.h"
 #include "UERLBatchBinding.h"
 #include "UERLProvider.h"
+#include "UObject/StrongObjectPtr.h"
 
 class UWorld;
+class UPrimitiveComponent;
+class UPhysicalMaterial;
 
 /** Owns one Environment instance, one Robot instance, and all stable Slot identities. */
 class UERLWORKER_API FUERLEnvironmentPool
@@ -92,6 +95,8 @@ private:
 		bool bAdvanceEpisode,
 		FString& OutError);
 
+	// Keep original overrides alive while transient training materials replace them.
+	TMap<TWeakObjectPtr<UPrimitiveComponent>, TStrongObjectPtr<UPhysicalMaterial>> OriginalGroundMaterials;
 	TUniquePtr<IUERLEnvironment> Environment;
 	TUniquePtr<IUERLRobot> Robot;
 	TArray<FUERLSlotContext> Slots;
