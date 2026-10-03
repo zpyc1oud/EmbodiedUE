@@ -5,13 +5,15 @@
 # runtime installation sources; resolve dependencies from package indexes.
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ue-rl-engine"
 version = "1.0.0"
-description = "Train robot policies in Unreal Engine Chaos and deploy them in games."
+description = "Early-stage tools to train robot policies in Unreal Engine Chaos and deploy them in games."
+license = "Apache-2.0"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [

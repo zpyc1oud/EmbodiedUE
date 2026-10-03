@@ -114,6 +114,20 @@ def build_launch_overrides(
         ``-nullrhi`` in viewport mode, so the two modes emit disjoint RHI flags.
     """
 
+    if map_name == "/Game/Stylized_Egypt/Maps/Stylized_Egypt_Demo":
+        optional_map = project.parent / "Content/Stylized_Egypt/Maps/Stylized_Egypt_Demo.umap"
+        present = optional_map.is_file() and optional_map.stat().st_size > 0
+        if present:
+            with optional_map.open("rb") as stream:
+                present = not stream.read(64).startswith(b"version https://git-lfs.github.com/spec/v1")
+        if not present:
+            raise FileNotFoundError(
+                f"Optional Stylized Egypt map is missing or only an LFS pointer: {optional_map}. "
+                "Acquire/install your own copy from "
+                "https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd "
+                "and follow docs/how-to/optional-egypt-demo.md. No replacement map was selected."
+            )
+
     bridge_port = port if port is not None else _free_port()
     worker_args = [
         str(project),

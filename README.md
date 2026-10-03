@@ -10,6 +10,19 @@ The project includes CartPole and PhantomX hexapod tasks. It uses **rsl-rl**, wi
 
 These videos illustrate sample policies, not a performance guarantee for newly trained models.
 
+## Project status: Early-Stage
+
+EmbodiedUE is an early-stage project. APIs, artifact formats, and workflows may change;
+backward compatibility and production readiness are not guaranteed. Python checks do
+not establish UE runtime compatibility. Clean-host Windows/UE build, training, import,
+and packaging validation remain outstanding in the current release review.
+
+The Egypt gameplay scene is an [optional Fab installation](docs/how-to/optional-egypt-demo.md).
+Acquire [Stylized Egypt](https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd)
+yourself; the listing displayed Free on 2026-10-03. Its source assets are excluded from
+this tree. The default game map is the empty Engine Entry map; open the installed
+Egypt map explicitly for gameplay. CartPole and procedural-terrain task maps are unchanged.
+
 ## What is included
 
 - Request-driven physics stepping and batched robot instances in a UE world.
@@ -109,7 +122,7 @@ Export initializes a UE Session; it is not an offline checkpoint conversion. Dep
 | `UERL-PhantomX-Walk-v0` | Flat-ground locomotion | 512 |
 | `UERL-PhantomX-ContinuousTerrain-v0` | Eight levels of continuous terrain | 64 |
 | `UERL-PhantomX-DiscreteTerrain-v0` | Six levels of discrete obstacles | 64 |
-| `UERL-PhantomX-Pursuit-v0` | Pursuit in an authored map | 1 |
+| `UERL-PhantomX-Pursuit-v0` | Pursuit in an optional locally installed Egypt map | 1 |
 
 Use `uerl config --task <TaskID>` for the resolved defaults. Robot declarations live in `src/uerl/assets/robots/`; task factories can override base YAML settings. See [configuration](docs/configuration.md).
 
@@ -125,6 +138,15 @@ uv run pytest -q
 
 UE Automation, end-to-end training, recording, and packaging require the Windows/UE host. These Windows/UE workflows have not been rerun during this documentation update. Python-only validation does not establish runtime compatibility or policy performance.
 
-## License and publication status
+## License
 
-**A project license has not yet been selected or included.** This documentation update does not grant an open-source license. Source licensing, third-party notices, content redistribution rights, and a security reporting channel remain owner decisions before publication. See the [release-readiness inventory](docs/release-readiness.md).
+Original EmbodiedUE project code, documentation, and configuration are licensed under
+[Apache-2.0](LICENSE). Third-party code and content retain their respective rights;
+this license does not cover Unreal Engine, Fab/Epic assets, or robot assets, policy
+artifacts, and media without an explicit project licensing statement. See
+[Third-party notices and asset inventory](THIRD_PARTY_NOTICES.md).
+
+Unreal Engine is obtained separately under Epic's applicable agreements. The owner
+has confirmed that `Stylized_Egypt` comes from Fab. Its raw assets are excluded from
+the current tree; historical Git/LFS copies remain a publication blocker. Other
+content provenance is still under review. See [release readiness](docs/release-readiness.md).

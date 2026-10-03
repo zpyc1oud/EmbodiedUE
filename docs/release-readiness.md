@@ -1,26 +1,37 @@
 # Release-readiness inventory
 
-This inventory separates documentation work from publication decisions. The documentation is prepared for external readers; the repository is **not yet represented as licensed open source**. No license has been selected, no functional assets removed, and no publication action performed by this update.
+The owner selected **Apache-2.0** for original project code, documentation, and
+configuration, and **Early-Stage** status. [LICENSE](../LICENSE) contains the unmodified
+Apache text. Third-party rights remain separate; the current content bundle is not
+cleared for public redistribution. These local changes do not publish the repository.
 
-## Owner decisions before publication
+## Remaining publication decisions
 
-| Item | Checkout evidence | Required decision or verification |
+| Item | Verified state | Required decision or verification |
 |---|---|---|
-| Project license | No root `LICENSE` or `COPYING` file found; Python metadata does not declare a license | Select the license and copyright holders, then add the approved text and metadata |
-| Third-party notices | No project-level third-party notice inventory found | Inventory dependencies, incorporated code, binary runtime components, and required notices for the intended distribution |
-| UE content | `engine/Content/Stylized_Egypt/`, `Characters/Mannequins/`, `FirstPerson/`, `LevelPrototyping/`, robot assets, and plugin demo policies are present | Establish origin, author, source/license, permitted redistribution, and attribution for each collection; determine what can be shipped in source versus cooked form |
-| Training artifacts and media | `.uerlpol2` examples, policy `.uasset` files, parity fixtures, and `docs/media/` videos are present | Confirm provenance and distribution permission; identify the task/configuration used by each demonstration artifact |
-| Unreal Engine | UE 5.8 is a separately acquired prerequisite | Confirm the planned source/binary distribution respects the applicable engine and content terms; do not imply the project license covers UE |
-| Clean-host build | Host enables the bundled runtime and core engine dependencies only; live UE validation is unavailable here | Run build, training smoke, import, and packaging on a clean Windows machine |
-| Git LFS | `.gitattributes` tracks `.uasset` and `.umap` | Verify external users can retrieve the required objects and that storage/access policy supports the intended release |
-| Security reporting | No designated private contact or support policy supplied | Configure a private reporting channel and update `SECURITY.md` |
+| Project licensing | Apache-2.0 text, package metadata and contribution guidance are present | Confirm rights over original contributions and the preferred copyright-holder attribution; no legal name was inferred from Git identity. The generic placeholders in the official license appendix are part of its unmodified text |
+| Third-party notices | [Preliminary inventory](../THIRD_PARTY_NOTICES.md) records inspected dependency licenses and asset uncertainties | Complete provenance review; include actual upstream notices/licenses for any components bundled in a release |
+| Fab content | Owner confirms `engine/Content/Stylized_Egypt/` originated on Fab | 304 raw files excluded; optional [local installation](how-to/optional-egypt-demo.md) retains integration. Current Free price does not settle license/use rights; see [history plan](asset-publication-plan.md) |
+| Other UE/robot content | Template-like collections, robot assets, policies and media remain present | Determine per-collection source, rights and attribution; do not treat Apache-2.0 as covering unverified content |
+| History and LFS | Fab assets are excluded from current tree but present in tracked history and LFS metadata | Choose a rights-cleared publication snapshot or an explicitly authorized history/LFS cleanup; deleting only current paths would not clear historical distribution |
+| Security reporting | [SECURITY.md](../SECURITY.md) lacks a designated private reporting channel | Owner supplies a private contact or enables private reporting before publication |
 
-Dependency names such as rsl-rl, PyTorch, torchvision, NumPy, PyYAML, imageio-ffmpeg, Pillow, and ONNX Runtime identify review targets, not completed license clearance. Local `references/` is excluded by `.gitignore` and is not required by the public guides.
+## Early-Stage validation and distribution readiness
+
+Clean-host Windows/UE build, live Chaos training smoke, policy import and packaged-game
+checks remain outstanding. These are validation limits, not reasons to change the
+chosen code license. Verify LFS availability for authorized assets and document
+optional externally obtained content so default examples remain usable.
+
+UE 5.8 is a separately acquired prerequisite. A source release of original project
+code does not include rights to engine binaries, engine source or Epic/Fab content.
+Review applicable engine/content terms for the distribution actually planned.
 
 ## Inspection scope
 
-The documentation audit checks the current checkout for licensing files, asset groups, external prerequisites, machine-specific examples, and common credential patterns. It is not an exhaustive legal review, a scan of binary asset internals, or a full-history secret audit. Credential findings should be reported by location and type only. Before release, the owner must review history and binary/content provenance as appropriate for the distribution.
-
-## Validation boundaries
-
-Python CLI help, task enumeration, resolved configurations, and selected Python checks can be verified in the current Linux environment. It has no visible NVIDIA GPU/driver or Unreal Editor. Windows build, live Chaos training, recording, deployment import, and packaged-game validation remain outstanding; no such workflow was run for this documentation update.
+The current review covers tracked paths, textual references, Git/LFS metadata,
+selected installed dependency licenses, and owner-confirmed Fab provenance. It is
+not an exhaustive legal review, binary asset dependency analysis, or full-history
+secret audit. No credentials were displayed or tested. Earlier credential cleanup
+is not being reported as a new exposure; revocation status is outside this review.
+The Fab collection was recoverably removed from the current tree. No history was rewritten, LFS objects purged, or publication action taken.

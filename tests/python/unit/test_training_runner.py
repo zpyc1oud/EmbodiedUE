@@ -163,6 +163,9 @@ def test_launch_overrides_viewport_open_a_window_without_null_rhi(tmp_path: Path
 
 
 def test_launch_overrides_gameplay_preserve_map_player_without_observer(tmp_path: Path) -> None:
+    installed_map = tmp_path / "Content/Stylized_Egypt/Maps/Stylized_Egypt_Demo.umap"
+    installed_map.parent.mkdir(parents=True)
+    installed_map.write_bytes(b"synthetic package presence fixture")
     overrides = build_launch_overrides(
         ue_executable=tmp_path / "UnrealEditor-Cmd.exe",
         project=tmp_path / "UERLHost.uproject",
@@ -595,3 +598,24 @@ def test_run_training_rejects_missing_resume_before_opening_session(
         run_training(config)
 
     open_session.assert_not_called()
+
+
+@pytest.mark.parametrize("contents", [None, b"", b"version https://git-lfs.github.com/spec/v1\n"])
+def test_optional_egypt_missing_map_fails_before_launch_arguments(tmp_path: Path, contents: bytes | None) -> None:
+    map_file = tmp_path / "Content/Stylized_Egypt/Maps/Stylized_Egypt_Demo.umap"
+    if contents is not None:
+        map_file.parent.mkdir(parents=True)
+        map_file.write_bytes(contents)
+    with pytest.raises(FileNotFoundError, match="Acquire/install your own copy"):
+        build_launch_overrides(
+            ue_executable=tmp_path / "must-not-launch.exe",
+            project=tmp_path / "UERLHost.uproject",
+            map_name="/Game/Stylized_Egypt/Maps/Stylized_Egypt_Demo",
+            port=1,
+        )
+
+
+def test_default_host_map_does_not_require_optional_fab_content() -> None:
+    root = Path(__file__).resolve().parents[3]
+    text = (root / "engine/Config/DefaultEngine.ini").read_text()
+    assert "GameDefaultMap=/Engine/Maps/Entry" in text

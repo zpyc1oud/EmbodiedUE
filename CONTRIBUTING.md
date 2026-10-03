@@ -2,7 +2,15 @@
 
 EmbodiedUE combines Python training code with a UE 5.8 C++ plugin and binary content. Start with [setup](README.md#getting-started), [architecture](docs/architecture.md), and the [domain glossary](CONTEXT.md).
 
-The project license and contribution terms are still pending owner review. Before submitting third-party code or assets, resolve their provenance and redistribution terms with the maintainer. See [release readiness](docs/release-readiness.md).
+Original project code, documentation, and configuration use [Apache-2.0](LICENSE).
+Contributions intentionally submitted for inclusion are covered by that license,
+unless explicitly stated otherwise and agreed with the maintainer. Submit only work
+you have the right to contribute; retain third-party notices and identify any separate
+licenses. Asset contributions need their own provenance and redistribution permission.
+See [third-party notices](THIRD_PARTY_NOTICES.md) and [release readiness](docs/release-readiness.md).
+
+The project is **Early-Stage**; interfaces and workflows may change without a
+backward-compatibility guarantee.
 
 ## Propose a focused change
 

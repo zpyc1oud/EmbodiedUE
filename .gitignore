@@ -67,3 +67,6 @@ tmp/
 # Reference sources stay local and are not part of the published repository.
 references/
 .gitmodules
+
+# Optional Fab content is installed locally by its licensed user, never bundled.
+/engine/Content/Stylized_Egypt/
