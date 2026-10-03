@@ -15,6 +15,8 @@ Start with the [repository README](../README.md) for prerequisites and the first
 | Adding plan operators | [Operator admission](../engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md) |
 | Contributions and change review | [Contributing](../CONTRIBUTING.md) |
 | Trust boundaries and vulnerability reports | [Security](../SECURITY.md) |
+| Third-party code and content | [Notices and inventory](../THIRD_PARTY_NOTICES.md) |
+| Fab asset removal planning | [Asset publication plan](asset-publication-plan.md) |
 | Licensing, assets, and release decisions | [Release readiness](release-readiness.md) |
 | Change history | [Changelog](../CHANGELOG.md) |
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adopt Apache-2.0 for original project code, documentation and configuration; mark the project Early-Stage. Record third-party rights separately and document the unresolved Fab asset publication scope without removing content.
+
 - Repair the bundled legacy PhantomX converter: include required timing metadata and preserve its historical 115-input observation contract.
 
 - Fix training resume so an explicit missing checkpoint fails before UE startup. PPO now bootstraps pure timeouts only, excluding physical failures that coincide with the time limit.

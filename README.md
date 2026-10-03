@@ -10,6 +10,13 @@ The project includes CartPole and PhantomX hexapod tasks. It uses **rsl-rl**, wi
 
 These videos illustrate sample policies, not a performance guarantee for newly trained models.
 
+## Project status: Early-Stage
+
+EmbodiedUE is an early-stage project. APIs, artifact formats, and workflows may change;
+backward compatibility and production readiness are not guaranteed. Python checks do
+not establish UE runtime compatibility. Clean-host Windows/UE build, training, import,
+and packaging validation remain outstanding in the current release review.
+
 ## What is included
 
 - Request-driven physics stepping and batched robot instances in a UE world.
@@ -125,6 +132,15 @@ uv run pytest -q
 
 UE Automation, end-to-end training, recording, and packaging require the Windows/UE host. These Windows/UE workflows have not been rerun during this documentation update. Python-only validation does not establish runtime compatibility or policy performance.
 
-## License and publication status
+## License
 
-**A project license has not yet been selected or included.** This documentation update does not grant an open-source license. Source licensing, third-party notices, content redistribution rights, and a security reporting channel remain owner decisions before publication. See the [release-readiness inventory](docs/release-readiness.md).
+Original EmbodiedUE project code, documentation, and configuration are licensed under
+[Apache-2.0](LICENSE). Third-party code and content retain their respective rights;
+this license does not cover Unreal Engine, Fab/Epic assets, or robot assets, policy
+artifacts, and media without an explicit project licensing statement. See
+[Third-party notices and asset inventory](THIRD_PARTY_NOTICES.md).
+
+Unreal Engine is obtained separately under Epic's applicable agreements. The owner
+has confirmed that `Stylized_Egypt` comes from Fab; permission to redistribute its
+editable assets publicly has not been established. The current asset bundle is not
+cleared for public redistribution. See [release readiness](docs/release-readiness.md).
