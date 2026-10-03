@@ -21,3 +21,11 @@ Start with the [repository README](../README.md) for prerequisites and the first
 | Change history | [Changelog](../CHANGELOG.md) |
 
 Videos in `docs/media/` show historical inference. Generated runs and private reference checkouts are not required to read these guides and are not bundled experiment evidence.
+
+## Development proposals
+
+These documents describe planned work, not current product features or measured results.
+
+- [Development roadmap](development/roadmap.md): architecture changes, Task entry points, onboarding, dependencies, and release scope.
+- [Training benchmark design](development/training-benchmarks.md): workloads, timing, learning quality, statistics, and stability.
+- [Training and deployment compatibility](development/train-deploy-parity.md): shared semantics, runtime differences, diagnostics, and target-map validation.
