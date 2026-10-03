@@ -11,9 +11,9 @@ cleared for public redistribution. These local changes do not publish the reposi
 |---|---|---|
 | Project licensing | Apache-2.0 text, package metadata and contribution guidance are present | Confirm rights over original contributions and the preferred copyright-holder attribution; no legal name was inferred from Git identity. The generic placeholders in the official license appendix are part of its unmodified text |
 | Third-party notices | [Preliminary inventory](../THIRD_PARTY_NOTICES.md) records inspected dependency licenses and asset uncertainties | Complete provenance review; include actual upstream notices/licenses for any components bundled in a release |
-| Fab content | Owner confirms `engine/Content/Stylized_Egypt/` originated on Fab | Establish exact listing/acquired terms and public editable-asset redistribution rights, or exclude it; see [removal plan](asset-publication-plan.md) |
+| Fab content | Owner confirms `engine/Content/Stylized_Egypt/` originated on Fab | 304 raw files excluded; optional [local installation](how-to/optional-egypt-demo.md) retains integration. Current Free price does not settle license/use rights; see [history plan](asset-publication-plan.md) |
 | Other UE/robot content | Template-like collections, robot assets, policies and media remain present | Determine per-collection source, rights and attribution; do not treat Apache-2.0 as covering unverified content |
-| History and LFS | Assets are present in tracked history and LFS metadata | Choose a rights-cleared publication snapshot or an explicitly authorized history/LFS cleanup; deleting only current paths would not clear historical distribution |
+| History and LFS | Fab assets are excluded from current tree but present in tracked history and LFS metadata | Choose a rights-cleared publication snapshot or an explicitly authorized history/LFS cleanup; deleting only current paths would not clear historical distribution |
 | Security reporting | [SECURITY.md](../SECURITY.md) lacks a designated private reporting channel | Owner supplies a private contact or enables private reporting before publication |
 
 ## Early-Stage validation and distribution readiness
@@ -34,4 +34,4 @@ selected installed dependency licenses, and owner-confirmed Fab provenance. It i
 not an exhaustive legal review, binary asset dependency analysis, or full-history
 secret audit. No credentials were displayed or tested. Earlier credential cleanup
 is not being reported as a new exposure; revocation status is outside this review.
-No assets were deleted, history rewritten, LFS objects purged, or publication action taken.
+The Fab collection was recoverably removed from the current tree. No history was rewritten, LFS objects purged, or publication action taken.

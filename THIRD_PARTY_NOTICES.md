@@ -40,7 +40,7 @@ see [FFmpeg's official guidance](https://ffmpeg.org/legal.html).
 | Item | Verified provenance/status | Publication action still needed |
 |---|---|---|
 | Unreal Engine 5.8 | Separately acquired prerequisite; `engine/` contains the project, not a bundled engine distribution | Follow the applicable [UE agreement](https://www.unrealengine.com/eula/unreal); project Apache licensing does not grant engine rights |
-| `engine/Content/Stylized_Egypt/` | Owner confirmed Fab origin on 2026-10-03 | Identify exact listing, publisher, acquisition/license terms and redistribution scope, or exclude assets from the public release; **not cleared** |
+| `engine/Content/Stylized_Egypt/` | Owner confirmed Fab origin; official [Stylized Egypt by AleksandrIvanov](https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd) displayed Free on 2026-10-03; 304 raw files excluded from current tree | Local acquisition required; specific license and intended-use permissions unresolved; historical Git/LFS copies still block visibility change |
 | `engine/Content/Characters/Mannequins/`, `FirstPerson/`, `LevelPrototyping/`, `Weapons/` and related maps/external objects | Present; exact source classification and rights not verified | Distinguish Epic Examples/Templates, other Epic content, and third-party additions; retain applicable notices |
 | `engine/Content/Robots/CartPole/`, `PhantomX/` | Robot meshes, skeletons and PhysicsAssets present | Establish authorship/source and permission for editable-asset redistribution |
 | Policy `.uasset` / `.uerlpol2` files, parity fixtures and `docs/media/` | Present; no complete artifact/media rights inventory | Confirm origin and intended licensing of each distributed artifact or recording |
@@ -52,6 +52,7 @@ be established. Some content may instead carry another license. Likewise, Epic's
 [content agreement](https://www.unrealengine.com/eula/content) and the UE agreement's
 Examples provisions are distinct; directory names alone do not determine rights.
 
-No assets have been removed or reclassified by this inventory. See the
-[read-only asset publication plan](docs/asset-publication-plan.md) and
+The Fab collection and its text map export have been removed from the current tree;
+no third-party rights were reclassified. Original integration code remains. See the
+[asset exclusion and history plan](docs/asset-publication-plan.md) and
 [remaining release decisions](docs/release-readiness.md).

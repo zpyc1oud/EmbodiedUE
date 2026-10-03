@@ -2,7 +2,7 @@
 
 Deploy a `.uerlpol2` policy on a Skeletal Mesh Actor in UE 5.8. Runtime inference uses the imported `UUERLPolicyArtifactAsset` plus its mesh and PhysicsAsset. The source `.uerlpol2` is needed for Editor import/reimport, not as a loose file in the packaged game.
 
-The repository host's `Stylized_Egypt_Demo` gameplay spawns PhantomX and pursues the player. For another game, use the plugin's `BP_UERLPolicyRobot` or `UUERLPolicyComponent`; the host GameMode is demonstration code.
+After [optional Fab installation and local setup](how-to/optional-egypt-demo.md), the host's `Stylized_Egypt_Demo` gameplay spawns PhantomX and pursues the player. For another game, use the plugin's `BP_UERLPolicyRobot` or `UUERLPolicyComponent`; the host GameMode is demonstration code.
 
 ## Prepare a target project
 
@@ -174,7 +174,7 @@ Ensure that the map, Blueprint, game-side mesh and PhysicsAsset, imported policy
 [UERLPolicyComponent] first control step frame=7 observation_dt=0.005000 solver_dt=0.005000
 ```
 
-The host's Play experience uses `Stylized_Egypt_Demo`; avoid changing the Editor startup map to the large demo map solely for this workflow, since automation also loads the project.
+The host defaults to the empty `/Engine/Maps/Entry`. For the optional Egypt Play experience, install the content and open `Stylized_Egypt_Demo` explicitly; avoid changing the Editor startup map to the large demo map solely for this workflow, since automation also loads the project.
 
 ## Limitations
 

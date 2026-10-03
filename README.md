@@ -17,6 +17,12 @@ backward compatibility and production readiness are not guaranteed. Python check
 not establish UE runtime compatibility. Clean-host Windows/UE build, training, import,
 and packaging validation remain outstanding in the current release review.
 
+The Egypt gameplay scene is an [optional Fab installation](docs/how-to/optional-egypt-demo.md).
+Acquire [Stylized Egypt](https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd)
+yourself; the listing displayed Free on 2026-10-03. Its source assets are excluded from
+this tree. The default game map is the empty Engine Entry map; open the installed
+Egypt map explicitly for gameplay. CartPole and procedural-terrain task maps are unchanged.
+
 ## What is included
 
 - Request-driven physics stepping and batched robot instances in a UE world.
@@ -116,7 +122,7 @@ Export initializes a UE Session; it is not an offline checkpoint conversion. Dep
 | `UERL-PhantomX-Walk-v0` | Flat-ground locomotion | 512 |
 | `UERL-PhantomX-ContinuousTerrain-v0` | Eight levels of continuous terrain | 64 |
 | `UERL-PhantomX-DiscreteTerrain-v0` | Six levels of discrete obstacles | 64 |
-| `UERL-PhantomX-Pursuit-v0` | Pursuit in an authored map | 1 |
+| `UERL-PhantomX-Pursuit-v0` | Pursuit in an optional locally installed Egypt map | 1 |
 
 Use `uerl config --task <TaskID>` for the resolved defaults. Robot declarations live in `src/uerl/assets/robots/`; task factories can override base YAML settings. See [configuration](docs/configuration.md).
 
@@ -141,6 +147,6 @@ artifacts, and media without an explicit project licensing statement. See
 [Third-party notices and asset inventory](THIRD_PARTY_NOTICES.md).
 
 Unreal Engine is obtained separately under Epic's applicable agreements. The owner
-has confirmed that `Stylized_Egypt` comes from Fab; permission to redistribute its
-editable assets publicly has not been established. The current asset bundle is not
-cleared for public redistribution. See [release readiness](docs/release-readiness.md).
+has confirmed that `Stylized_Egypt` comes from Fab. Its raw assets are excluded from
+the current tree; historical Git/LFS copies remain a publication blocker. Other
+content provenance is still under review. See [release readiness](docs/release-readiness.md).
