@@ -94,6 +94,13 @@ not establish that a different UE installation or project has equivalent assets.
 
 ### Checkpoint state and old Runs
 
+Only load checkpoints from trusted sources. Checkpoint loading uses
+`torch.load(..., weights_only=False)` to recover Python training state; pickle
+can execute code during deserialization. Empty, truncated, invalid or Git LFS
+pointer files produce a checkpoint-path error before Session startup. Restore a
+complete trusted checkpoint, including the actual LFS content when applicable,
+and retry. This error handling does not make untrusted checkpoints safe.
+
 The existing runner loader restores actor and critic state (including enabled
 observation-normalization statistics and actor distribution parameters), PPO
 optimizer state and iteration, named curriculum state, the saved decimation RNG,

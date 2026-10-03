@@ -141,3 +141,63 @@ def test_invalid_continuation_stops_before_session_or_output(
     assert train.main(argv) == 1
     assert not output.exists()
     assert before == {path.name: path.read_bytes() for path in run.iterdir()}
+
+
+@pytest.mark.parametrize("kind", ["empty", "invalid_pickle", "lfs_pointer", "truncated_archive"])
+def test_unreadable_checkpoint_returns_actionable_failure_without_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    kind: str,
+) -> None:
+    from uerl.errors import ConfigError
+    from uerl.training.checkpoint import inspect_resume_checkpoint
+
+    run = tmp_path / "source"
+    run.mkdir()
+    output = tmp_path / "new-run"
+    checkpoint = run / "model_final.pt"
+    config = build_run_config(CARTPOLE_TASK_ID, overrides={"runner.checkpoint": str(checkpoint)})
+    (run / "resolved_config.json").write_text(canonical_json(config))
+    if kind == "truncated_archive":
+        torch.save({"weight": torch.ones(16)}, checkpoint)
+        checkpoint.write_bytes(checkpoint.read_bytes()[:64])
+    else:
+        checkpoint.write_bytes(
+            {
+                "empty": b"",
+                "invalid_pickle": b"not a checkpoint",
+                "lfs_pointer": b"version https://git-lfs.github.com/spec/v1\noid sha256:123\nsize 1000\n",
+            }[kind]
+        )
+    before = {path.name: path.read_bytes() for path in run.iterdir()}
+
+    def forbidden(*args: object, **kwargs: object) -> NoReturn:
+        pytest.fail("unreadable checkpoint reached Session.open")
+
+    monkeypatch.setattr(UERLSession, "open", forbidden)
+    assert (
+        train.main(
+            [
+                "--task",
+                CARTPOLE_TASK_ID,
+                "--resume",
+                str(run),
+                "--run-dir",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    captured = capsys.readouterr()
+    assert str(checkpoint) in captured.out
+    assert "complete trusted checkpoint" in captured.out
+    assert "[FAIL]" in captured.out
+    assert not captured.err
+    assert not output.exists()
+    assert before == {path.name: path.read_bytes() for path in run.iterdir()}
+    with pytest.raises(ConfigError) as error:
+        inspect_resume_checkpoint(config)
+    assert error.value.code == "INVALID_CHECKPOINT"
+    assert error.value.path == str(checkpoint)
+    assert error.value.__cause__ is not None

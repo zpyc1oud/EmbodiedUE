@@ -53,7 +53,17 @@ def inspect_resume_checkpoint(
     checkpoint = config.runner.checkpoint
     if checkpoint is None or not checkpoint.is_file():
         raise ConfigError("continuation checkpoint not found", code="INVALID_CHECKPOINT", path=str(checkpoint))
-    payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+    try:
+        payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+    except Exception as exc:
+        # Scope the conversion to file reading/deserialization, not validation.
+        # Exception deliberately excludes KeyboardInterrupt and SystemExit.
+        raise ConfigError(
+            "cannot read checkpoint; restore a complete trusted checkpoint "
+            "(fetch the actual Git LFS content if needed) and retry",
+            code="INVALID_CHECKPOINT",
+            path=str(checkpoint),
+        ) from exc
     if not isinstance(payload, Mapping):
         _fail("expected a checkpoint mapping", "checkpoint")
     for key in ("actor_state_dict", "critic_state_dict", "optimizer_state_dict"):

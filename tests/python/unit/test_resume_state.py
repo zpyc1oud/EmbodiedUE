@@ -131,3 +131,22 @@ def test_malformed_saved_state_is_rejected(tmp_path: Path, invalid: str) -> None
     _save(config, payload)
     with pytest.raises(ConfigError):
         inspect_resume_checkpoint(config)
+
+
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
+def test_checkpoint_read_preserves_process_interruptions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interruption: type[BaseException],
+) -> None:
+    from typing import NoReturn
+
+    config, payload = _checkpoint(tmp_path, phantomx=False)
+    _save(config, payload)
+
+    def interrupted(*args: object, **kwargs: object) -> NoReturn:
+        raise interruption
+
+    monkeypatch.setattr(torch, "load", interrupted)
+    with pytest.raises(interruption):
+        inspect_resume_checkpoint(config)
