@@ -1,4 +1,4 @@
-"""Rebuild the configuration a Run was trained with for export and playback."""
+"""Resolve registered defaults or saved Run settings without starting a Worker."""
 
 from __future__ import annotations
 
@@ -33,10 +33,12 @@ def resolve_run_config(
 ) -> RunConfig:
     """Resolve the Run's own Worker, Task and runner settings plus this command's launch shape.
 
-    Session and logging start from the Task registration so the command never
+    Session endpoint and logging start from the Task registration so the command never
     reuses the training port or writes evidence into the training Run. Only the
-    given ``overrides`` (launch arguments, Slot count, device, seed) differ from
-    the Run. Without ``resolved_config.json`` the registered defaults are used.
+    given ``overrides`` differ from the saved Worker, Task and runner settings.
+    The recorded map is restored unless explicitly overridden. Without
+    ``resolved_config.json`` the registered defaults are used. Missing dataclass
+    fields retain current defaults; this is not a faithful continuation contract.
     """
 
     registry = create_default_registry()
@@ -66,9 +68,15 @@ def resolve_run_config(
     worker = _typed(type(defaults.worker), defaults.worker, payload.get("worker"), "worker")
     task = _typed(type(defaults.task), defaults.task, payload.get("task"), "task")
     runner = _typed(type(defaults.runner), defaults.runner, payload.get("runner"), "runner")
+    session = payload.get("session")
+    map_path = session.get("map_path") if isinstance(session, dict) else None
+    session_config = registration.session_config
+    if isinstance(map_path, str) and map_path:
+        session_config = replace(session_config, map_path=map_path)
     run_registration = replace(
         registration,
         task_version=task_version,
+        session_config=session_config,
         environment_id=worker.environment_id,
         robot_id=worker.robot_id,
         worker_config_factory=lambda: worker,
@@ -77,17 +85,6 @@ def resolve_run_config(
     )
     config = RunConfigResolver(_SingleRegistration(run_registration)).resolve(task_id, overrides)
     return RunConfig(config, run_hash, from_run=True)
-
-
-def recorded_map_path(run_directory: Path | None) -> str | None:
-    """Return the World the Run trained in, when it recorded one."""
-
-    path = None if run_directory is None else run_directory / RESOLVED_CONFIG_FILENAME
-    if path is None or not path.is_file():
-        return None
-    session = json.loads(path.read_text(encoding="utf-8")).get("session")
-    map_path = session.get("map_path") if isinstance(session, dict) else None
-    return map_path if isinstance(map_path, str) and map_path else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,4 +158,4 @@ def _typed(annotation: Any, template: Any, value: Any, path: str) -> Any:
     raise ConfigError(f"cannot read {value!r} as {annotation!r}", code="INVALID_RUN_CONFIG", path=path)
 
 
-__all__ = ["RESOLVED_CONFIG_FILENAME", "RunConfig", "recorded_map_path", "resolve_run_config"]
+__all__ = ["RESOLVED_CONFIG_FILENAME", "RunConfig", "resolve_run_config"]
