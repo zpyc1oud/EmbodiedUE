@@ -8,7 +8,7 @@ import json
 from ..errors import ConfigError, RegistryError, UERLError
 from ..tasks.registry import create_default_registry
 from ..training import build_run_config, robot_runtime_from_config
-from .boundary import suggest_task_ids
+from .boundary import describe
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -48,11 +48,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         report = _task_report(args.task_id)
-    except RegistryError:
-        candidates = suggest_task_ids(args.task_id)
-        print(f"[FAIL] unknown Task {args.task_id!r}; run `uerl tasks` to list registered Tasks")
-        if candidates:
-            print(f"candidates: {', '.join(candidates)}")
+    except RegistryError as exc:
+        for line in describe(exc):
+            print(line)
         return 1
     except (ConfigError, UERLError, OSError) as exc:
         print(f"[FAIL] task preflight: {exc}")

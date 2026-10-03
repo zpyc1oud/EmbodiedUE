@@ -24,7 +24,7 @@ def test_default_cartpole_config_is_in_dedicated_task_folder() -> None:
 
     config = load_cartpole_training_config()
 
-    assert DEFAULT_CARTPOLE_TRAINING_CONFIG == Path("configs/tasks/cartpole/training.yaml").resolve()
+    assert DEFAULT_CARTPOLE_TRAINING_CONFIG == Path("src/uerl/configs/tasks/cartpole/training.yaml").resolve()
     assert config.worker.environment_id == CARTPOLE_ENVIRONMENT_ID
     assert config.worker.robot_id == CARTPOLE_ROBOT_ID
     assert config.worker.robot_asset_path == "/Game/Robots/CartPole/SKM_CartPole"

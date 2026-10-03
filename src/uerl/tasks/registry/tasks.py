@@ -40,7 +40,9 @@ class TaskRegistry:
             pass. Failed registration leaves the registry unchanged.
         """
 
-        if not registration.task_id:
+        if not isinstance(registration, TaskRegistration):
+            raise RegistryError("factory must return TaskRegistration", code="INVALID_REGISTRATION")
+        if not isinstance(registration.task_id, str) or not registration.task_id.strip():
             raise RegistryError("Task ID must not be empty", code="EMPTY_TASK_ID")
         for factory_name, factory in (
             ("task_factory", registration.task_factory),

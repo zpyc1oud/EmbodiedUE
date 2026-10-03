@@ -41,7 +41,7 @@ def describe(exc: ConfigError | RegistryError | FileNotFoundError) -> list[str]:
     """Return the printable lines for one input-boundary failure."""
 
     if isinstance(exc, RegistryError):
-        if exc.task_id is None:
+        if exc.code != "UNKNOWN_TASK_ID" or exc.task_id is None:
             return [f"[FAIL] registry: {exc}"]
         lines = [f"[FAIL] unknown Task {exc.task_id!r}; run `uerl tasks` to list registered Tasks"]
         candidates = suggest_task_ids(exc.task_id)

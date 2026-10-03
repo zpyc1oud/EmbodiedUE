@@ -16,9 +16,9 @@ These commands do not start UE. A successful task check validates declarations, 
 |---|---|
 | UE Skeletal Mesh / Skeleton / PhysicsAsset | Bodies, joints, hierarchy, mass, inertia, geometry, and limits |
 | `src/uerl/assets/robots/*.py` | Asset references, actuator semantics, gains, reference poses, observation selection, and reset distributions |
-| `configs/tasks/*/training.yaml` | Base task, Worker, and runner settings |
+| `src/uerl/configs/tasks/*/training.yaml` | Base task, Worker, and runner settings |
 | `src/uerl/tasks/*/registration.py` | Task-specific factories and defaults |
-| `configs/environments/terrains/phantomx/*.yaml` | Terrain tiers and generation parameters |
+| `src/uerl/configs/environments/terrains/phantomx/*.yaml` | Terrain tiers and generation parameters |
 | Run `resolved_config.json` and manifest | The configuration and identities recorded for an actual run |
 
 Robot declarations support derivation and regular-expression joint selection. Runtime Worker projections are generated from those declarations and reflected topology; they are not a second configuration to edit.
