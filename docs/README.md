@@ -25,6 +25,6 @@ Videos in `docs/media/` show historical inference. Generated runs and private re
 ## Development planning
 
 - [Next release roadmap](roadmap/next-release.md): proposed release goals, scope, stages, and release conditions.
-- [RFC 0001: Developer workflow](rfcs/0001-developer-workflow.md): user experience, architecture, tradeoffs, migration, and validation. Status: Draft.
+- [RFC 0001: Developer workflow](rfcs/0001-developer-workflow.md): user experience, architecture, tradeoffs, migration, and validation. Status: Accepted.
 
 Implementation progress belongs in linked GitHub Issues and PRs once the design is reviewed.
