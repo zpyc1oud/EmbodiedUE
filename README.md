@@ -76,6 +76,8 @@ uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
 ```
 
 The task check validates Python declarations, not the installed UE binary, content loading, or GPU readiness.
+Use `uv run uerl check host` for static CartPole host file checks and a reusable
+[machine profile](docs/how-to/ue-host-profile.md).
 
 ### Run a small training smoke test
 

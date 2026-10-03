@@ -4,6 +4,7 @@ Complete [Getting started](../../README.md#getting-started) before following a r
 
 | Guide | Purpose |
 |---|---|
+| [Reusable host profile](ue-host-profile.md) | Save machine paths, run static CartPole host checks, and reuse selected paths |
 | [PhantomX training and evaluation](phantomx-robust-training.md) | Terrain configuration, physical-time objectives, checkpoints, and per-level evaluation |
 | [Record video](record-video.md) | Record inference from the UE viewport and use keyboard commands |
 | [Optional Egypt demo](optional-egypt-demo.md) | Acquire Fab content locally and restore the existing gameplay/Pursuit integration |
