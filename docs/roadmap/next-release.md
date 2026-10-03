@@ -1,6 +1,6 @@
 # Next release roadmap
 
-Status: planning. Version number and release date are not assigned.
+Status: design accepted; implementation planning. Version number and release date are not assigned.
 
 ## Goal
 
@@ -37,9 +37,16 @@ Measure throughput, learning quality, and deployment behavior separately. Use th
 
 ## Tracking
 
-After design review, create one release Milestone and a small set of theme Issues: host setup, Task development, run operations, and game deployment. Link implementation PRs to those Issues.
+The accepted design is tracked by four theme Issues:
 
-This page owns release scope. The RFC owns design decisions. Issues own execution status. No tracking Issues have been created for this proposal yet. Add their links here when they exist.
+- [Host setup and diagnostics](https://github.com/zpyc1oud/EmbodiedUE/issues/5)
+- [External Tasks and shared entry points](https://github.com/zpyc1oud/EmbodiedUE/issues/6)
+- [Saved-run operations](https://github.com/zpyc1oud/EmbodiedUE/issues/7)
+- [Game deployment validation](https://github.com/zpyc1oud/EmbodiedUE/issues/8)
+
+Link implementation PRs to the relevant Issue. Group these under the release Milestone when it is created; the release number/date remain unassigned.
+
+This page owns release scope. The RFC owns design decisions. Issues own execution status. The links above identify the execution records; progress is maintained there.
 
 ## Release decision
 
