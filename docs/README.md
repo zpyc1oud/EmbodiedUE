@@ -21,3 +21,10 @@ Start with the [repository README](../README.md) for prerequisites and the first
 | Change history | [Changelog](../CHANGELOG.md) |
 
 Videos in `docs/media/` show historical inference. Generated runs and private reference checkouts are not required to read these guides and are not bundled experiment evidence.
+
+## Development planning
+
+- [Next release roadmap](roadmap/next-release.md): proposed release goals, scope, stages, and release conditions.
+- [RFC 0001: Developer workflow](rfcs/0001-developer-workflow.md): user experience, architecture, tradeoffs, migration, and validation. Status: Draft.
+
+Implementation progress belongs in linked GitHub Issues and PRs once the design is reviewed.
