@@ -1,6 +1,7 @@
 # RFC 0001: Developer workflow for the next release
 
-- Status: Draft
+- Status: Accepted
+- Accepted: 2026-10-04
 - Created: 2026-10-04
 - Baseline: `42fae6dd404b8a5a74110113cdde251c7ec069b5`
 - Related plan: [Next release roadmap](../roadmap/next-release.md)
@@ -150,14 +151,13 @@ After RFC review, track execution through theme Issues under one release Milesto
 
 A release candidate freezes the interfaces and migration guidance, then runs on an independent Windows setup. Publish supported versions, reference results, known limitations, and upgrade instructions with the release.
 
-## Unresolved decisions
+## Implementation details to resolve
 
-- Confirm the initial release goal and static-ground deployment boundary.
 - Validate entry-point discovery and the smallest public Task interface with the external CartPole prototype.
 - Freeze the supported Windows/UE/Python combination and the explicitly allowed continuation overrides.
 - Establish behavioral thresholds and estimate remaining work after the complete path and pilot measurements.
 
-The overall document structure is agreed; these technical details remain proposals until reviewed.
+The maintainer accepted the release goal and core design on 2026-10-04. The implementation details listed above remain to be validated; acceptance does not mean the features are implemented.
 
 ## References
 
