@@ -37,10 +37,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--resume",
         help=(
-            "Checkpoint file, Run directory, or 'latest'. "
+            "Continue from a checkpoint with its complete Run configuration, a Run directory, or 'latest'. "
             "A Run uses model_final.pt, or the highest rsl_rl/model_<iteration>.pt "
             "when training stopped before the final file was written."
         ),
+    )
+    parser.add_argument(
+        "--resume-normalization", choices=("update", "frozen"),
+        help="Recover the normalization update policy of an old Run with no recorded policy.",
     )
     parser.add_argument(
         "--run-name",
@@ -61,7 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--map",
         dest="map_name",
-        help="UE World long package name; defaults to the registered Task map.",
+        help="UE World long package name; continuation preserves the recorded map.",
     )
     parser.add_argument(
         "--presentation",
@@ -83,6 +87,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Resolve one Run, execute generic PPO, and print durable evidence."""
 
+    from ..application.continuation import Continuation
     from ..core.config import PresentationMode
     from ..training import (
         build_launch_overrides,
@@ -92,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         resolve_resume_checkpoint,
         run_training,
     )
+    from ..training.checkpoint import inspect_resume_checkpoint
 
     parser = _parser()
     args, remaining = parser.parse_known_args(argv)
@@ -105,17 +111,23 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--run-dir cannot be combined with --logging.run_directory")
     if args.resume is not None and "runner.checkpoint" in direct_overrides:
         parser.error("--resume cannot be combined with --runner.checkpoint")
-    if args.resume is not None:
-        direct_overrides["runner.checkpoint"] = str(
-            resolve_resume_checkpoint(args.resume, task_id=args.task)
-        )
-
-    base_config = build_run_config(args.task, overrides=direct_overrides)
-    map_name = (
-        args.map_name
-        or direct_overrides.get("session.map_path")
-        or base_config.session.map_path
+    reference = args.resume or direct_overrides.get("runner.checkpoint")
+    continuation = None
+    if reference is not None:
+        checkpoint = resolve_resume_checkpoint(reference, task_id=args.task)
+        continuation = Continuation.open(args.task, checkpoint)
+    elif args.resume_normalization is not None:
+        parser.error("--resume-normalization requires --resume or --runner.checkpoint")
+    if args.map_name:
+        direct_overrides["session.map_path"] = args.map_name
+    base_config = (
+        continuation.resolve(direct_overrides) if continuation is not None
+        else build_run_config(args.task, overrides=direct_overrides)
     )
+    resume_state = None if continuation is None else inspect_resume_checkpoint(
+        base_config, terrain_level=args.terrain_level, normalization=args.resume_normalization,
+    )
+    map_name = base_config.session.map_path
     launch_overrides: dict[str, str] = {}
     if direct_overrides.get("session.mode") != "attach":
         launch_overrides = build_launch_overrides(
@@ -134,9 +146,11 @@ def main(argv: list[str] | None = None) -> int:
                     for item in worker_args
                 ]
             )
+    generated_output = False
     if args.run_dir is not None:
         direct_overrides["logging.run_directory"] = str(args.run_dir)
     elif "logging.run_directory" not in direct_overrides:
+        generated_output = True
         configured_name = base_config.runner.parameters.get("run_name", "run")
         run_directory = make_run_directory(
             args.task,
@@ -144,11 +158,37 @@ def main(argv: list[str] | None = None) -> int:
         )
         direct_overrides["logging.run_directory"] = str(run_directory)
     overrides = {**launch_overrides, **direct_overrides, "session.map_path": map_name}
-    config = build_run_config(args.task, overrides=overrides)
+    config = (
+        continuation.resolve(direct_overrides, launch_overrides=launch_overrides)
+        if continuation is not None else build_run_config(args.task, overrides=overrides)
+    )
+    if continuation is not None:
+        continuation.validate_output(config.logging.run_directory)
+        print(f"[RUN] config={continuation.directory / 'resolved_config.json'} intent=continuation")
+        report_overrides = dict(direct_overrides)
+        if generated_output:
+            del report_overrides["logging.run_directory"]
+        for change in continuation.changes(config, report_overrides, launch_overrides):
+            print(f"[CONFIG] {change.path}: {json.dumps(change.saved)} -> {json.dumps(change.effective)} "
+                  f"source={change.source}")
+    if resume_state is not None:
+        random_text = "restore" if resume_state.restores_decimation_rng else "not_recorded_fixed_interval"
+        print(f"[RESTORE] actor=restore critic=restore optimizer=restore iteration={resume_state.iteration} "
+              f"normalization={'frozen' if resume_state.options.freeze_observation_normalization else 'update'} "
+              f"curriculum={','.join(resume_state.curriculum_terms) or 'none'} "
+              f"decimation_rng={random_text} "
+              f"terrain_level={resume_state.options.terrain_level} options_source={resume_state.options_source} "
+              "episodes=fresh full_rng=not_saved physics_state=not_saved")
     record_command(config.logging.run_directory, list(sys.argv[1:] if argv is None else argv))
     resume_text = f" resume={config.runner.checkpoint}" if config.runner.checkpoint is not None else " resume=none"
     print(f"[RUN] directory={config.logging.run_directory}{resume_text}")
-    result = run_training(config, terrain_level=args.terrain_level)
+    if resume_state is None:
+        result = run_training(config, terrain_level=args.terrain_level)
+    else:
+        result = run_training(
+            config, terrain_level=resume_state.options.terrain_level,
+            freeze_observation_normalization=resume_state.options.freeze_observation_normalization,
+        )
     print(
         f"[VERIFY] VC-007: task={result.task_id} iterations={result.iterations} "
         f"checkpoint={result.checkpoint} metrics={result.metrics_directory} "

@@ -22,6 +22,7 @@ from ..core.mdp.managers.event import EventManager
 from ..runtime.session import UERLSession, UERLSessionAdapter, WorkerProcessController
 from ..tasks.evaluation import EvaluationSummary, TaskEvaluator
 from ..tasks.registry import create_default_registry
+from .checkpoint import TrainingOptions
 from .rsl_rl import UERLOnPolicyRunner, UERLVecEnvWrapper
 from .rsl_rl.time_aware_ppo import PHANTOMX_PHYSICAL_TIME_OBJECTIVE
 
@@ -350,6 +351,7 @@ def run_training(
             log_dir=str(metrics_directory),
             device=config.runner.device,
         )
+        runner.training_options = TrainingOptions(terrain_level, freeze_observation_normalization).to_dict()
         if resume_checkpoint is not None and resume_checkpoint.is_file():
             runner.load(
                 str(resume_checkpoint),

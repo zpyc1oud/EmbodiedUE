@@ -60,19 +60,81 @@ Python callers of the former `uerl.cli.run_config` module should import
 `resolve_run_config` from `uerl.application.run_config` instead; map restoration
 is included in the returned configuration.
 
-### Current limitations
+## Continue training
 
-A missing snapshot still uses current Task defaults. Missing dataclass fields in
-an existing snapshot still use the current template; unknown fields, invalid
-field types, and a different Task identity are rejected. These legacy fallback
-rules do not establish faithful continuation for incomplete runs.
+`train --resume` restores the source Run's Worker, Task, runner, map and protocol
+settings, then applies permitted machine, output and budget changes. A Run
+reference, `latest`, or a checkpoint within the Run root, `rsl_rl/`, or
+`checkpoints/` is supported. A detached checkpoint needs its original
+`resolved_config.json`; weights alone cannot establish the training semantics.
+The dotted `--runner.checkpoint` option follows the same continuation rules.
 
-`train --resume` still selects a checkpoint while building configuration from
-current Task defaults and explicit overrides, through the same application
-resolver's defaults path. It does **not** restore the source run snapshot.
-Objective checks and checkpoint curriculum/random-state restoration remain in
-the training runner. Strict continuation metadata requirements, allowed semantic
-overrides, warm-start intent, and configuration differences remain tracked in
+```powershell
+uv run uerl train --task UERL-CartPole-Direct-v0 --resume runs/cartpole_source --run-dir runs/cartpole_continued --max-iterations 100
+```
+
+`--max-iterations` is an **additional** iteration budget, not an absolute target.
+The source is captured once and reused when launch arguments and the final
+configuration are assembled. `[CONFIG]` lines show changed field paths, saved
+and effective values, and whether each change came from explicit overrides,
+launch settings, local defaults, or generated output. The new snapshot and
+`command.txt` retain the effective configuration and selected checkpoint.
+
+Allowed changes are Session launch/attach mode, executable, host, port, timeouts,
+presentation, runner device, output directory, iteration budget, and runner
+`run_name`, `experiment_name` and `save_interval`. The project and window size
+are supplied through the ordinary launch flags. Arbitrary
+`--session.worker_args` changes are rejected; use the launch flags instead.
+The destination must be empty or new, outside the source Run.
+
+Changes to Slot count, seed, map, rewards, timing, Robot/terrain semantics,
+network structure or PPO settings are rejected even when tensor dimensions
+would still match. Repeating a saved value is accepted. Machine overrides do
+not establish that a different UE installation or project has equivalent assets.
+
+### Checkpoint state and old Runs
+
+The existing runner loader restores actor and critic state (including enabled
+observation-normalization statistics and actor distribution parameters), PPO
+optimizer state and iteration, named curriculum state, the saved decimation RNG,
+and RND state when enabled. Episodes start fresh. UE physical state, rollout
+buffers, event timers and the complete set of process RNG states are not saved;
+continuation is not a promise of an uninterrupted identical trajectory.
+The PhantomX physical-time objective check remains required.
+
+New training checkpoints record `terrain_level` and
+`freeze_observation_normalization` in `infos.uerl_training_options`; continuation
+recovers them automatically. `[RESTORE]` prints the selected state policy.
+
+Complete, compatible old Run snapshots remain supported. Missing semantic
+fields (including required runner parameter keys), a different Task/version,
+or missing required checkpoint state fail before Session startup. Continuation
+never fills those gaps with current Task defaults. For legacy runtime options:
+
+- A saved terrain curriculum term identifies adaptive terrain. Without that
+  term, a Run with terrain requires its original explicit `--terrain-level N`.
+- A Run with observation normalization enabled but no recorded update policy
+  requires `--resume-normalization update` or `--resume-normalization frozen`.
+  Supply the policy actually used in that Run; the checkpoint's statistics alone
+  do not reveal whether updates were frozen.
+- Explicit recovery inputs must match recorded options when those are present.
+  The next checkpoint persists the recovered options.
+- Variable decimation requires its saved generator state. With fixed decimation,
+  a missing unused sampler state is reported and accepted.
+
+Neither source files nor checkpoints are rewritten. Recover missing configuration
+from original experiment evidence before retrying; there is no automatic migration
+or warm-start mode. The strict contract applies to the training CLI. Programmatic
+callers can use `Continuation` and `inspect_resume_checkpoint` before passing the
+resolved configuration and recovered options to `run_training`.
+
+### Evaluation and export limitations
+
+`play --run` and `export --run` retain their existing compatibility rules: a missing
+snapshot uses current defaults, and missing dataclass fields use the current
+template. Unknown fields, invalid field types and a different Task identity are
+rejected. These fallbacks do not establish faithful recovery of incomplete runs.
+Broader run intent, warm start and deployment validation remain tracked in
 [Issue #7](https://github.com/zpyc1oud/EmbodiedUE/issues/7).
 
 ## Timing and parallelism

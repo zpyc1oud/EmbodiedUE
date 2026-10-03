@@ -12,17 +12,21 @@ from .vecenv import UERLVecEnvWrapper
 _CURRICULUM_CHECKPOINT_KEY = "uerl_curriculum"
 _DIRECT_ENV_RANDOM_STATE_KEY = "uerl_direct_env_random"
 _TRAINING_OBJECTIVE_KEY = "uerl_training_objective"
+TRAINING_OPTIONS_KEY = "uerl_training_options"
 
 
 class UERLOnPolicyRunner(OnPolicyRunner):  # type: ignore[misc]
     """Extend the pinned runner only with curriculum checkpoint ownership."""
 
     env: UERLVecEnvWrapper
+    training_options: Mapping[str, object] | None = None
 
     def save(self, path: str, infos: dict[str, object] | None = None) -> None:
         """Save policy state and the environment's named curriculum terms."""
 
         checkpoint_infos = dict(infos) if infos is not None else {}
+        if self.training_options is not None:
+            checkpoint_infos[TRAINING_OPTIONS_KEY] = dict(self.training_options)
         if isinstance(self.alg, TimeAwarePPO):
             checkpoint_infos[_TRAINING_OBJECTIVE_KEY] = PHANTOMX_PHYSICAL_TIME_OBJECTIVE
         curriculum_state = self.env.direct_env.curriculum_state_dict()
