@@ -1,7 +1,8 @@
-# Reuse a host profile for static checks
+# Reuse a host profile
 
-Store your UE executable and host project paths once, then run `uerl check host`
-from the installed Python environment. This preflight targets the bundled
+Store your UE executable and host project paths once. `train`, `play`, and `export`
+reuse them whenever they launch a Worker. Run `uerl check host` from the installed
+Python environment to inspect the files first. This preflight targets the bundled
 Windows x64 / UE 5.8 CartPole host. Follow the [installation and build
 instructions](../../README.md#install-and-build) first.
 
@@ -32,7 +33,7 @@ uv run uerl check host
 uv run uerl check host --project 'D:\other\engine\UERLHost.uproject'
 ```
 
-The command reads files only. It neither creates the profile nor changes project,
+The check command reads files only. It neither creates the profile nor changes project,
 plugin, driver, environment, or system settings.
 
 ## Resolution rules
@@ -64,20 +65,34 @@ their sources (`explicit`, `profile`, or `default`), check codes and corrective
 actions. JSON exposes `ok`, `scope`, `platform`, `selected`, and `checks`. A profile
 parse/read failure returns `ok: false` and an `error` with `code` and `message`.
 
-`train`, `play`, and `export` still use their existing flags; they do not yet load
-this profile automatically. Until those entry points are integrated, pass the
-selected paths explicitly. For example, after the preflight passes:
+`train`, `play`, and `export` automatically use the same profile and resolution
+rules in launch mode. After the preflight passes, train without repeating paths:
 
 ```powershell
-$report = uv run uerl check host --json | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0) { throw 'Resolve the reported host checks first.' }
-$hostArgs = @('--ue-executable', $report.selected.ue_executable, '--project', $report.selected.project)
-uv run uerl train --task UERL-CartPole-Direct-v0 --num-envs 2 --max-iterations 1 --device cpu @hostArgs
+uv run uerl train --task UERL-CartPole-Direct-v0 --num-envs 2 --max-iterations 1 --device cpu
+$runDir = 'runs/UERL-CartPole-Direct-v0/<run-directory>'
+uv run uerl play --task UERL-CartPole-Direct-v0 --run $runDir
+uv run uerl export --task UERL-CartPole-Direct-v0 --run $runDir
 ```
 
-Reuse `@hostArgs` with `play` and `export`. Training, playback and export start UE;
-the check itself does not. This profile does not select a deployment target or
-change `deploy --check` or the E2E test runner.
+All three accept `--host-profile`, `--ue-executable`, and `--project`. An explicit
+path replaces just that field, so overriding the executable still uses the
+profile's project. Advanced `--session.worker_executable` and
+`--session.worker_args` overrides retain their existing precedence over the
+computed launch values, including explicit path flags; the latter replaces the
+whole argument list. Map and port precedence are unchanged.
+
+With `--session.mode attach`, these commands do not read the host profile and
+ignore these local launch flags. They keep the existing external-Worker ownership
+behavior. A missing or malformed local profile cannot prevent an attach operation.
+
+Machine paths populate Session launch settings only. They do not replace saved
+Worker, Task, or runner settings, edit the source Run, or change continuation
+rules. The existing resolved-configuration hash covers Session settings too, so
+it may change when machine paths change; it is not a semantic compatibility test.
+This profile does not select a deployment target or change `deploy --check` or the
+E2E test runner. Runtime commands launch UE; `check host` itself does not. Runtime
+commands resolve the profile but do not automatically run the static file checks.
 
 Python callers can use `uerl.host.resolve_host_profile(profile_path=...)` and
 `uerl.host.check_host(profile)`. Resolution returns selected `Path` values,

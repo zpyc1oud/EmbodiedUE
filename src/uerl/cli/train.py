@@ -9,11 +9,7 @@ from pathlib import Path
 
 from .boundary import guard, parse_overrides
 from .flags import TRAIN_FLAGS, add_common_flags, apply_common_flags
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_UE_EXECUTABLE = Path(
-    r"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
-)
+from .host_flags import add_host_flags, resolve_host_flags
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -46,18 +42,7 @@ def _parser() -> argparse.ArgumentParser:
         "--run-name",
         help="Readable name used in the default Run directory.",
     )
-    parser.add_argument(
-        "--ue-executable",
-        type=Path,
-        default=DEFAULT_UE_EXECUTABLE,
-        help="Path to UnrealEditor-Cmd.exe.",
-    )
-    parser.add_argument(
-        "--project",
-        type=Path,
-        default=REPO_ROOT / "engine" / "UERLHost.uproject",
-        help="UE project containing the UERL plugin.",
-    )
+    add_host_flags(parser)
     parser.add_argument(
         "--map",
         dest="map_name",
@@ -118,9 +103,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     launch_overrides: dict[str, str] = {}
     if direct_overrides.get("session.mode") != "attach":
+        host = resolve_host_flags(args)
         launch_overrides = build_launch_overrides(
-            ue_executable=args.ue_executable,
-            project=args.project,
+            ue_executable=host.ue_executable,
+            project=host.project,
             map_name=map_name,
             presentation=PresentationMode(args.presentation),
             window_size=(args.res_x, args.res_y),

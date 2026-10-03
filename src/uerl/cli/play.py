@@ -9,18 +9,14 @@ from typing import cast
 
 from ..core.config.canonical import canonical_json
 from ..core.config.manifest import capture_git_identity
+from ..host.profile import DEFAULT_UE_EXECUTABLE
 from ..presentation import InternalViewportRecorder
 from .boundary import guard, parse_overrides
 from .flags import PLAY_FLAGS, add_common_flags, apply_common_flags
+from .host_flags import add_host_flags, resolve_host_flags
 from .run_config import RESOLVED_CONFIG_FILENAME, recorded_map_path, resolve_run_config
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-
 __all__ = ["DEFAULT_UE_EXECUTABLE", "InternalViewportRecorder", "_parser", "main"]
-
-DEFAULT_UE_EXECUTABLE = Path(
-    r"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
-)
 
 
 def _write_record_evidence(
@@ -68,8 +64,7 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         help="Fix the procedural terrain level for playback; omit to use the task curriculum.",
     )
-    parser.add_argument("--ue-executable", type=Path, default=DEFAULT_UE_EXECUTABLE)
-    parser.add_argument("--project", type=Path, default=REPO_ROOT / "engine" / "UERLHost.uproject")
+    add_host_flags(parser)
     parser.add_argument(
         "--map",
         dest="map_name",
@@ -169,9 +164,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         launch_overrides: dict[str, str] = {}
         if direct_overrides.get("session.mode") != "attach":
+            host = resolve_host_flags(args)
             launch_overrides = build_launch_overrides(
-                ue_executable=args.ue_executable,
-                project=args.project,
+                ue_executable=host.ue_executable,
+                project=host.project,
                 map_name=map_name,
                 presentation=PresentationMode(args.presentation),
                 window_size=(args.res_x, args.res_y),

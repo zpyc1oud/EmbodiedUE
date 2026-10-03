@@ -6,26 +6,20 @@ import argparse
 import json
 import sys
 from dataclasses import asdict
-from pathlib import Path
 
 from ..errors import ConfigError
-from ..host import check_host, resolve_host_profile
+from ..host import check_host
+from .host_flags import add_host_flags, resolve_host_flags
 
 
 def add_host_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--host-profile", type=Path, help="TOML profile; else UERL_HOST_PROFILE or ~/.uerl/host.toml.")
-    parser.add_argument("--ue-executable", type=Path, help="Override the profile's UnrealEditor-Cmd.exe path.")
-    parser.add_argument("--project", type=Path, help="Override the profile's host .uproject path.")
+    add_host_flags(parser)
     parser.add_argument("--json", action="store_true", help="Print static checks and selected paths as JSON.")
 
 
 def run_host_check(args: argparse.Namespace) -> int:
     try:
-        profile = resolve_host_profile(
-            profile_path=args.host_profile,
-            ue_executable=args.ue_executable,
-            project=args.project,
-        )
+        profile = resolve_host_flags(args)
     except ConfigError as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": {"code": exc.code, "message": str(exc)}}))
