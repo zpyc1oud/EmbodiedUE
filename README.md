@@ -108,7 +108,7 @@ uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terra
 uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terrain-level 0 --record artifacts/walk.mp4
 ```
 
-Playback uses one robot. Explicitly select a terrain level to avoid restoring a multi-Slot terrain curriculum into a single-Slot evaluation. A control-step count is not a fixed duration when decimation varies. For keyboard control, recording options, and interpretation of results, see [recording and playback](docs/how-to/record-video.md).
+Playback uses one robot and starts with the registered Task curriculum. Use `--terrain-level` to evaluate a selected procedural tier. A control-step count is not a fixed duration when decimation varies. For keyboard control, recording options, and interpretation of results, see [recording and playback](docs/how-to/record-video.md).
 
 ### Export and deploy
 
