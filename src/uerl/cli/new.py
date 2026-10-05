@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import keyword
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,7 +46,7 @@ class _ScaffoldError(ValueError):
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate UE-RL Robot and Task skeletons.")
+    parser = argparse.ArgumentParser(prog="uerl new", description="Generate UE-RL Robot and Task projects.")
     subparsers = parser.add_subparsers(dest="kind", required=True)
 
     robot_parser = subparsers.add_parser("robot", help="generate a Robot declaration skeleton")
@@ -85,6 +86,19 @@ def _parser() -> argparse.ArgumentParser:
         help="Project root where src/, configs/, and docs/ are created (default: current directory).",
     )
     task_parser.add_argument("--json", action="store_true", help="Print a machine-readable result.")
+
+    cartpole_parser = subparsers.add_parser(
+        "external-cartpole",
+        help="generate an independently installable CartPole Task package",
+    )
+    cartpole_parser.add_argument("name", help="Package name, such as balance-demo.")
+    cartpole_parser.add_argument("--task-id", help="Stable Task ID (default: UERL-<Name>-v0).")
+    cartpole_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Destination project directory (default: <name> under the current directory).",
+    )
+    cartpole_parser.add_argument("--json", action="store_true", help="Print a machine-readable result.")
     return parser
 
 
@@ -391,6 +405,159 @@ def _task_files(
     }
 
 
+def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, str]:
+    """Build a standalone CartPole reward-variant package using the public entry point."""
+
+    distribution_name = f"uerl-{slug.replace('_', '-')}"
+    entry_point = slug.replace("_", "-")
+    class_name = _class_name(slug)
+    metadata = dedent(
+        f'''\
+        [build-system]
+        requires = ["setuptools>=77"]
+        build-backend = "setuptools.build_meta"
+
+        [project]
+        name = "{distribution_name}"
+        version = "0.1.0"
+        requires-python = ">=3.11,<3.12"
+        dependencies = ["ue-rl-engine==1.0.0"]
+
+        [project.entry-points."uerl.tasks"]
+        {entry_point} = "{slug}:create_registration"
+
+        [tool.setuptools.packages.find]
+        where = ["src"]
+
+        [tool.setuptools.package-data]
+        {slug} = ["reward.yaml"]
+        '''
+    )
+    package = dedent(
+        f'''\
+        """Register a CartPole reward variant as an external Task."""
+
+        from __future__ import annotations
+
+        from dataclasses import replace
+        from importlib.resources import files
+
+        from uerl.core.config.yaml_loader import load_unique_yaml
+        from uerl.tasks.cartpole import CartPoleTaskConfig
+        from uerl.tasks.cartpole.registration import create_cartpole_registration, create_cartpole_task_config
+        from uerl.tasks.registry import TaskRegistration
+
+        TASK_ID = "{task_id}"
+
+
+        def create_task_config() -> CartPoleTaskConfig:
+            """Change the configured pole-position reward and preserve CartPole semantics."""
+
+            reward = load_unique_yaml(files(__package__).joinpath("reward.yaml").read_text(encoding="utf-8"))
+            weight = reward.get("pole_position_weight") if isinstance(reward, dict) else None
+            if not isinstance(weight, (int, float)) or isinstance(weight, bool):
+                raise ValueError("reward.yaml must define a numeric pole_position_weight")
+            return replace(
+                create_cartpole_task_config(),
+                rew_scale_pole_pos=float(weight),
+            )
+
+
+        def create_registration() -> TaskRegistration:
+            """Return fresh metadata that reuses the framework CartPole runtime."""
+
+            return replace(
+                create_cartpole_registration(),
+                task_id=TASK_ID,
+                task_version="0.1.0",
+                task_config_factory=create_task_config,
+            )
+
+
+        __all__ = ["TASK_ID", "create_registration", "create_task_config"]
+        '''
+    )
+    readme = dedent(
+        f'''\
+        # {class_name}: external CartPole Task
+
+        This installable package registers `{task_id}` through the `uerl.tasks`
+        entry-point group. It reuses EmbodiedUE's CartPole Task, Robot declaration,
+        Worker and runner configurations, and runtime. Its only Task change is the
+        pole-position reward weight in `src/{slug}/reward.yaml`.
+
+        ## Requirements
+
+        Use Python 3.11 in an environment with EmbodiedUE `ue-rl-engine==1.0.0`
+        and its runtime dependencies installed. Training also requires a configured
+        Windows/UE 5.8 host; package installation and the inspection commands below
+        do not start UE.
+
+        ## Install and inspect
+
+        From this project directory in PowerShell:
+
+        ```powershell
+        uv pip install -e . --no-deps
+        $env:UERL_TASK_PLUGINS = '{entry_point}'
+        uerl tasks --filter {task_id}
+        uerl check task {task_id}
+        uerl config --task {task_id} --json
+        ```
+
+        In Bash, use `export UERL_TASK_PLUGINS={entry_point}`. After installation,
+        these `uerl` commands work from any current directory. `check task` validates
+        the Python registration, resolved configuration, and Task construction.
+
+        Train it on a configured Windows/UE host with:
+
+        ```powershell
+        uerl train --task {task_id} --num-envs 2 --max-iterations 1 --device cpu
+        ```
+
+        ## Change the reward
+
+        Edit `pole_position_weight` in `src/{slug}/reward.yaml` (initially `-2.0`).
+        The package reads this resource for each fresh Task configuration. A
+        non-editable installation must be reinstalled after the file changes.
+        The generated tests in `tests/test_registration.py` check the registration,
+        Task construction, and reward-only customization. Run them with
+        `python -m pytest tests` in the prepared framework environment.
+        '''
+    )
+    tests = dedent(
+        f'''\
+        from uerl.core.direct.task import DirectTask
+        from uerl.tasks.cartpole.registration import create_cartpole_task_config
+
+        from {slug} import TASK_ID, create_registration
+
+
+        def test_external_registration_changes_only_pole_position_reward() -> None:
+            registration = create_registration()
+            config = registration.task_config_factory()
+            defaults = create_cartpole_task_config()
+
+            assert registration.task_id == "{task_id}"
+            assert registration.task_version == "0.1.0"
+            assert config.rew_scale_pole_pos == -2.0
+            assert config.rew_scale_alive == defaults.rew_scale_alive
+            assert config.rew_scale_terminated == defaults.rew_scale_terminated
+            assert config.rew_scale_cart_vel == defaults.rew_scale_cart_vel
+            assert config.rew_scale_pole_vel == defaults.rew_scale_pole_vel
+            assert isinstance(registration.task_factory(config), DirectTask)
+            assert TASK_ID == registration.task_id
+        '''
+    )
+    return {
+        root / "pyproject.toml": metadata,
+        root / "README.md": readme,
+        root / "src" / slug / "__init__.py": package,
+        root / "src" / slug / "reward.yaml": "pole_position_weight: -2.0\n",
+        root / "tests" / "test_registration.py": tests,
+    }
+
+
 def _emit(result: dict[str, object], *, as_json: bool) -> None:
     if as_json:
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
@@ -447,10 +614,36 @@ def _generate_task(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def _generate_external_cartpole(args: argparse.Namespace) -> dict[str, object]:
+    slug = _slug(args.name, label="package name")
+    if keyword.iskeyword(slug):
+        raise _ScaffoldError("package name must not be a Python keyword")
+    task_id = args.task_id or _task_id(slug)
+    if not re.fullmatch(r"UERL-[A-Za-z0-9][A-Za-z0-9._-]*-v\d+", task_id):
+        raise _ScaffoldError("--task-id must look like UERL-Name-v0")
+    root = args.output_dir if args.output_dir is not None else Path(slug.replace("_", "-"))
+    files = _write_files(_external_cartpole_files(root, slug, task_id))
+    return {
+        "kind": "external-cartpole",
+        "name": slug,
+        "package_name": slug,
+        "distribution_name": f"uerl-{slug.replace('_', '-')}",
+        "entry_point": slug.replace("_", "-"),
+        "task_id": task_id,
+        "files": [str(path) for path in files],
+        "next_step": f"install the package, enable its entry point, then run `uerl check task {task_id}`",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        result = _generate_robot(args) if args.kind == "robot" else _generate_task(args)
+        if args.kind == "robot":
+            result = _generate_robot(args)
+        elif args.kind == "task":
+            result = _generate_task(args)
+        else:
+            result = _generate_external_cartpole(args)
     except (_ScaffoldError, OSError) as exc:
         print(f"[FAIL] scaffold: {exc}")
         return 1
