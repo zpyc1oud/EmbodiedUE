@@ -17,7 +17,7 @@ uv run uerl play `
 
 | Option | Meaning |
 |---|---|
-| `--task` | Registered Task ID |
+| `--task` | Optional with an explicit Run directory; when supplied, it must match the saved Task ID. Required with `--run latest`. |
 | `--run` | Run directory or `latest`; `--checkpoint` can select a specific file instead |
 | `--record` | Output MP4 path |
 | `--record-seconds` | Maximum recording duration; default 20 seconds |

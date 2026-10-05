@@ -11,6 +11,7 @@ import argparse
 import functools
 from collections.abc import Callable
 from difflib import get_close_matches
+from typing import Literal
 
 from ..errors import ConfigError, RegistryError
 
@@ -20,6 +21,25 @@ Command = Callable[..., int]
 _PATH_CODES = frozenset(
     {"UNKNOWN_OVERRIDE_PATH", "INVALID_OVERRIDE_PATH", "DERIVED_FIELD_OVERRIDE"}
 )
+_SAVED_RUN_COMMON_OVERRIDE_PATHS = frozenset(
+    {
+        "worker.slot_count",
+        "runner.device",
+        "session.mode",
+        "session.worker_executable",
+        "session.worker_args",
+        "session.host",
+        "session.port",
+        "session.connect_timeout_s",
+        "session.request_timeout_s",
+        "session.presentation_mode",
+        "session.map_path",
+    }
+)
+_SAVED_RUN_OVERRIDE_PATHS = {
+    "play": _SAVED_RUN_COMMON_OVERRIDE_PATHS | {"worker.run_seed"},
+    "export": _SAVED_RUN_COMMON_OVERRIDE_PATHS,
+}
 
 
 def guard(command: Command) -> Command:
@@ -77,4 +97,21 @@ def parse_overrides(parser: argparse.ArgumentParser, tokens: list[str]) -> dict[
         parser.error(str(exc))
 
 
-__all__ = ["describe", "guard", "parse_overrides", "suggest_task_ids"]
+def validate_saved_run_overrides(
+    parser: argparse.ArgumentParser,
+    overrides: dict[str, str],
+    *,
+    operation: Literal["play", "export"],
+) -> None:
+    """Keep saved Run semantics fixed while allowing evaluation and host settings."""
+
+    invalid = sorted(set(overrides) - _SAVED_RUN_OVERRIDE_PATHS[operation])
+    if invalid:
+        paths = ", ".join(f"--{path}" for path in invalid)
+        parser.error(
+            f"play/export preserve the saved Task, timing, Robot, plan and PPO configuration; "
+            f"these overrides are not allowed: {paths}"
+        )
+
+
+__all__ = ["describe", "guard", "parse_overrides", "suggest_task_ids", "validate_saved_run_overrides"]

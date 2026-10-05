@@ -1,6 +1,5 @@
 """Verify atomic Run Manifest recording at the filesystem boundary."""
 
-import json
 from pathlib import Path
 
 import pytest
@@ -16,6 +15,8 @@ from uerl import (
     WorkerConfig,
 )
 from uerl.core.config.manifest import capture_git_identity
+from uerl.core.config.snapshot import resolved_config_from_yaml
+from uerl.core.config.yaml_loader import load_unique_yaml
 
 
 def _config() -> ResolvedRunConfig:
@@ -63,7 +64,8 @@ def test_manifest_identity_excludes_only_local_run_directory(tmp_path: Path) -> 
     second_hash = RunRecorder(second_directory).write_manifest_atomic(_manifest(second_directory))
 
     assert first_hash == second_hash
-    first_payload = json.loads((first_directory / "manifest.json").read_text(encoding="utf-8"))
+    first_payload = load_unique_yaml((first_directory / "manifest.yaml").read_text(encoding="utf-8"))
+    assert isinstance(first_payload, dict)
     assert first_payload["resolved_config"]["worker"]["robot_config_path"] == "robots/cartpole/robot.yaml"
     assert first_payload["resolved_config"]["worker"]["terrain_config_path"] == (
         "environments/terrains/phantomx/continuous.yaml"
@@ -96,9 +98,14 @@ def test_manifest_is_written_before_ready_boundary(tmp_path: Path) -> None:
     _ = recorder.write_resolved_config(_config())
     manifest_hash = recorder.write_manifest_atomic(_manifest(run_directory))
 
-    manifest = json.loads((run_directory / "manifest.json").read_text(encoding="utf-8"))
+    manifest = load_unique_yaml((run_directory / "manifest.yaml").read_text(encoding="utf-8"))
+    assert isinstance(manifest, dict)
     assert manifest["resolved_config"]["task_id"] == "task"
     assert manifest["run_seed"] == 7
     assert manifest["schema_hashes"]["state"] == "c" * 64
     assert len(manifest_hash) == 64
+    config_payload = resolved_config_from_yaml((run_directory / "resolved_config.yaml").read_text(encoding="utf-8"))
+    assert config_payload["task_id"] == "task"
+    assert not (run_directory / "resolved_config.json").exists()
+    assert not (run_directory / "manifest.json").exists()
     print(f"[VERIFY] VC-002: manifest_before_ready=true ready_ack_count=0 hash={manifest_hash}")

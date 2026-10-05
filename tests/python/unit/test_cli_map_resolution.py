@@ -6,12 +6,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import torch
 
 from uerl import training
 from uerl.cli import play, train
+from uerl.core.config.canonical import to_jsonable
 from uerl.core.config.models import ResolvedRunConfig
 from uerl.tasks.phantomx import PHANTOMX_TERRAIN_TASK_ID
 from uerl.tasks.phantomx.evaluation import PhantomXEvaluationResult
+from uerl.training import build_run_config
 
 
 def test_train_map_flag_overrides_dotted_map_in_attach_mode(
@@ -54,6 +57,7 @@ def test_train_map_flag_overrides_dotted_map_in_attach_mode(
 def test_play_map_flag_sets_expected_map_in_attach_mode(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     captured: list[ResolvedRunConfig] = []
 
@@ -93,13 +97,20 @@ def test_play_map_flag_sets_expected_map_in_attach_mode(
         )
 
     monkeypatch.setattr(training, "run_evaluation", run_evaluation)
+    run = tmp_path / "run"
+    run.mkdir()
+    checkpoint = run / "model.pt"
+    torch.save({"infos": {}}, checkpoint)
+    from tests.python.run_config_files import write_resolved_config
+
+    write_resolved_config(run, to_jsonable(build_run_config(PHANTOMX_TERRAIN_TASK_ID)))
 
     result = play.main(
         [
             "--task",
             PHANTOMX_TERRAIN_TASK_ID,
             "--checkpoint",
-            "model.pt",
+            str(checkpoint),
             "--map",
             "/Game/Maps/Explicit",
             "--session.mode",

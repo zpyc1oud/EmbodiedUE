@@ -25,6 +25,9 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
     shutil.copytree(REPO / "src", project / "src", ignore=shutil.ignore_patterns("__pycache__", "*.egg-info"))
     for name in ("pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"):
         shutil.copy(REPO / name, project / name)
+    example = tmp_path / "example"
+    shutil.copytree(REPO / "examples" / "external-cartpole", example,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.egg-info", "build"))
     generated = tmp_path / "balance-demo"
     assert new.main(["external-cartpole", "balance-demo", "--output-dir", str(generated)]) == 0
     generated_test_env = os.environ.copy()
@@ -40,7 +43,7 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
     unpacked = tmp_path / "unpacked"
     shutil.unpack_archive(source, unpacked)
     source_root = next(unpacked.iterdir())
-    for root in (source_root, generated):
+    for root in (source_root, example, generated):
         _run([sys.executable, "-c",
               f"from setuptools.build_meta import build_wheel; build_wheel({str(wheels)!r})"], root)
     installed = tmp_path / "installed"
@@ -49,6 +52,7 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
     _run([uv, "--no-cache", "pip", "install", "--python", sys.executable, "--no-deps", "--target", str(installed),
           *map(str, wheels.glob("*.whl"))], tmp_path)
     shutil.rmtree(project)
+    shutil.rmtree(example)
     shutil.rmtree(generated)
     shutil.rmtree(unpacked)
     probe = tmp_path / "probe.py"
@@ -69,23 +73,32 @@ registry = create_default_registry(external_tasks=())
 assert len(registry.list()) == 5
 for entry in registry.list():
     build_run_config(entry.task_id)
-os.environ['UERL_TASK_PLUGINS'] = 'balance-demo'
+os.environ['UERL_TASK_PLUGINS'] = 'example-cartpole,balance-demo'
 registry = create_default_registry()
-assert len(registry.list()) == 6
-config = registry.create_task_config('UERL-BalanceDemo-v0')
-assert config.rew_scale_pole_pos == -2.0
+assert len(registry.list()) == 7
+example_config = registry.create_task_config('Example-CartPole-v0')
+generated_config = registry.create_task_config('UERL-BalanceDemo-v0')
+assert example_config.rew_scale_pole_pos == -2.0
+assert generated_config.rew_scale_pole_pos == -2.0
 assert registry.create_task_config('UERL-CartPole-Direct-v0').rew_scale_pole_pos == -1.0
-assert isinstance(registry.create_task('UERL-BalanceDemo-v0', config), DirectTask)
+assert isinstance(registry.create_task('Example-CartPole-v0', example_config), DirectTask)
+assert isinstance(registry.create_task('UERL-BalanceDemo-v0', generated_config), DirectTask)
+assert main(['check', 'task', 'Example-CartPole-v0']) == 0
 assert main(['check', 'task', 'UERL-BalanceDemo-v0']) == 0
+assert main(['config', '--task', 'Example-CartPole-v0', '--json']) == 0
 assert main(['config', '--task', 'UERL-BalanceDemo-v0', '--json']) == 0
+assert main(['tasks', '--filter', 'Example-CartPole-v0']) == 0
 assert main(['tasks', '--filter', 'UERL-BalanceDemo-v0']) == 0
 # Package-owned resource changes feed the next fresh config without affecting built-ins.
-resource = Path(sys.argv[1]) / 'balance_demo' / 'reward.yaml'
-resource.write_text('pole_position_weight: -3.0\\n', encoding='utf-8')
-assert registry.create_task_config('UERL-BalanceDemo-v0').rew_scale_pole_pos == -3.0
+example_resource = Path(sys.argv[1]) / 'example_cartpole' / 'reward.yaml'
+example_resource.write_text('pole_position_weight: -3.0\\n', encoding='utf-8')
+assert registry.create_task_config('Example-CartPole-v0').rew_scale_pole_pos == -3.0
+generated_resource = Path(sys.argv[1]) / 'balance_demo' / 'reward.yaml'
+generated_resource.write_text('pole_position_weight: -4.0\\n', encoding='utf-8')
+assert registry.create_task_config('UERL-BalanceDemo-v0').rew_scale_pole_pos == -4.0
 assert registry.create_task_config('UERL-CartPole-Direct-v0').rew_scale_pole_pos == -1.0
-os.environ['UERL_TASK_PLUGINS'] = 'balance-demo,balance-demo'
-assert main(['check', 'task', 'UERL-BalanceDemo-v0']) == 1
+os.environ['UERL_TASK_PLUGINS'] = 'example-cartpole,example-cartpole'
+assert main(['check', 'task', 'Example-CartPole-v0']) == 1
 ''', encoding="utf-8")
     # Isolated mode ignores PYTHONPATH and the working directory. Existing numerical
     # dependencies are reused; the installed target must own all product imports.

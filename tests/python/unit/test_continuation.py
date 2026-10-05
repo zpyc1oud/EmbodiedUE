@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from tests.python.run_config_files import write_resolved_config
 from uerl.application.continuation import Continuation
-from uerl.core.config.canonical import canonical_json
+from uerl.core.config.canonical import to_jsonable
 from uerl.errors import ConfigError
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID
 from uerl.training import build_run_config
@@ -16,9 +17,9 @@ from uerl.training import build_run_config
 def test_continuation_reuses_captured_source_and_reports_budget(tmp_path: Path) -> None:
     run = tmp_path / "source"
     run.mkdir()
-    snapshot = run / "resolved_config.json"
-    snapshot.write_text(
-        canonical_json(
+    snapshot = write_resolved_config(
+        run,
+        to_jsonable(
             build_run_config(
                 CARTPOLE_TASK_ID,
                 overrides={
@@ -27,7 +28,7 @@ def test_continuation_reuses_captured_source_and_reports_budget(tmp_path: Path) 
                     "runner.max_iterations": "10",
                 },
             )
-        )
+        ),
     )
     continuation = Continuation.open(CARTPOLE_TASK_ID, run / "model_final.pt")
     snapshot.unlink()  # Neither the second build nor defaults may replace the captured semantics.
@@ -60,7 +61,7 @@ def test_continuation_reuses_captured_source_and_reports_budget(tmp_path: Path) 
 )
 def test_continuation_rejects_semantic_overrides(tmp_path: Path, path: str, value: str) -> None:
     config = build_run_config(CARTPOLE_TASK_ID)
-    (tmp_path / "resolved_config.json").write_text(canonical_json(config))
+    write_resolved_config(tmp_path, to_jsonable(config))
     source = Continuation.open(CARTPOLE_TASK_ID, tmp_path / "model_final.pt")
 
     with pytest.raises(ConfigError) as error:
@@ -72,10 +73,6 @@ def test_continuation_rejects_semantic_overrides(tmp_path: Path, path: str, valu
 
 @pytest.mark.parametrize("missing", ["snapshot", "task.rew_scale_alive", "runner.parameters.gamma", "session.map_path"])
 def test_continuation_rejects_incomplete_sources(tmp_path: Path, missing: str) -> None:
-    import json
-
-    from uerl.core.config.canonical import to_jsonable
-
     payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
     if missing != "snapshot":
         owner = payload
@@ -83,7 +80,7 @@ def test_continuation_rejects_incomplete_sources(tmp_path: Path, missing: str) -
         for part in parts:
             owner = owner[part]
         del owner[leaf]
-        (tmp_path / "resolved_config.json").write_text(json.dumps(payload))
+        write_resolved_config(tmp_path, payload)
 
     with pytest.raises(ConfigError):
         Continuation.open(CARTPOLE_TASK_ID, tmp_path / "model_final.pt")
@@ -91,7 +88,7 @@ def test_continuation_rejects_incomplete_sources(tmp_path: Path, missing: str) -
 
 @pytest.mark.parametrize("layout", ["model_final.pt", "rsl_rl/model_8.pt", "checkpoints/model_8.pt"])
 def test_continuation_recognizes_existing_checkpoint_layouts(tmp_path: Path, layout: str) -> None:
-    (tmp_path / "resolved_config.json").write_text(canonical_json(build_run_config(CARTPOLE_TASK_ID)))
+    write_resolved_config(tmp_path, to_jsonable(build_run_config(CARTPOLE_TASK_ID)))
     source = Continuation.open(CARTPOLE_TASK_ID, tmp_path / layout)
     assert source.directory == tmp_path
     with pytest.raises(ConfigError, match="outside the source Run"):
@@ -101,16 +98,12 @@ def test_continuation_recognizes_existing_checkpoint_layouts(tmp_path: Path, lay
 
 
 def test_continuation_rejects_version_change_and_existing_output(tmp_path: Path) -> None:
-    import json
-
-    from uerl.core.config.canonical import to_jsonable
-
     payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
-    (tmp_path / "resolved_config.json").write_text(json.dumps(payload))
+    write_resolved_config(tmp_path, payload)
     source = Continuation.open(CARTPOLE_TASK_ID, tmp_path / "model_final.pt")
     with pytest.raises(ConfigError, match="new or empty"):
         source.validate_output(tmp_path.parent)
     payload["task_version"] = "different"
-    (tmp_path / "resolved_config.json").write_text(json.dumps(payload))
+    write_resolved_config(tmp_path, payload)
     with pytest.raises(ConfigError, match="version differs"):
         Continuation.open(CARTPOLE_TASK_ID, tmp_path / "model_final.pt")

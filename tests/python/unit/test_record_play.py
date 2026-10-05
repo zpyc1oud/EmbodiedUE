@@ -10,6 +10,7 @@ import torch
 
 from tests.python.unit.test_phantomx_task import SHAPES, _robot_spec, _state
 from uerl.cli import export, play, train
+from uerl.core.config.canonical import to_jsonable
 from uerl.errors import ConfigError
 from uerl.tasks.cartpole import create_cartpole_task, create_cartpole_task_config
 from uerl.tasks.controllers import (
@@ -20,6 +21,18 @@ from uerl.tasks.controllers import (
 from uerl.tasks.evaluation import EvaluationSummary
 from uerl.tasks.phantomx.config import PhantomXTaskConfig
 from uerl.tasks.phantomx.task import PhantomXTask
+from uerl.training import build_run_config
+
+
+def _saved_checkpoint(tmp_path: Path, task_id: str) -> Path:
+    run = tmp_path / "run"
+    run.mkdir()
+    checkpoint = run / "model.pt"
+    torch.save({"infos": {}}, checkpoint)
+    from tests.python.run_config_files import write_resolved_config
+
+    write_resolved_config(run, to_jsonable(build_run_config(task_id)))
+    return checkpoint
 
 
 def test_installed_console_entrypoint_is_uerl() -> None:
@@ -32,44 +45,47 @@ def test_installed_console_entrypoint_is_uerl() -> None:
     assert callable(entry_point.load())
 
 
-def test_play_rejects_more_than_one_slot() -> None:
+def test_play_rejects_more_than_one_slot(tmp_path: Path) -> None:
+    checkpoint = _saved_checkpoint(tmp_path, "UERL-PhantomX-Walk-v0")
     with pytest.raises(SystemExit):
         play.main(
             [
                 "--task",
                 "UERL-PhantomX-Walk-v0",
                 "--checkpoint",
-                "model.pt",
+                str(checkpoint),
                 "--worker.slot_count",
                 "2",
             ]
         )
 
 
-def test_play_rejects_an_unknown_controller_before_launch() -> None:
+def test_play_rejects_an_unknown_controller_before_launch(tmp_path: Path) -> None:
+    checkpoint = _saved_checkpoint(tmp_path, "UERL-PhantomX-Walk-v0")
     with pytest.raises(SystemExit):
         play.main(
             [
                 "--task",
                 "UERL-PhantomX-Walk-v0",
                 "--checkpoint",
-                "model.pt",
+                str(checkpoint),
                 "--controller",
                 "missing",
             ]
         )
 
 
-def test_play_record_requires_a_new_viewport() -> None:
+def test_play_record_requires_a_new_viewport(tmp_path: Path) -> None:
     from uerl.tasks.cartpole.config import CARTPOLE_TASK_ID
 
+    checkpoint = _saved_checkpoint(tmp_path, CARTPOLE_TASK_ID)
     with pytest.raises(SystemExit):
         play.main(
             [
                 "--task",
                 CARTPOLE_TASK_ID,
                 "--checkpoint",
-                "model.pt",
+                str(checkpoint),
                 "--record",
                 "walk.mp4",
                 "--presentation",
@@ -82,7 +98,7 @@ def test_play_record_requires_a_new_viewport() -> None:
                 "--task",
                 CARTPOLE_TASK_ID,
                 "--checkpoint",
-                "model.pt",
+                str(checkpoint),
                 "--record",
                 "walk.mp4",
                 "--session.mode",
@@ -91,7 +107,10 @@ def test_play_record_requires_a_new_viewport() -> None:
         )
 
 
-def test_play_forces_one_slot_and_keeps_the_task_controller(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_play_forces_one_slot_and_keeps_the_task_controller(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     from uerl.tasks.cartpole.config import CARTPOLE_TASK_ID
 
     seen: dict[str, object] = {}
@@ -111,7 +130,8 @@ def test_play_forces_one_slot_and_keeps_the_task_controller(monkeypatch: pytest.
         )
 
     monkeypatch.setattr("uerl.training.run_evaluation", fake_run)
-    play.main(["--task", CARTPOLE_TASK_ID, "--checkpoint", "model.pt"])
+    checkpoint = _saved_checkpoint(tmp_path, CARTPOLE_TASK_ID)
+    play.main(["--task", CARTPOLE_TASK_ID, "--checkpoint", str(checkpoint)])
 
     assert seen == {"slots": 1, "controller": "task", "terrain_level": None, "restore_curriculum": False}
 

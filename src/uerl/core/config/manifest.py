@@ -9,8 +9,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from .canonical import canonical_json, sha256_hex, to_jsonable
 from .models import ResolvedRunConfig, _freeze_value
+from .snapshot import resolved_config_to_yaml
 
 _SOURCE_REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
@@ -90,8 +93,8 @@ class RunRecorder:
         """Create a recorder rooted at one Run directory.
 
         Args:
-            run_directory: Directory receiving ``resolved_config.json`` and
-                ``manifest.json``. Parent directories are created on first write.
+            run_directory: Directory receiving ``resolved_config.yaml`` and
+                ``manifest.yaml``. Parent directories are created on first write.
         """
 
         self._run_directory = run_directory
@@ -104,15 +107,15 @@ class RunRecorder:
                 the Worker projection.
 
         Returns:
-            The path of the replaced ``resolved_config.json`` file.
+            The path of the replaced ``resolved_config.yaml`` file.
 
         Side effects:
-            Create the Run directory, write a temporary canonical JSON file,
+            Create the Run directory, write a temporary versioned YAML file,
             flush it to disk, and replace the target without exposing a partial
             file.
         """
 
-        return self._write_json("resolved_config.json", to_jsonable(config))
+        return self._write_text("resolved_config.yaml", resolved_config_to_yaml(config))
 
     def write_manifest_atomic(self, manifest: RunManifest) -> str:
         """Atomically write the Manifest and return its audit hash.
@@ -126,20 +129,20 @@ class RunRecorder:
             ``run_directory`` path.
 
         Side effects:
-            Atomically replace ``manifest.json`` after flushing the complete
-            canonical payload. The returned hash is the identity later sent in
-            ReadyAck.
+            Atomically replace ``manifest.yaml`` after flushing the complete
+            YAML payload. The returned hash is the canonical identity later
+            sent in ReadyAck.
         """
 
         payload = to_jsonable(manifest)
-        manifest_json = canonical_json(payload)
         identity_payload = dict(payload)
         identity_payload.pop("run_directory", None)
         manifest_hash = sha256_hex(canonical_json(identity_payload))
-        self._write_json("manifest.json", payload, serialized=manifest_json)
+        manifest_yaml = yaml.safe_dump(payload, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        self._write_text("manifest.yaml", manifest_yaml)
         return manifest_hash
 
-    def _write_json(self, filename: str, payload: object, *, serialized: str | None = None) -> Path:
+    def _write_text(self, filename: str, serialized: str) -> Path:
         self._run_directory.mkdir(parents=True, exist_ok=True)
         target = self._run_directory / filename
         temporary: Path | None = None
@@ -153,9 +156,9 @@ class RunRecorder:
                 delete=False,
             ) as stream:
                 temporary = Path(stream.name)
-                stream.write(serialized if serialized is not None else canonical_json(payload))
+                stream.write(serialized)
                 stream.write("\n")
-                # Flush before replace so Ready cannot acknowledge a manifest
+                # Flush before replace so Ready cannot acknowledge a record
                 # whose durable contents are only present in Python buffers.
                 stream.flush()
                 os.fsync(stream.fileno())

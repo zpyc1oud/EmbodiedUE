@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import socket
 from collections.abc import Callable, Mapping, Sequence
@@ -13,6 +12,7 @@ from typing import Any, cast
 from ..application.run_config import resolve_run_config
 from ..core.config import PresentationMode, ResolvedRunConfig
 from ..core.config.robot import RobotSpec
+from ..core.config.snapshot import encode_worker_args
 from ..core.direct.curriculum import CurriculumManager
 from ..core.direct.env import UERLDirectEnv
 from ..core.direct.profiling import StageProfiler
@@ -146,7 +146,7 @@ def build_launch_overrides(
     ]
     return {
         "session.worker_executable": str(ue_executable),
-        "session.worker_args": json.dumps(worker_args),
+        "session.worker_args": encode_worker_args(worker_args),
         "session.map_path": map_name,
         "session.port": str(bridge_port),
         "session.presentation_mode": presentation.value,
@@ -351,6 +351,7 @@ def run_training(
             log_dir=str(metrics_directory),
             device=config.runner.device,
         )
+        runner.resolved_config = config
         runner.training_options = TrainingOptions(terrain_level, freeze_observation_normalization).to_dict()
         if resume_checkpoint is not None and resume_checkpoint.is_file():
             runner.load(

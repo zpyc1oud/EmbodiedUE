@@ -30,7 +30,7 @@ they work from any directory after installation. In Bash, use
 
 ## Change one reward
 
-Edit `pole_position_weight` in `src/example_cartpole/reward.json` (initially
+Edit `pole_position_weight` in `src/example_cartpole/reward.yaml` (initially
 `-2.0`). The editable installation reads this file when it creates each fresh
 Task configuration. Run `uerl config --task Example-CartPole-v0 --json` again and
 inspect `task.rew_scale_pole_pos`. Built-in CartPole defaults stay unchanged.

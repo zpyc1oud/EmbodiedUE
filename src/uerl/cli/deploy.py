@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
 
+from ..application.run_config import RESOLVED_CONFIG_FILENAME
+from ..core.config.snapshot import resolved_config_from_yaml
+from ..errors import ConfigError
 from ..training.runs import resolve_run_directory
 from .boundary import guard
 
@@ -103,12 +105,11 @@ def _mesh_from_task(task_id: str) -> str:
 def _mesh_from_run(run_directory: Path | None) -> str | None:
     if run_directory is None:
         return None
-    path = run_directory / "resolved_config.json"
-    if not path.is_file():
-        return None
+    path = run_directory / RESOLVED_CONFIG_FILENAME
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        text = path.read_text(encoding="utf-8")
+        payload = resolved_config_from_yaml(text, path=str(path))
+    except (OSError, UnicodeDecodeError, ConfigError, TypeError, ValueError):
         return None
     worker = payload.get("worker") if isinstance(payload, dict) else None
     asset = worker.get("robot_asset_path") if isinstance(worker, dict) else None

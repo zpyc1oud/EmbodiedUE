@@ -101,7 +101,7 @@ def _drive_formal_session(config: ResolvedRunConfig) -> tuple[dict[str, Any], di
             item["layout_kind"]: Layout.parse(item, batch_size=config.worker.slot_count)
             for item in result.response["layouts"]
         }
-        manifest_path = config.logging.run_directory / "manifest.json"
+        manifest_path = config.logging.run_directory / "manifest.yaml"
         assert manifest_path.exists()
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         assert manifest["resolved_config"]["normalized_hash"] == config.normalized_hash
