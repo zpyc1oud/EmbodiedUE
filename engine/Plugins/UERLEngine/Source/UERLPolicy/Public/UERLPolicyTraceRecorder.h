@@ -41,6 +41,7 @@ public:
 private:
 	bool FinalizeTrace(bool bMarkComplete);
 	bool WriteTrace();
+	void AppendEventPosition(FString& Record) const;
 
 	UFUNCTION()
 	void OnControlFrameCompleted(const FUERLPolicyControlFrameSnapshot& Frame);
