@@ -274,6 +274,7 @@ bool UUERLPolicyComponent::StartPolicy()
 	Config.AssetPath = Artifact->RobotMesh->GetPathName();
 	Config.GroundOrigin = GetOwner() ? GetOwner()->GetActorLocation() : FVector::ZeroVector;
 	Config.GroundNormal = FVector::UpVector;
+	Config.GroundQueryIgnoreActor = GetOwner();
 	Config.bClaimAuthoredActor = bClaimOwnerMesh;
 	Config.ClaimedMesh = ClaimedMesh;
 	Config.PlacementTransform = GetOwner() ? GetOwner()->GetActorTransform() : FTransform::Identity;

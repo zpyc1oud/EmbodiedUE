@@ -38,6 +38,18 @@ public:
 		LastStaleSeconds = StaleSeconds;
 	}
 
+	TWeakObjectPtr<UUERLPolicyComponent> StaleFallbackComponent;
+
+	UFUNCTION()
+	void OnStaleStopPolicy(FName Channel, float StaleSeconds)
+	{
+		OnStale(Channel, StaleSeconds);
+		if (UUERLPolicyComponent* Component = StaleFallbackComponent.Get())
+		{
+			Component->StopPolicy();
+		}
+	}
+
 	int32 FaultCount = 0;
 	FString LastFaultReason;
 

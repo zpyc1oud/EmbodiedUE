@@ -119,7 +119,7 @@ Place `BP_UERLPolicyRobot` in a map with ground and a PlayerStart. Its documente
 
 BeginPlay binds the four diagnostic events, calls `GetRequiredCommandChannels`, sets `velocity` to `[0,0,0]`, then calls `StartPolicy`. Tick uses `GetPlayerPawn(0)` and `GetRobotTransform` to generate pursuit commands, commanding zero inside 1.25 m. The generic API is `SetCommand`; there is no `SetCommandVelocity` node.
 
-`GetRobotTransform` returns the claimed or spawned mesh transform, not the Owner transform. Claiming detaches the mesh from the Owner's root; Chaos moves the mesh while the Owner can remain at its original position. Ground queries start near the robot and look downward through WorldStatic, ignoring the Owner, so an overhead roof is not mistaken for ground. Deployment terrain scans, clearance, and pose reset follow the same downward-ground convention.
+`GetRobotTransform` returns the claimed or spawned mesh transform, not the Owner transform. Claiming detaches the mesh from the Owner's root; Chaos moves the mesh while the Owner can remain at its original position. Deployment terrain scans accept blocking `WorldStatic` hits and ignore the controlled Robot actor. Start-clearance and pose-reset traces also ignore the policy component's Owner actor. Other blocking `WorldStatic` surfaces inside a probe path can be selected, so keep the robot's downward probe areas clear of ceilings, platforms, and collision shells that are not ground.
 
 With the game viewport focused, the sample Blueprint exposes:
 
@@ -155,7 +155,7 @@ ResetToReferencePose() -> bPoseOK
 StartPolicy()                 // Explicitly restart after reset.
 ```
 
-No old control step continues after `StopPolicy`. The runtime destroys a Robot Actor it spawned; for a claimed mesh it restores the attachment and physics settings captured at claim time. `OnPolicyFault` disables inference/ticks but leaves the host to choose a fallback. A claimed mesh may keep simulating its prior drive; restoring an originally non-simulating mesh stops that mesh. `StopPolicy` does not globally pause Chaos or provide a universal emergency stop. Resolve the fault, set every required command channel again, and call `StartPolicy` explicitly to restart. Floating-base pose reset uses current ground and the Owner mounting transform; a fixed base retains its mounting transform.
+No old control step continues after `StopPolicy`. The runtime destroys a Robot Actor it spawned; for a claimed mesh it restores the attachment and physics settings captured at claim time. `OnPolicyFault` disables inference/ticks but leaves the host to choose a fallback. A claimed mesh may keep simulating its prior drive; restoring an originally non-simulating mesh stops that mesh. `StopPolicy` does not globally pause Chaos or provide a universal emergency stop. Resolve the fault, set every required command channel again, and call `StartPolicy` explicitly to restart. Floating-base pose reset uses current ground and the Owner mounting transform; a fixed base retains its mounting transform. Start-clearance and pose-reset traces ignore the policy component's Owner actor; other blocking `WorldStatic` surfaces below the probe origin remain eligible ground.
 
 For the phase-separated numerical, fixed-action, target-scene, and fault-recovery procedure, see [static-ground deployment validation](how-to/policy-deployment-validation.md).
 

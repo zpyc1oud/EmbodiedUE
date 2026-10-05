@@ -1475,4 +1475,123 @@ bool FUERLPolicyComponentHostFaultFallbackRecoveryTest::RunTest(const FString& P
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLPolicyComponentSpawnedResetIgnoresHostCollisionTest,
+	"UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_017.SpawnedPoseResetIgnoresHostWorldStaticCollision",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPolicyComponentSpawnedResetIgnoresHostCollisionTest::RunTest(const FString& Parameters)
+{
+	UUERLPolicyArtifactAsset* Asset = RequirePhantomXAsset(*this);
+	if (!Asset)
+	{
+		return false;
+	}
+	FComponentTestRig Rig;
+	if (!Rig.Build(*this, Asset))
+	{
+		return false;
+	}
+
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	TestNotNull(TEXT("host collision shell mesh loads"), Cube);
+	if (!Cube)
+	{
+		return false;
+	}
+	UStaticMeshComponent* OwnerShell = NewObject<UStaticMeshComponent>(Rig.Host);
+	Rig.Host->AddInstanceComponent(OwnerShell);
+	OwnerShell->SetStaticMesh(Cube);
+	OwnerShell->SetMobility(EComponentMobility::Static);
+	OwnerShell->SetCollisionObjectType(ECC_WorldStatic);
+	OwnerShell->SetCollisionResponseToAllChannels(ECR_Block);
+	OwnerShell->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	OwnerShell->SetWorldLocation(FVector(0.0, 0.0, 5.0));
+	OwnerShell->SetWorldScale3D(FVector(1.0, 1.0, 0.2));
+	OwnerShell->RegisterComponent();
+
+	FDeployPhysicsSettingsGuard Guard(0.005f, 10);
+	if (!StartWithZeroCommand(*this, Rig.Component))
+	{
+		return false;
+	}
+	TickPolicyWorld(Rig.World(), 0.010f);
+
+	TestTrue(TEXT("spawned robot resets with an overlapping host WorldStatic shell"),
+		Rig.Component->ResetToReferencePose());
+	FTransform ResetPose;
+	TestTrue(TEXT("spawned robot transform remains available after reset"),
+		Rig.Component->GetRobotTransform(ResetPose));
+	TestTrue(TEXT("reset selects the ground beneath the host instead of its collision shell"),
+		FMath::Abs(ResetPose.GetLocation().Z - Rig.Host->GetActorLocation().Z) < 2.0);
+
+	Rig.Component->StopPolicy();
+	AddInfo(TEXT(
+		"[VERIFY] AC_UE_INT_COMPONENT_017: spawned pose reset ignores its host Owner's WorldStatic collision and uses the ground below"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLPolicyComponentStaleCommandHostFallbackTest,
+	"UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_018.HostStopsAndRestartsOnStaleCommand",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPolicyComponentStaleCommandHostFallbackTest::RunTest(const FString& Parameters)
+{
+	UUERLPolicyArtifactAsset* Asset = RequirePhantomXAsset(*this);
+	if (!Asset)
+	{
+		return false;
+	}
+	FComponentTestRig Rig;
+	if (!Rig.Build(*this, Asset))
+	{
+		return false;
+	}
+	Rig.Component->CommandStalenessSeconds = 0.015;
+	FDeployPhysicsSettingsGuard Guard(0.005f, 10);
+	if (!StartWithZeroCommand(*this, Rig.Component))
+	{
+		return false;
+	}
+
+	UUERLPolicyComponentTestEventRecorder* Recorder = NewObject<UUERLPolicyComponentTestEventRecorder>();
+	Recorder->StaleFallbackComponent = Rig.Component;
+	BindRecorderEvent(
+		Rig.Component->OnCommandStale,
+		Recorder,
+		GET_FUNCTION_NAME_CHECKED(UUERLPolicyComponentTestEventRecorder, OnStaleStopPolicy));
+	BindRecorderEvent(
+		Rig.Component->OnPolicyFault,
+		Recorder,
+		GET_FUNCTION_NAME_CHECKED(UUERLPolicyComponentTestEventRecorder, OnFault));
+
+	TickPolicyWorld(Rig.World(), 0.010f);
+	TestEqual(TEXT("command below the staleness threshold keeps running"), Recorder->StaleCount, 0);
+	TickPolicyWorld(Rig.World(), 0.010f);
+	TestEqual(TEXT("host receives one stale-command event"), Recorder->StaleCount, 1);
+	TestEqual(TEXT("stale response identifies the velocity channel"), Recorder->LastChannel, FName(TEXT("velocity")));
+	TestFalse(TEXT("host StopPolicy fallback stops inference"), Rig.Component->IsRunning());
+	TestEqual(TEXT("intentional stale fallback does not create a policy fault"), Recorder->FaultCount, 0);
+
+	for (const FUERLPolicyCommandChannelInfo& Channel : Rig.Component->GetRequiredCommandChannels())
+	{
+		TArray<float> Zeros;
+		Zeros.SetNumZeroed(Channel.Width);
+		TestTrue(TEXT("host re-latches each required channel before restart"),
+			Rig.Component->SetCommand(Channel.Name, Zeros));
+	}
+	TestTrue(TEXT("host explicitly restarts after its stale-command fallback"), Rig.Component->StartPolicy());
+	TickPolicyWorld(Rig.World(), 0.010f);
+	TestTrue(TEXT("restarted policy remains active before commands go stale again"), Rig.Component->IsRunning());
+	TestEqual(TEXT("re-latched commands rearm the stale event"), Recorder->StaleCount, 1);
+	TickPolicyWorld(Rig.World(), 0.010f);
+	TestEqual(TEXT("stale host fallback triggers again after the re-latched command ages"), Recorder->StaleCount, 2);
+	TestFalse(TEXT("second stale event also stops inference"), Rig.Component->IsRunning());
+
+	AddInfo(TEXT(
+		"[VERIFY] AC_UE_INT_COMPONENT_018: a host StopPolicy stale-command fallback re-latches commands and explicitly restarts"));
+	return true;
+}
+
 #endif

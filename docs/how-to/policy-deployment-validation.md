@@ -20,12 +20,16 @@ git lfs install
 git lfs pull
 uv sync --locked
 
-$ueRoot = 'C:\Program Files\Epic Games\UE_5.8'
+$ueRoot = $env:UE_ROOT
+if (-not $ueRoot) { throw 'Set UE_ROOT to the UE 5.8 installation root.' }
 $project = (Resolve-Path 'engine/UERLHost.uproject').Path
 $runDir = (Resolve-Path 'runs/UERL-PhantomX-ContinuousTerrain-v0/<run-directory>').Path
 $map = '/Game/Maps/UERLPolicyDemo'
 & "$ueRoot\Engine\Build\BatchFiles\Build.bat" UERLHostEditor Win64 Development $project -WaitMutex
 ```
+
+Set `UE_ROOT` to the local UE 5.8 install directory and replace
+`<run-directory>` with the saved Run folder selected for evaluation.
 
 LFS pointers are not loadable map, mesh, PhysicsAsset, or policy assets. The
 Egypt Fab scene is optional external content and is not required for this
@@ -125,14 +129,26 @@ and detaches it for physics control. `GetRobotTransform` reports the live
 controlled mesh transform; the Owner transform can remain at its authored
 location while the mesh moves.
 
-Deployment terrain, clearance, and pose-reset queries use blocking
-`WorldStatic` geometry below the robot and ignore its owner. Training's shared
-World query uses the Environment terrain-owner whitelist; Slot-isolated
-training uses its terrain query channel. Confirm that the target map's ground
-is the intended surface and that an overhead WorldStatic object is not being
-treated as ground. `StartPolicy` measures current ground clearance;
-`ResetToReferencePose` uses current XY/yaw and traces current ground again.
-`SoftReset` clears policy history and observation caches while retaining pose.
+Deployment terrain scans accept blocking `WorldStatic` hits and ignore the
+controlled Robot actor. Start-clearance and pose-reset traces ignore the
+policy component's Owner actor. Other blocking `WorldStatic` geometry along a
+downward probe can be selected, so ensure ceilings, platforms, and Owner
+collision shells do not intersect the target map's probe paths. Training's
+shared World query uses the Environment terrain-owner whitelist;
+Slot-isolated training uses its terrain query channel. `StartPolicy` measures
+current ground clearance; `ResetToReferencePose` uses current XY/yaw and traces
+current ground again. `SoftReset` clears policy history and observation
+caches while retaining pose.
+
+The `AC_UE_INT_COMPONENT_017.SpawnedPoseResetIgnoresHostWorldStaticCollision`
+Automation case checks that a spawned Robot reset selects ground below an
+Owner collision shell:
+
+```powershell
+& $ueCmd $project '/Engine/Maps/Entry' `
+  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_017;Quit' `
+  -unattended -nullrhi -nosound -NoSplash
+```
 
 Repeat the Task-side playback and the in-game policy run without changing the
 map, artifact, seed, start, or command schedule. Keep separate evidence for:
@@ -156,7 +172,9 @@ short smoke run or from numerical parity.
 all three values. `OnCommandStale` reports one command channel and its age; the
 latched value otherwise remains in use. Neither event changes the host command
 or automatically pauses physics. The host must choose and test its response
-for the target game.
+for the target game. Component regressions exercise a host `StopPolicy`
+fallback for overrun and stale-command callbacks, followed by explicit command
+re-latching and restart; a game may choose another response.
 
 `OnPolicyFault` stops policy inference and component ticks. The host must
 choose a fallback before relying on a stopped controller. For a
@@ -178,12 +196,13 @@ unrelated Chaos motion, and restart after the ground and commands are restored:
   -unattended -nullrhi -nosound -NoSplash
 ```
 
-The adjacent existing cases cover overrun clock reports, stale-channel
-rearming, stop/reset from an overrun callback, and reset failure reporting:
+The adjacent cases cover overrun clock reports, stale-channel rearming,
+stop/reset from an overrun callback, and reset failure reporting. The stale
+fallback case verifies that the host can stop, re-latch commands, and restart:
 
 ```powershell
 & $ueCmd $project '/Engine/Maps/Entry' `
-  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_009+UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_010+UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_011+UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_012;Quit' `
+  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_009+UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_010+UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_011+UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_012+UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_018;Quit' `
   -unattended -nullrhi -nosound -NoSplash
 ```
 

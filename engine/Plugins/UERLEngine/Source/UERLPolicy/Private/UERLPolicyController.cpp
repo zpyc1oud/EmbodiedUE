@@ -255,6 +255,7 @@ bool FUERLPolicyController::InitializeFromBytes(
 	RuntimeConfig.GroundOrigin = Config.GroundOrigin;
 	RuntimeConfig.GroundNormal = Config.GroundNormal;
 	RuntimeConfig.TerrainQueryActors = Config.TerrainQueryActors;
+	RuntimeConfig.GroundQueryIgnoreActor = Config.GroundQueryIgnoreActor;
 	RuntimeConfig.InitialRootHeightMeters = Config.InitialRootHeightMeters;
 	RuntimeConfig.bClaimAuthoredActor = Config.bClaimAuthoredActor;
 
