@@ -35,13 +35,12 @@ states that mocks do not verify Chaos or other engine behavior.
    homes and commands. The existing guide clearly distinguishes mock evidence
    from engine evidence. There is no evidence for replacing these layers or
    mechanically rewriting the existing suite.
-2. **The audited GitHub workflow did not run pytest.**
-   `.github/workflows/static-checks.yml` ran Ruff and Mypy at the inventory
-   baseline. Local contribution guidance asks for `pytest -q`, and the full
-   validation runner starts with that same suite. This left ordinary Python
-   behavior outside the automated PR gate. This task adds the configured
-   default pytest suite to CI after confirming it passes locally; its pytest
-   collection deliberately excludes UE-only E2E and runs without UE.
+2. **CI is intentionally limited to static checks.**
+   `.github/workflows/static-checks.yml` runs Ruff and Mypy. The user had
+   previously selected that basic CI scope, so the absence of pytest in CI is a
+   recorded boundary, not a defect or authorization to broaden the workflow.
+   This task runs the requested full default Python suite locally and reports it
+   separately from CI and UE evidence.
 3. **The native UE suite needs a Windows/UE host.** The current environment is
    Linux and does not provide the project's UE 5.8 installation, so UE
    Automation, Chaos, and real Worker E2E remain unverified here. Keep that
@@ -87,11 +86,23 @@ Worker Slot behavior. Likewise, Isaac Sim test fixtures cannot stand in for UE
 Automation or prove UE slot routing.
 
 The current official Isaac Lab PR workflow also runs pytest suites in its GPU
-Docker environment and stores JUnit reports. EmbodiedUE's pure Python suite can
-use the same general practice in its existing Ubuntu workflow without adding UE
-to CI. The external task installer and capability preflight remain EmbodiedUE
+Docker environment and stores JUnit reports. That is useful comparison evidence,
+not a reason to change EmbodiedUE's explicitly scoped static-check workflow. The
+external task installer and capability preflight remain EmbodiedUE
 responsibilities; they need package-discovery, CLI-boundary, and independent
 behavior tests.
+
+## Layer-by-layer comparison
+
+| EmbodiedUE layer | Isaac Lab v2.3.2 evidence | Review and decision |
+|---|---|---|
+| Python unit | `source/isaaclab/test/managers/test_termination_manager.py` uses a small dummy environment and changing expected masks. | Same useful pattern: CPU-level tests with fixed numeric expectations. Keep existing task math tests; no suite-wide rewrite. |
+| Python integration | `source/isaaclab_tasks/test/test_environments.py` and `env_test_utils.py` launch registered tasks, reset them, send batched actions, and check outputs. | These smoke checks do not prove reward math or UE lifecycle. EmbodiedUE retains installed entry-point and scripted-session checks as separate layers. |
+| Protocol | The tagged Isaac Lab test tree has no U4/U5 socket/wire codec counterpart. | The independent protocol oracle and socket-fragmentation cases are specific to EmbodiedUE's wire contract; keep them project-owned. |
+| Parity | `source/isaaclab_tasks/test/test_environment_determinism.py` compares repeat runs in one Isaac Lab simulator setup. | Same-simulator determinism is not cross-language parity. Keep reviewed Python/UE fixtures and explicit numeric tolerances. |
+| Tooling/package | Isaac Lab's `tools/template/generator.py` and template guide create external projects; the tagged `tools/template` tree has no pytest install/discovery suite. | EmbodiedUE's real wheel install, entry-point discovery, resource loading, and CLI checks cover an extra contract that the upstream template leaves manual. |
+| Real UE E2E | Isaac Lab's pytest cases use its Isaac Sim/Kit launcher and simulator-owned lifecycle. | They cannot validate Unreal Worker startup, Chaos, Slot routing, or UE process ownership. Keep EmbodiedUE's separate UE E2E and mark it blocked without a Windows/UE host. |
+| UE Automation | No Unreal C++ Automation test layer exists in the Isaac Lab release. | This is stack-specific and has no transferable test harness. Keep the native C++ cases in their UBT modules; do not infer execution from Python results. |
 
 ## Source references
 
@@ -101,5 +112,8 @@ behavior tests.
 - [Isaac Lab v2.3.2 test runner](https://github.com/isaac-sim/IsaacLab/blob/37ddf626871758333d6ed89cf64ad702aef127d0/tools/run_all_tests.py)
 - [Isaac Lab v2.3.2 termination manager tests](https://github.com/isaac-sim/IsaacLab/blob/37ddf626871758333d6ed89cf64ad702aef127d0/source/isaaclab/test/managers/test_termination_manager.py)
 - [Isaac Lab v2.3.2 task smoke tests](https://github.com/isaac-sim/IsaacLab/blob/37ddf626871758333d6ed89cf64ad702aef127d0/source/isaaclab_tasks/test/test_environments.py)
+- [Isaac Lab v2.3.2 environment determinism tests](https://github.com/isaac-sim/IsaacLab/blob/37ddf626871758333d6ed89cf64ad702aef127d0/source/isaaclab_tasks/test/test_environment_determinism.py)
+- [Isaac Lab v2.3.2 task smoke helpers](https://github.com/isaac-sim/IsaacLab/blob/37ddf626871758333d6ed89cf64ad702aef127d0/source/isaaclab_tasks/test/env_test_utils.py)
+- [Isaac Lab v2.3.2 template generator](https://github.com/isaac-sim/IsaacLab/blob/37ddf626871758333d6ed89cf64ad702aef127d0/tools/template/generator.py)
 - [Isaac Lab main at `b0542fe`: Build and Test workflow](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/.github/workflows/build.yml)
 - [Isaac Lab main at `b0542fe`: pytest runner action](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/.github/actions/run-tests/action.yml)
