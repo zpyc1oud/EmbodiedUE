@@ -14,6 +14,8 @@ backward-compatibility guarantee.
 
 ## Propose a focused change
 
+Follow the [contribution workflow](docs/contribution-workflow.md) for choosing an Issue or RFC, branch and PR review, validation evidence, merge, and release decisions.
+
 Describe the concrete problem, the expected behavior, and how to reproduce it. For bugs, include the task, commit, versions, command, and redacted logs. For design changes, explain the relevant training/deployment contract and a representative use case.
 
 Keep fixes within the current product scope. New robot integrations should add assets and Python declarations through the existing runtime. Changes to plan operators must follow [operator admission](engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md), including Python/C++ implementations, reviewed parity data, and a negative self-check.
