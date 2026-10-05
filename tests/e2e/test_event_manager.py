@@ -7,6 +7,7 @@ from typing import cast
 
 import torch
 
+from tests.e2e.support.worker_runner import UE_CMD
 from uerl import PresentationMode, UERLDirectEnv, UERLSession, UERLSessionAdapter
 from uerl.core.config.robot import RobotSpec, RobotTopology
 from uerl.core.mdp.lib.events import randomize_initial_terrain_levels
@@ -47,9 +48,7 @@ def test_startup_terrain_level_event_reaches_session(tmp_path: Path) -> None:
         PHANTOMX_TERRAIN_TASK_ID,
         overrides={
             **build_launch_overrides(
-                ue_executable=Path(
-                    r"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
-                ),
+                ue_executable=Path(UE_CMD),
                 project=REPO_ROOT / "engine" / "UERLHost.uproject",
                 map_name="/Engine/Maps/Entry",
                 presentation=PresentationMode.NONE,

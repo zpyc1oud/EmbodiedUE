@@ -100,6 +100,7 @@ def test_play_forces_one_slot_and_keeps_the_task_controller(monkeypatch: pytest.
         seen["slots"] = config.worker.slot_count  # type: ignore[attr-defined]
         seen["controller"] = kwargs["play_controller"]
         seen["terrain_level"] = kwargs["terrain_level"]
+        seen["restore_curriculum"] = kwargs["restore_curriculum"]
         return EvaluationSummary(
             task_id=CARTPOLE_TASK_ID,
             checkpoint=Path("model.pt"),
@@ -112,7 +113,7 @@ def test_play_forces_one_slot_and_keeps_the_task_controller(monkeypatch: pytest.
     monkeypatch.setattr("uerl.training.run_evaluation", fake_run)
     play.main(["--task", CARTPOLE_TASK_ID, "--checkpoint", "model.pt"])
 
-    assert seen == {"slots": 1, "controller": "task", "terrain_level": None}
+    assert seen == {"slots": 1, "controller": "task", "terrain_level": None, "restore_curriculum": False}
 
 
 def test_train_and_export_do_not_accept_a_play_controller() -> None:

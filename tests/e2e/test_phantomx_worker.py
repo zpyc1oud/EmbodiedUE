@@ -12,6 +12,7 @@ from typing import cast
 import pytest
 import torch
 
+from tests.e2e.support.worker_runner import UE_CMD
 from uerl import PresentationMode, UERLDirectEnv, UERLSession, UERLSessionAdapter
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.phantomx import PHANTOMX_TERRAIN_TASK_ID
@@ -74,9 +75,7 @@ def test_phantomx_contact_force_fields_round_trip_as_nonnegative_finite_values(t
         PHANTOMX_TERRAIN_TASK_ID,
         overrides={
             **build_launch_overrides(
-                ue_executable=Path(
-                    r"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
-                ),
+                ue_executable=Path(UE_CMD),
                 project=REPO_ROOT / "engine" / "UERLHost.uproject",
                 map_name="/Engine/Maps/Entry",
                 presentation=PresentationMode.NONE,
@@ -145,9 +144,7 @@ def test_phantomx_default_pose_settles_without_spurious_reset(
         PHANTOMX_TERRAIN_TASK_ID,
         overrides={
             **build_launch_overrides(
-                ue_executable=Path(
-                    r"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
-                ),
+                ue_executable=Path(UE_CMD),
                 project=REPO_ROOT / "engine" / "UERLHost.uproject",
                 map_name="/Engine/Maps/Entry",
                 presentation=PresentationMode.NONE,

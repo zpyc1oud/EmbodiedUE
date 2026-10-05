@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from ..core.config import ResolvedRunConfig, RunConfigResolver
+from ..core.config.configspec import from_mapping
+from ..core.config.training_spec import RslRlRunnerParametersCfg
 from ..errors import ConfigError
 from ..tasks.registry import TaskRegistration, create_default_registry
 
@@ -26,27 +28,55 @@ class RunConfig:
     from_run: bool
 
 
+@dataclass(frozen=True, slots=True)
+class RunConfigSource:
+    """A captured source reused while launch and output settings are assembled."""
+
+    registration: TaskRegistration
+    recorded: ResolvedRunConfig | None = None
+    run_hash: str | None = None
+
+    def resolve(self, overrides: Mapping[str, str]) -> RunConfig:
+        config = RunConfigResolver(_SingleRegistration(self.registration)).resolve(
+            self.registration.task_id,
+            overrides,
+        )
+        return RunConfig(config, self.run_hash or config.normalized_hash, self.recorded is not None)
+
+
 def resolve_run_config(
     task_id: str,
     run_directory: Path | None,
     overrides: Mapping[str, str],
 ) -> RunConfig:
-    """Resolve the Run's own Worker, Task and runner settings plus this command's launch shape.
+    """Restore saved settings for play/export, retaining their legacy fallback rules."""
 
-    Session endpoint and logging start from the Task registration so the command never
-    reuses the training port or writes evidence into the training Run. Only the
-    given ``overrides`` differ from the saved Worker, Task and runner settings.
-    The recorded map is restored unless explicitly overridden. Without
-    ``resolved_config.json`` the registered defaults are used. Missing dataclass
-    fields retain current defaults; this is not a faithful continuation contract.
+    return load_run_config_source(task_id, run_directory).resolve(overrides)
+
+
+def load_run_config_source(
+    task_id: str,
+    run_directory: Path | None,
+    *,
+    strict: bool = False,
+) -> RunConfigSource:
+    """Capture configuration once; strict continuation never fills semantic fields.
+
+    Session endpoint and logging defaults are local to the new command. The
+    recorded map and protocol are semantic settings, not machine settings.
+    Play/export retain their existing non-strict missing-field behavior.
     """
 
     registry = create_default_registry()
     path = None if run_directory is None else run_directory / RESOLVED_CONFIG_FILENAME
     if path is None or not path.is_file():
-        config = RunConfigResolver(registry).resolve(task_id, overrides)
-        return RunConfig(config, config.normalized_hash, from_run=False)
-    payload = json.loads(path.read_text(encoding="utf-8"))
+        if strict:
+            raise ConfigError("continuation requires resolved_config.json", code="MISSING_RUN_CONFIG", path=str(path))
+        return RunConfigSource(registry.resolve(task_id))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ConfigError("invalid saved JSON", code="INVALID_RUN_CONFIG", path=str(path)) from exc
     if not isinstance(payload, dict):
         raise ConfigError("resolved config must be a JSON object", code="INVALID_RUN_CONFIG", path=str(path))
     if payload.get("task_id") != task_id:
@@ -64,27 +94,63 @@ def resolve_run_config(
             path=str(path),
         )
     registration = registry.resolve(task_id)
+    if strict and task_version != registration.task_version:
+        raise ConfigError(
+            "saved Task version differs from the registered version", code="RUN_TASK_MISMATCH", path="task_version"
+        )
     defaults = RunConfigResolver(registry).resolve(task_id)
-    worker = _typed(type(defaults.worker), defaults.worker, payload.get("worker"), "worker")
-    task = _typed(type(defaults.task), defaults.task, payload.get("task"), "task")
-    runner = _typed(type(defaults.runner), defaults.runner, payload.get("runner"), "runner")
+    worker = _typed(type(defaults.worker), defaults.worker, payload.get("worker"), "worker", strict=strict)
+    task = _typed(type(defaults.task), defaults.task, payload.get("task"), "task", strict=strict)
+    runner = _typed(type(defaults.runner), defaults.runner, payload.get("runner"), "runner", strict=strict)
     session = payload.get("session")
     map_path = session.get("map_path") if isinstance(session, dict) else None
+    if strict:
+        if not isinstance(map_path, str) or not map_path:
+            raise ConfigError(
+                "continuation requires the recorded map", code="MISSING_RUN_CONFIG", path="session.map_path"
+            )
+        from_mapping(RslRlRunnerParametersCfg, dict(runner.parameters), path="runner.parameters")
     session_config = registration.session_config
     if isinstance(map_path, str) and map_path:
         session_config = replace(session_config, map_path=map_path)
+    recorded_session = _typed(type(defaults.session), defaults.session, session or {}, "session")
+    if strict:
+        assert isinstance(session, dict)
+        protocol = _typed(
+            type(defaults.session.protocol),
+            defaults.session.protocol,
+            session.get("protocol"),
+            "session.protocol",
+            strict=True,
+        )
+        session_config = replace(session_config, protocol=protocol)
+    recorded_logging = _typed(type(defaults.logging), defaults.logging, payload.get("logging", {}), "logging")
+    recorded = replace(
+        defaults,
+        task_version=task_version,
+        worker=worker,
+        task=task,
+        runner=runner,
+        session=recorded_session,
+        logging=recorded_logging,
+        normalized_hash=run_hash,
+    )
     run_registration = replace(
         registration,
         task_version=task_version,
         session_config=session_config,
+        logging_config=(
+            replace(recorded_logging, run_directory=registration.logging_config.run_directory)
+            if strict
+            else registration.logging_config
+        ),
         environment_id=worker.environment_id,
         robot_id=worker.robot_id,
         worker_config_factory=lambda: worker,
         task_config_factory=lambda: task,
         runner_config_factory=lambda: runner,
     )
-    config = RunConfigResolver(_SingleRegistration(run_registration)).resolve(task_id, overrides)
-    return RunConfig(config, run_hash, from_run=True)
+    return RunConfigSource(run_registration, recorded, run_hash)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +161,7 @@ class _SingleRegistration:
         return self.registration
 
 
-def _typed(annotation: Any, template: Any, value: Any, path: str) -> Any:
+def _typed(annotation: Any, template: Any, value: Any, path: str, *, strict: bool = False) -> Any:
     """Invert ``to_jsonable`` for one value of the given annotation.
 
     Fields absent from the Run fall back to ``template``; fields this code does
@@ -111,7 +177,7 @@ def _typed(annotation: Any, template: Any, value: Any, path: str) -> Any:
             return None
         if len(members) != 1:
             raise ConfigError("unsupported union in resolved config", code="INVALID_RUN_CONFIG", path=path)
-        return _typed(members[0], template, value, path)
+        return _typed(members[0], template, value, path, strict=strict)
     if isinstance(annotation, type) and is_dataclass(annotation):
         if not isinstance(value, dict):
             raise ConfigError("expected a JSON object", code="INVALID_RUN_CONFIG", path=path)
@@ -123,12 +189,17 @@ def _typed(annotation: Any, template: Any, value: Any, path: str) -> Any:
                 code="INVALID_RUN_CONFIG",
                 path=path,
             )
+        missing = sorted(set(declared) - set(value))
+        if strict and missing:
+            raise ConfigError(
+                f"saved config is missing fields: {', '.join(missing)}", code="MISSING_RUN_CONFIG", path=path
+            )
         hints = get_type_hints(annotation)
         values: dict[str, Any] = {}
         for name in declared:
             child_template = getattr(template, name) if template is not None else None
             if name in value:
-                values[name] = _typed(hints[name], child_template, value[name], f"{path}.{name}")
+                values[name] = _typed(hints[name], child_template, value[name], f"{path}.{name}", strict=strict)
             elif template is not None:
                 values[name] = child_template
         return annotation(**values)
@@ -147,15 +218,23 @@ def _typed(annotation: Any, template: Any, value: Any, path: str) -> Any:
     if origin is tuple and isinstance(value, list):
         tuple_args = get_args(annotation)
         if len(tuple_args) == 2 and tuple_args[1] is Ellipsis:
-            return tuple(_typed(tuple_args[0], None, item, f"{path}[{index}]") for index, item in enumerate(value))
+            return tuple(
+                _typed(tuple_args[0], None, item, f"{path}[{index}]", strict=strict) for index, item in enumerate(value)
+            )
         if len(tuple_args) == len(value):
             return tuple(
-                _typed(member, None, item, f"{path}[{index}]")
+                _typed(member, None, item, f"{path}[{index}]", strict=strict)
                 for index, (member, item) in enumerate(zip(tuple_args, value, strict=True))
             )
     if origin in (Mapping, dict) and isinstance(value, dict):
+        if strict and path.startswith("task.parameters") and isinstance(template, Mapping):
+            missing = sorted(set(template) - set(value))
+            if missing:
+                raise ConfigError(
+                    f"saved config is missing parameters: {', '.join(missing)}", code="MISSING_RUN_CONFIG", path=path
+                )
         return value
     raise ConfigError(f"cannot read {value!r} as {annotation!r}", code="INVALID_RUN_CONFIG", path=path)
 
 
-__all__ = ["RESOLVED_CONFIG_FILENAME", "RunConfig", "resolve_run_config"]
+__all__ = ["RESOLVED_CONFIG_FILENAME", "RunConfig", "RunConfigSource", "load_run_config_source", "resolve_run_config"]

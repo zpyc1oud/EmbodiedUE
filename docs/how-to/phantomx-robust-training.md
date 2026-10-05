@@ -44,7 +44,7 @@ uv run uerl train --task UERL-PhantomX-ContinuousTerrain-v0 --resume $runDir
 
 Checkpoints created before the physical-time objective lack the `phantomx_physical_time_v1` marker and are rejected for resume before UE starts. Terrain checkpoints from before command-direction progress was introduced also lack the state needed for adaptive terrain resume. `uerl train --terrain-level N --resume ...` bypasses restoration of the terrain curriculum while retaining command-curriculum restoration; it does not bypass the objective compatibility check. Earlier terrain checkpoints may also lack the curriculum random stream.
 
-For single-robot playback, explicitly fix `--terrain-level` so that multi-Slot terrain curriculum state is not restored. Historical policy behavior cannot establish the effectiveness of the current objective.
+Single-robot playback starts with registered Task curriculum settings instead of restoring per-Slot checkpoint state. Use `--terrain-level N` to evaluate one selected procedural tier. Historical policy behavior cannot establish the effectiveness of the current objective.
 
 ## Per-level evaluation
 

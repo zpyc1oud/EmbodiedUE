@@ -23,7 +23,7 @@ uv run uerl play `
 | `--record-seconds` | Maximum recording duration; default 20 seconds |
 | `--record-fps` | Encoded frame rate; default 30 fps |
 | `--controller` | `task` for task commands (default), or `player` for keyboard control |
-| `--terrain-level` | Fixed procedural terrain level; explicitly select it for single-robot terrain playback |
+| `--terrain-level` | Fixed procedural terrain tier; otherwise single-robot playback starts with registered Task curriculum settings |
 
 For objective comparisons, name the intended Run explicitly. `latest` selects by time and does not distinguish training objectives. Recordings illustrate behavior; use [per-level evaluation](phantomx-robust-training.md#per-level-evaluation) to measure performance. Recording also writes a JSON evidence file beside the video.
 

@@ -199,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
             checkpoint=checkpoint,
             steps=args.steps,
             terrain_level=args.terrain_level,
+            # Playback is one Slot; checkpoint curriculum state is per-Slot training state.
+            restore_curriculum=False,
             play_controller=args.controller,
         )
     except BaseException:
