@@ -134,6 +134,11 @@ For every host reset/restart, first call `ResetToReferencePose` or `SoftReset`,
 then call `MarkEpisodeBoundary` with the episode index from the Task trace's
 post-reset row and a reason. The call must occur before the next policy
 bootstrap frame. This marks the new phase and resets the trace's episode clock.
+The trace recorder defers applying that boundary until it receives a bootstrap
+frame whose sequence is greater than the component sequence at the reset call.
+This keeps the callback frame in the old episode whether the host callback runs
+before or after the recorder callback. A boundary record uses the sequence of
+the first new-episode bootstrap frame.
 The first Task input is `post_reset_input`; UE's first-ever control callback is
 `bootstrap_input`, so the comparator will mark that initial pair not comparable.
 Later Task/UE rows pair only when episode index, policy step, command, timing,
@@ -172,9 +177,19 @@ Worker's post-step `TransitionState` **before Reset**, with the actual
 validity, and fault. When done, the `reset` record separately captures the
 post-reset state and the observation returned for the next episode. It must not
 be treated as the terminal transition or paired with that transition's action.
+`field_layout.deployment_state_fields` records the state names selected by the
+bound Task observation plan. The Task trace retains every raw state field,
+including Task-only diagnostics; comparisons require and measure the plan fields
+only. UE's recorded raw-state field set must exactly match those deployment
+requirements, with matching widths. Task-only fields are listed as diagnostic
+fields on each pair and do not block comparison. A required field missing on
+either side, or a non-finite required value, makes the pair not comparable.
 Trace capture is off by default and allocates no per-step copies when disabled.
 The `UERLPolicyTraceRecorder` also records control overruns, stale command
 channels, policy faults, and explicit episode-boundary records while active.
+UE trace files are written as UTF-8 without a BOM, so host-provided Unicode
+reset reasons round-trip through the Python reader. Artifacts with no command
+channels write `commands: []` as an empty YAML sequence.
 
 The UE host trace uses the same YAML field names for decision inputs and action
 outputs; it also records the artifact Task/Robot identity, map package, supplied
@@ -185,7 +200,8 @@ with the Run and host evidence.
 
 Pair rows by episode and policy-step only as candidate decision samples. Before
 comparing values, check the Task/Robot and map identities, seed, command values,
-raw-state and observation layouts, and dt **with the phase stated**. Task input
+the exact deployment-required raw-state fields and observation layouts, and dt
+**with the phase stated**. Task input
 observation dt corresponds to the dt used by the UE event's observation plan;
 Task action `transition_dt` corresponds to the following UE event's elapsed
 physics window, not the current event's elapsed window. Game and solver clocks
@@ -224,6 +240,10 @@ inside the public frame callback and checks the restart/bootstrap boundary.
 
 & $ueCmd $project '/Engine/Maps/Entry' `
   '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_021;Quit' `
+  -unattended -nullrhi -nosound -NoSplash
+
+& $ueCmd $project '/Engine/Maps/Entry' `
+  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_022;Quit' `
   -unattended -nullrhi -nosound -NoSplash
 ```
 

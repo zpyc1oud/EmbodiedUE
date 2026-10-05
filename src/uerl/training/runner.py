@@ -490,6 +490,10 @@ def run_evaluation(
             initial_terrain_level=terrain_level,
             step_trace_callback=None if trace_recorder is None else trace_recorder.record_step,
         )
+        if trace_recorder is not None:
+            trace_recorder.set_deployment_state_fields(
+                tuple(task.observation_plan.state_requirements)
+            )
         vec_env = UERLVecEnvWrapper(direct_env, cfg=config)
         runner = UERLOnPolicyRunner(
             vec_env,

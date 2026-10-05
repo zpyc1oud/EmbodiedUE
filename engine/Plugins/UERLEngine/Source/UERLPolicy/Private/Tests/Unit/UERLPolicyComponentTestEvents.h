@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "UERLPolicyComponent.h"
+#include "UERLPolicyTraceRecorder.h"
 #include "UERLPolicyComponentTestEvents.generated.h"
 
 enum class EUERLPolicyTestFrameCallbackMode : uint8
 {
 	Stop,
 	SoftReset,
+	SoftResetAndMarkBoundary,
 	RecordOnly,
 };
 
@@ -24,6 +26,9 @@ public:
 	TArray<FUERLPolicyControlFrameSnapshot> ControlFrames;
 	EUERLPolicyTestFrameCallbackMode ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::RecordOnly;
 	TWeakObjectPtr<UUERLPolicyComponent> ControlFrameCallbackComponent;
+	TWeakObjectPtr<UUERLPolicyTraceRecorder> ControlFrameTraceRecorder;
+	int32 ControlFrameEpisodeIndex = 1;
+	FString ControlFrameBoundaryReason = TEXT("callback_soft_reset");
 	bool bControlFrameCallbackSucceeded = false;
 
 	UFUNCTION()
@@ -42,6 +47,23 @@ public:
 			else if (ControlFrameCallbackMode == EUERLPolicyTestFrameCallbackMode::SoftReset)
 			{
 				bControlFrameCallbackSucceeded = Component->SoftReset();
+			}
+			else if (ControlFrameCallbackMode == EUERLPolicyTestFrameCallbackMode::SoftResetAndMarkBoundary)
+			{
+				bControlFrameCallbackSucceeded = Component->SoftReset();
+				if (bControlFrameCallbackSucceeded)
+				{
+					if (UUERLPolicyTraceRecorder* Trace = ControlFrameTraceRecorder.Get())
+					{
+						bControlFrameCallbackSucceeded = Trace->MarkEpisodeBoundary(
+							ControlFrameEpisodeIndex, ControlFrameBoundaryReason);
+					}
+					else
+					{
+						bControlFrameCallbackSucceeded = false;
+					}
+				}
+				ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::RecordOnly;
 			}
 		}
 	}

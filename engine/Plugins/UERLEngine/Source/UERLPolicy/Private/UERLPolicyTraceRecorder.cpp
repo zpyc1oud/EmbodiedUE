@@ -216,8 +216,11 @@ bool UUERLPolicyTraceRecorder::StartTrace(const FString& FileName, int32 InSeed)
 	ActuatorTargetWidth = 0;
 	EpisodeIndex = 0;
 	EpisodeStep = 0;
+	PendingEpisodeIndex = 0;
 	LastSequence = PolicyComponent->GetControlFrameSequence();
+	PendingBoundaryAfterSequence = 0;
 	EpisodeElapsedSeconds = 0.0;
+	PendingBoundaryReason.Reset();
 	bSawFirstFrame = false;
 	bPendingEpisodeBoundary = false;
 	bRecording = true;
@@ -240,6 +243,11 @@ bool UUERLPolicyTraceRecorder::MarkEpisodeBoundary(int32 NewEpisodeIndex, const 
 		LastError = TEXT("no policy trace is recording");
 		return false;
 	}
+	if (bPendingEpisodeBoundary)
+	{
+		LastError = TEXT("an episode boundary is already pending for the next bootstrap frame");
+		return false;
+	}
 	if (NewEpisodeIndex <= EpisodeIndex)
 	{
 		LastError = FString::Printf(
@@ -251,14 +259,9 @@ bool UUERLPolicyTraceRecorder::MarkEpisodeBoundary(int32 NewEpisodeIndex, const 
 		LastError = TEXT("mark the episode boundary after reset/restart arms the next bootstrap frame");
 		return false;
 	}
-	FString Record(TEXT("  - kind: boundary\n"));
-	Record += FString::Printf(TEXT("    sequence: %lld\n"), static_cast<long long>(LastSequence));
-	Record += FString::Printf(TEXT("    episode_index: %d\n"), NewEpisodeIndex);
-	Record += FString::Printf(TEXT("    reason: %s\n"), *QuoteYaml(Reason));
-	Records.Add(MoveTemp(Record));
-	EpisodeIndex = NewEpisodeIndex;
-	EpisodeStep = 0;
-	EpisodeElapsedSeconds = 0.0;
+	PendingEpisodeIndex = NewEpisodeIndex;
+	PendingBoundaryAfterSequence = BoundPolicyComponent->GetControlFrameSequence();
+	PendingBoundaryReason = Reason;
 	bPendingEpisodeBoundary = true;
 	LastError.Reset();
 	return true;
@@ -312,7 +315,8 @@ bool UUERLPolicyTraceRecorder::WriteTrace()
 	const FString Contents = SerializeTrace();
 	const FString TemporaryPath = TracePath + TEXT(".")
 		+ FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".tmp");
-	if (!FFileHelper::SaveStringToFile(Contents, *TemporaryPath))
+	if (!FFileHelper::SaveStringToFile(
+		Contents, *TemporaryPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 	{
 		LastError = FString::Printf(TEXT("could not write temporary policy trace: %s"), *TemporaryPath);
 		return false;
@@ -345,18 +349,29 @@ void UUERLPolicyTraceRecorder::OnControlFrameCompleted(const FUERLPolicyControlF
 		return;
 	}
 	FString Phase;
-	if (bPendingEpisodeBoundary && Frame.bBootstrap)
+	const bool bApplyEpisodeBoundary = bPendingEpisodeBoundary
+		&& Frame.Sequence > PendingBoundaryAfterSequence
+		&& Frame.bBootstrap;
+	if (bApplyEpisodeBoundary)
 	{
+		EpisodeIndex = PendingEpisodeIndex;
 		EpisodeStep = 0;
 		EpisodeElapsedSeconds = 0.0;
 		Phase = TEXT("post_reset_input");
 		bPendingEpisodeBoundary = false;
+		FString BoundaryRecord(TEXT("  - kind: boundary\n"));
+		BoundaryRecord += FString::Printf(
+			TEXT("    sequence: %lld\n"), static_cast<long long>(Frame.Sequence));
+		BoundaryRecord += FString::Printf(TEXT("    episode_index: %d\n"), EpisodeIndex);
+		BoundaryRecord += FString::Printf(TEXT("    reason: %s\n"), *QuoteYaml(PendingBoundaryReason));
+		Records.Add(MoveTemp(BoundaryRecord));
+		PendingBoundaryReason.Reset();
 	}
 	else if (Frame.bBootstrap)
 	{
 		EpisodeElapsedSeconds = 0.0;
 		Phase = TEXT("bootstrap_input");
-		if (bSawFirstFrame)
+		if (bSawFirstFrame && !bPendingEpisodeBoundary)
 		{
 			FString EventRecord(TEXT("  - kind: event\n"));
 			EventRecord += TEXT("    event: unmarked_bootstrap_boundary\n");
@@ -407,12 +422,19 @@ void UUERLPolicyTraceRecorder::OnControlFrameCompleted(const FUERLPolicyControlF
 	Record += FString::Printf(TEXT("      raw_state: %s\n"), *YamlFloatArray(Frame.RawState));
 	Record += FString::Printf(TEXT("      observation: %s\n"), *YamlFloatArray(Frame.Observation));
 	Record += FString::Printf(TEXT("      previous_action: %s\n"), *YamlFloatArray(Frame.PreviousAction));
-	Record += TEXT("      commands:\n");
-	for (const FUERLPolicyCommandSample& Command : Frame.Commands)
+	if (Frame.Commands.IsEmpty())
 	{
-		Record += FString::Printf(TEXT("        - channel: %s\n"), *QuoteYaml(Command.Channel.ToString()));
-		Record += FString::Printf(TEXT("          values: %s\n"), *YamlFloatArray(Command.Values));
-		Record += FString::Printf(TEXT("          age_seconds: %s\n"), *YamlNumber(Command.AgeSeconds));
+		Record += TEXT("      commands: []\n");
+	}
+	else
+	{
+		Record += TEXT("      commands:\n");
+		for (const FUERLPolicyCommandSample& Command : Frame.Commands)
+		{
+			Record += FString::Printf(TEXT("        - channel: %s\n"), *QuoteYaml(Command.Channel.ToString()));
+			Record += FString::Printf(TEXT("          values: %s\n"), *YamlFloatArray(Command.Values));
+			Record += FString::Printf(TEXT("          age_seconds: %s\n"), *YamlNumber(Command.AgeSeconds));
+		}
 	}
 	Record += TEXT("    action:\n");
 	Record += FString::Printf(TEXT("      policy_action: %s\n"), *YamlFloatArray(Frame.Action));
@@ -433,9 +455,12 @@ void UUERLPolicyTraceRecorder::OnControlStepOverrun(
 	}
 	FString Record(TEXT("  - kind: event\n"));
 	Record += TEXT("    event: control_step_overrun\n");
-	Record += FString::Printf(TEXT("    sequence: %lld\n"), static_cast<long long>(LastSequence + 1));
-	Record += FString::Printf(TEXT("    episode_index: %d\n"), EpisodeIndex);
-	Record += FString::Printf(TEXT("    episode_step: %d\n"), EpisodeStep);
+	const int64 EventSequence = bPendingEpisodeBoundary
+		? PendingBoundaryAfterSequence + 1 : LastSequence + 1;
+	Record += FString::Printf(TEXT("    sequence: %lld\n"), static_cast<long long>(EventSequence));
+	Record += FString::Printf(
+		TEXT("    episode_index: %d\n"), bPendingEpisodeBoundary ? PendingEpisodeIndex : EpisodeIndex);
+	Record += FString::Printf(TEXT("    episode_step: %d\n"), bPendingEpisodeBoundary ? 0 : EpisodeStep);
 	Record += FString::Printf(TEXT("    game_seconds: %s\n"), *YamlNumber(GameSeconds));
 	Record += FString::Printf(TEXT("    physics_seconds: %s\n"), *YamlNumber(PhysicsSeconds));
 	Record += FString::Printf(TEXT("    observation_seconds: %s\n"), *YamlNumber(ObservationSeconds));
@@ -450,9 +475,12 @@ void UUERLPolicyTraceRecorder::OnCommandStale(FName Channel, float StaleSeconds)
 	}
 	FString Record(TEXT("  - kind: event\n"));
 	Record += TEXT("    event: command_stale\n");
-	Record += FString::Printf(TEXT("    sequence: %lld\n"), static_cast<long long>(LastSequence + 1));
-	Record += FString::Printf(TEXT("    episode_index: %d\n"), EpisodeIndex);
-	Record += FString::Printf(TEXT("    episode_step: %d\n"), EpisodeStep);
+	const int64 EventSequence = bPendingEpisodeBoundary
+		? PendingBoundaryAfterSequence + 1 : LastSequence + 1;
+	Record += FString::Printf(TEXT("    sequence: %lld\n"), static_cast<long long>(EventSequence));
+	Record += FString::Printf(
+		TEXT("    episode_index: %d\n"), bPendingEpisodeBoundary ? PendingEpisodeIndex : EpisodeIndex);
+	Record += FString::Printf(TEXT("    episode_step: %d\n"), bPendingEpisodeBoundary ? 0 : EpisodeStep);
 	Record += FString::Printf(TEXT("    channel: %s\n"), *QuoteYaml(Channel.ToString()));
 	Record += FString::Printf(TEXT("    stale_seconds: %s\n"), *YamlNumber(StaleSeconds));
 	Records.Add(MoveTemp(Record));
@@ -467,9 +495,12 @@ void UUERLPolicyTraceRecorder::OnPolicyFault(const FString& Reason)
 	bSawPolicyFault = true;
 	FString Record(TEXT("  - kind: event\n"));
 	Record += TEXT("    event: policy_fault\n");
-	Record += FString::Printf(TEXT("    sequence: %lld\n"), static_cast<long long>(LastSequence + 1));
-	Record += FString::Printf(TEXT("    episode_index: %d\n"), EpisodeIndex);
-	Record += FString::Printf(TEXT("    episode_step: %d\n"), EpisodeStep);
+	const int64 EventSequence = bPendingEpisodeBoundary
+		? PendingBoundaryAfterSequence + 1 : LastSequence + 1;
+	Record += FString::Printf(TEXT("    sequence: %lld\n"), static_cast<long long>(EventSequence));
+	Record += FString::Printf(
+		TEXT("    episode_index: %d\n"), bPendingEpisodeBoundary ? PendingEpisodeIndex : EpisodeIndex);
+	Record += FString::Printf(TEXT("    episode_step: %d\n"), bPendingEpisodeBoundary ? 0 : EpisodeStep);
 	Record += FString::Printf(TEXT("    reason: %s\n"), *QuoteYaml(Reason));
 	Records.Add(MoveTemp(Record));
 }

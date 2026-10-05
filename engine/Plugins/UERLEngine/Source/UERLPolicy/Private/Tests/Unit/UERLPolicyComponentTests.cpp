@@ -14,6 +14,7 @@
 #include "PhysicsEngine/PhysicsSettings.h"
 #include "PreviewScene.h"
 #include "Components/StaticMeshComponent.h"
+#include "Containers/StringConv.h"
 #include "UObject/UnrealType.h"
 #include "UERLPolicyArtifactAsset.h"
 #include "UERLPolicyComponent.h"
@@ -2046,7 +2047,7 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 
 	TickPolicyWorld(Rig.World(), 0.005f);
 	TestTrue(TEXT("host reset clears the policy and arms a new bootstrap"), Rig.Component->SoftReset());
-	TestTrue(TEXT("host records the matching episode boundary"), Trace->MarkEpisodeBoundary(1, TEXT("host_soft_reset")));
+	TestTrue(TEXT("host records the matching episode boundary"), Trace->MarkEpisodeBoundary(1, TEXT("主机软重置")));
 	Rig.Component->OnControlStepOverrun.Broadcast(0.04f, 0.04f, 0.035f);
 	Rig.Component->OnCommandStale.Broadcast(FName(TEXT("velocity")), 0.04f);
 	TickPolicyWorld(Rig.World(), 0.005f);
@@ -2060,6 +2061,26 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 		FPaths::ProjectSavedDir(), TEXT("UERLPolicyTraces"), FileName);
 	FString Contents;
 	TestTrue(TEXT("trace output exists"), FFileHelper::LoadFileToString(Contents, *TracePath));
+	TArray<uint8> TraceBytes;
+	TestTrue(TEXT("trace output is readable as raw bytes"), FFileHelper::LoadFileToArray(TraceBytes, *TracePath));
+	TestTrue(TEXT("trace output does not have a UTF-8 BOM"),
+		TraceBytes.Num() < 3 || TraceBytes[0] != 0xef || TraceBytes[1] != 0xbb || TraceBytes[2] != 0xbf);
+	const FTCHARToUTF8 Utf8BoundaryReason(TEXT("主机软重置"));
+	bool bContainsUtf8BoundaryReason = false;
+	for (int32 ByteIndex = 0; ByteIndex + Utf8BoundaryReason.Length() <= TraceBytes.Num(); ++ByteIndex)
+	{
+		if (FMemory::Memcmp(
+			TraceBytes.GetData() + ByteIndex,
+			Utf8BoundaryReason.Get(),
+			Utf8BoundaryReason.Length()) == 0)
+		{
+			bContainsUtf8BoundaryReason = true;
+			break;
+		}
+	}
+	TestTrue(TEXT("boundary reason is serialized as raw UTF-8"), bContainsUtf8BoundaryReason);
+	TestTrue(TEXT("UTF-8 trace round-trips a non-ASCII boundary reason"),
+		Contents.Contains(TEXT("reason: \"主机软重置\"")));
 	TestTrue(TEXT("trace declares schema version and UE identity"),
 		Contents.Contains(TEXT("schema_version: 1"))
 		&& Contents.Contains(TEXT("side: ue"))
@@ -2104,6 +2125,82 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("event sequence inherits the component's monotonic sequence baseline"),
 		ContinuationContents.Contains(TEXT("event: control_step_overrun\n    sequence: 4"))
 		&& ContinuationContents.Contains(TEXT("kind: frame\n    sequence: 4")));
+	auto VerifyCallbackBoundaryOrdering = [this, &Rig](bool bTraceFirst, const FString& Label)
+	{
+		UUERLPolicyTraceRecorder* OrderedTrace = NewObject<UUERLPolicyTraceRecorder>(Rig.Host);
+		Rig.Host->AddInstanceComponent(OrderedTrace);
+		OrderedTrace->PolicyComponent = Rig.Component;
+		OrderedTrace->RegisterComponent();
+		UUERLPolicyComponentTestEventRecorder* HostCallback =
+			NewObject<UUERLPolicyComponentTestEventRecorder>(Rig.Host);
+		HostCallback->ControlFrameCallbackComponent = Rig.Component;
+		HostCallback->ControlFrameTraceRecorder = OrderedTrace;
+		HostCallback->ControlFrameCallbackMode =
+			EUERLPolicyTestFrameCallbackMode::SoftResetAndMarkBoundary;
+		HostCallback->ControlFrameEpisodeIndex = 1;
+		HostCallback->ControlFrameBoundaryReason = Label;
+		const FString OrderedFileName = FString::Printf(
+			TEXT("AC021_order_%s_%s.yaml"),
+			bTraceFirst ? TEXT("trace_first") : TEXT("host_first"),
+			*FGuid::NewGuid().ToString(EGuidFormats::Digits));
+		if (bTraceFirst)
+		{
+			this->TestTrue(*FString::Printf(TEXT("%s trace starts before the host callback"), *Label),
+				OrderedTrace->StartTrace(OrderedFileName, 7));
+			BindRecorderEvent(
+				Rig.Component->OnControlStepCompleted,
+				HostCallback,
+				GET_FUNCTION_NAME_CHECKED(
+					UUERLPolicyComponentTestEventRecorder, OnControlFrameCompleted));
+		}
+		else
+		{
+			BindRecorderEvent(
+				Rig.Component->OnControlStepCompleted,
+				HostCallback,
+				GET_FUNCTION_NAME_CHECKED(
+					UUERLPolicyComponentTestEventRecorder, OnControlFrameCompleted));
+			this->TestTrue(*FString::Printf(TEXT("%s trace starts after the host callback"), *Label),
+				OrderedTrace->StartTrace(OrderedFileName, 7));
+		}
+		for (int32 Tick = 0; Tick < 32 && !HostCallback->bControlFrameCallbackSucceeded; ++Tick)
+		{
+			TickPolicyWorld(Rig.World(), 0.005f);
+		}
+		this->TestTrue(*FString::Printf(TEXT("%s callback resets and marks the boundary"), *Label),
+			HostCallback->bControlFrameCallbackSucceeded);
+		const int64 BeforeBootstrapSequence = HostCallback->LastControlFrame.Sequence;
+		for (int32 Tick = 0; Tick < 32
+			&& Rig.Component->GetControlFrameSequence() <= BeforeBootstrapSequence; ++Tick)
+		{
+			TickPolicyWorld(Rig.World(), 0.005f);
+		}
+		this->TestTrue(*FString::Printf(TEXT("%s emits a later bootstrap frame"), *Label),
+			Rig.Component->GetControlFrameSequence() > BeforeBootstrapSequence);
+		const int64 BootstrapSequence = BeforeBootstrapSequence + 1;
+		this->TestTrue(*FString::Printf(TEXT("%s trace stops"), *Label), OrderedTrace->StopTrace());
+		const FString OrderedPath = FPaths::Combine(
+			FPaths::ProjectSavedDir(), TEXT("UERLPolicyTraces"), OrderedFileName);
+		FString OrderedContents;
+		this->TestTrue(*FString::Printf(TEXT("%s trace output exists"), *Label),
+			FFileHelper::LoadFileToString(OrderedContents, *OrderedPath));
+		const FString OldFrame = FString::Printf(
+			TEXT("kind: frame\n    sequence: %lld\n    episode_index: 0\n"),
+			static_cast<long long>(BeforeBootstrapSequence));
+		const FString Boundary = FString::Printf(
+			TEXT("kind: boundary\n    sequence: %lld\n    episode_index: 1\n    reason: \"%s\""),
+			static_cast<long long>(BootstrapSequence), *Label);
+		const FString NewFrame = FString::Printf(
+			TEXT("kind: frame\n    sequence: %lld\n    episode_index: 1\n    episode_step: 0\n    phase: post_reset_input"),
+			static_cast<long long>(BootstrapSequence));
+		this->TestTrue(*FString::Printf(TEXT("%s retains the callback frame in the old episode"), *Label),
+			OrderedContents.Contains(OldFrame));
+		this->TestTrue(*FString::Printf(TEXT("%s marks the next sequence as the new episode"), *Label),
+			OrderedContents.Contains(Boundary) && OrderedContents.Contains(NewFrame));
+		IFileManager::Get().Delete(*OrderedPath, false, true, true);
+	};
+	VerifyCallbackBoundaryOrdering(false, TEXT("host_before_trace"));
+	VerifyCallbackBoundaryOrdering(true, TEXT("trace_before_host"));
 	Rig.Component->StopPolicy();
 	UUERLPolicyTraceRecorder* ExistingTrace = NewObject<UUERLPolicyTraceRecorder>(Rig.Host);
 	Rig.Host->AddInstanceComponent(ExistingTrace);
@@ -2130,6 +2227,61 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 	IFileManager::Get().Delete(*ContinuationPath, false, true);
 	AddInfo(TEXT(
 		"[VERIFY] AC_UE_INT_COMPONENT_021: opt-in UE YAML trace records aligned policy frames and explicit reset boundaries"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLPolicyTraceRecorderEmptyCommandsTest,
+	"UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_022.EmptyCommandTraceSerializesAsSequence",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPolicyTraceRecorderEmptyCommandsTest::RunTest(const FString& Parameters)
+{
+	FString Error;
+	UUERLPolicyArtifactAsset* Asset = MakeTransientAsset(Error);
+	if (!Asset)
+	{
+		AddError(Error);
+		return false;
+	}
+	FComponentTestRig Rig;
+	if (!Rig.Build(*this, Asset))
+	{
+		return false;
+	}
+	FDeployPhysicsSettingsGuard Guard(0.005f, 10);
+	TestEqual(TEXT("CartPole controller has no command channels"),
+		Rig.Component->GetRequiredCommandChannels().Num(), 0);
+	if (!StartWithZeroCommand(*this, Rig.Component))
+	{
+		return false;
+	}
+	UUERLPolicyTraceRecorder* Trace = NewObject<UUERLPolicyTraceRecorder>(Rig.Host);
+	Rig.Host->AddInstanceComponent(Trace);
+	Trace->PolicyComponent = Rig.Component;
+	Trace->RegisterComponent();
+	const FString FileName = FString::Printf(
+		TEXT("AC022_empty_commands_%s.yaml"), *FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	TestTrue(TEXT("CartPole trace starts"), Trace->StartTrace(FileName, 0));
+	const int64 InitialSequence = Rig.Component->GetControlFrameSequence();
+	for (int32 Tick = 0; Tick < 32
+		&& Rig.Component->GetControlFrameSequence() <= InitialSequence; ++Tick)
+	{
+		TickPolicyWorld(Rig.World(), 0.005f);
+	}
+	TestTrue(TEXT("CartPole emits a policy frame"),
+		Rig.Component->GetControlFrameSequence() > InitialSequence);
+	TestTrue(TEXT("CartPole trace stops"), Trace->StopTrace());
+	const FString TracePath = FPaths::Combine(
+		FPaths::ProjectSavedDir(), TEXT("UERLPolicyTraces"), FileName);
+	FString Contents;
+	TestTrue(TEXT("CartPole trace output exists"), FFileHelper::LoadFileToString(Contents, *TracePath));
+	TestTrue(TEXT("no-command trace serializes commands as an empty YAML sequence"),
+		Contents.Contains(TEXT("commands: []")));
+	IFileManager::Get().Delete(*TracePath, false, true, true);
+	Rig.Component->StopPolicy();
+	AddInfo(TEXT(
+		"[VERIFY] AC_UE_INT_COMPONENT_022: CartPole trace with no command channels writes commands: []"));
 	return true;
 }
 

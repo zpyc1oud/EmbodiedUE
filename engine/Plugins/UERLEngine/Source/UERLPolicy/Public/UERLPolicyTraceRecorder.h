@@ -76,8 +76,11 @@ private:
 	int32 Seed = -1;
 	int32 EpisodeIndex = 0;
 	int32 EpisodeStep = 0;
+	int32 PendingEpisodeIndex = 0;
 	int64 LastSequence = 0;
+	int64 PendingBoundaryAfterSequence = 0;
 	double EpisodeElapsedSeconds = 0.0;
+	FString PendingBoundaryReason;
 	bool bRecording = false;
 	bool bSawFirstFrame = false;
 	bool bPendingEpisodeBoundary = false;

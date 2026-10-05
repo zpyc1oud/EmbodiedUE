@@ -35,6 +35,7 @@ class TaskPolicyTraceRecorder:
         self.source = cast(dict[str, object], _yaml_value(source))
         self.clock = cast(dict[str, object], _yaml_value(clock))
         self.actor_observation_groups = tuple(actor_observation_groups)
+        self.deployment_state_fields: tuple[str, ...] = ()
         self.records: list[dict[str, object]] = []
         self._finished = False
 
@@ -67,12 +68,28 @@ class TaskPolicyTraceRecorder:
             raise ValueError("policy ONNX fingerprint must be a 40-character lowercase SHA-1")
         self.source["policy_onnx_sha1"] = onnx_sha1
 
+    def set_deployment_state_fields(self, fields: Sequence[str]) -> None:
+        """Record the exact state fields selected by the bound deployment plan."""
+
+        if self._finished or self.records:
+            raise RuntimeError("deployment state fields must be set before recording steps")
+        normalized = tuple(fields)
+        if not normalized or any(not isinstance(name, str) or not name for name in normalized):
+            raise ValueError("deployment state fields must be a non-empty sequence of names")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("deployment state fields must be unique")
+        self.deployment_state_fields = normalized
+
     def finish(self, *, complete: bool) -> Path:
         """Persist the trace and say whether the requested evaluation finished."""
 
         if self._finished:
             return self.path
-        field_layout = _task_field_layout(self.records, self.actor_observation_groups)
+        field_layout = _task_field_layout(
+            self.records,
+            self.actor_observation_groups,
+            self.deployment_state_fields,
+        )
         payload = {
             "schema_version": _TRACE_SCHEMA_VERSION,
             "source": {"side": "task", **self.source},
@@ -99,6 +116,7 @@ def compare_policy_traces(task_path: Path, ue_path: Path) -> dict[str, object]:
         + _clock_mismatches(task, ue)
         + _layout_mismatches(task, ue)
     )
+    deployment_state_fields = _required_state_fields(task)
     task_rows = _index_records(task, "step")
     ue_rows = _index_records(ue, "frame")
     ue_events = _index_events(ue)
@@ -120,7 +138,9 @@ def compare_policy_traces(task_path: Path, ue_path: Path) -> dict[str, object]:
         if ue_row is None:
             reasons.append("UE row is missing for this episode/policy-step")
         if task_row is not None and ue_row is not None:
-            reasons.extend(_row_alignment_mismatches(task_row, ue_row))
+            reasons.extend(
+                _row_alignment_mismatches(task_row, ue_row, deployment_state_fields)
+            )
         if any(event.get("event") == "policy_fault" for event in frame_events):
             reasons.append("UE policy fault occurred before this policy decision frame")
         task_events = [] if task_row is None else _task_row_events(task_row)
@@ -133,14 +153,27 @@ def compare_policy_traces(task_path: Path, ue_path: Path) -> dict[str, object]:
             "reasons": reasons,
             "events": {"task": task_events, "ue": frame_events},
         }
+        if task_row is not None:
+            task_input_value = task_row.get("input")
+            task_state_value = (
+                task_input_value.get("raw_state")
+                if isinstance(task_input_value, Mapping)
+                else None
+            )
+            task_fields = set(task_state_value) if isinstance(task_state_value, Mapping) else set()
+            pair["task_diagnostic_only_state_fields"] = sorted(
+                task_fields - set(deployment_state_fields)
+            )
         if not reasons and task_row is not None and ue_row is not None:
             pair["actual_time_s"] = {
                 "task_episode": _nested(task_row, "clocks", "input_episode_elapsed_s"),
                 "ue_episode": _nested(ue_row, "clocks", "episode_elapsed_s"),
                 "ue_solver": _nested(ue_row, "clocks", "solver_time_s"),
             }
-            pair["metrics"] = _row_metrics(task_row, ue_row)
-            pair["successor"] = _successor_comparison(task_row, ue_rows)
+            pair["metrics"] = _row_metrics(task_row, ue_row, deployment_state_fields)
+            pair["successor"] = _successor_comparison(
+                task_row, ue_rows, deployment_state_fields
+            )
         pairs.append(pair)
 
     comparable_count = sum(bool(pair["comparable"]) for pair in pairs)
@@ -262,20 +295,40 @@ def _layout_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) -> list[s
     if not isinstance(task_layout, Mapping) or not isinstance(ue_layout, Mapping):
         return ["field layout is missing"]
     reasons: list[str] = []
-    task_state_fields = {
-        str(item["name"]): int(item["width"])
-        for item in cast(Sequence[Mapping[str, Any]], task_layout.get("raw_state_fields", []))
-    }
-    ue_state_fields = {
-        str(item["name"]): int(item["width"])
-        for item in cast(Sequence[Mapping[str, Any]], ue_layout.get("raw_state_fields", []))
-    }
-    for name, width in ue_state_fields.items():
+    task_state_fields = _layout_state_fields(task_layout, "Task", reasons)
+    ue_state_fields = _layout_state_fields(ue_layout, "UE", reasons)
+    required_value = task_layout.get("deployment_state_fields")
+    if (
+        not isinstance(required_value, Sequence)
+        or isinstance(required_value, str | bytes)
+        or not required_value
+        or any(not isinstance(name, str) or not name for name in required_value)
+    ):
+        reasons.append("Task deployment state field requirements are missing or invalid")
+        required_fields: tuple[str, ...] = ()
+    else:
+        required_fields = tuple(cast(Sequence[str], required_value))
+        if len(set(required_fields)) != len(required_fields):
+            reasons.append("Task deployment state field requirements contain duplicates")
+
+    for name in required_fields:
         task_width = task_state_fields.get(name)
+        ue_width = ue_state_fields.get(name)
         if task_width is None:
-            reasons.append(f"raw state field {name!r} is missing from Task layout")
-        elif task_width != width:
-            reasons.append(f"raw state field {name!r} width differs (Task={task_width}, UE={width})")
+            reasons.append(f"deployment-required raw state field {name!r} is missing from Task layout")
+        if ue_width is None:
+            reasons.append(f"deployment-required raw state field {name!r} is missing from UE layout")
+        elif task_width is not None and task_width != ue_width:
+            reasons.append(
+                f"deployment-required raw state field {name!r} width differs "
+                f"(Task={task_width}, UE={ue_width})"
+            )
+    unexpected_ue_fields = sorted(set(ue_state_fields) - set(required_fields))
+    if unexpected_ue_fields:
+        reasons.append(
+            "UE raw state fields do not match the deployment plan; "
+            f"unexpected fields={unexpected_ue_fields}"
+        )
     for task_field, ue_field, label in (
         ("actor_observation_width", "observation_width", "observation"),
         ("previous_action_width", "previous_action_width", "previous_action"),
@@ -289,6 +342,33 @@ def _layout_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) -> list[s
         elif left != right:
             reasons.append(f"{label} width differs (Task={left!r}, UE={right!r})")
     return reasons
+
+
+def _layout_state_fields(
+    layout: Mapping[str, Any], side: str, reasons: list[str]
+) -> dict[str, int]:
+    raw_fields = layout.get("raw_state_fields")
+    if not isinstance(raw_fields, Sequence) or isinstance(raw_fields, str | bytes):
+        reasons.append(f"{side} raw state field layout is missing or invalid")
+        return {}
+    fields: dict[str, int] = {}
+    for index, item in enumerate(raw_fields):
+        if not isinstance(item, Mapping):
+            reasons.append(f"{side} raw state field layout entry {index} is invalid")
+            continue
+        name = item.get("name")
+        width = item.get("width")
+        if not isinstance(name, str) or not name:
+            reasons.append(f"{side} raw state field layout entry {index} has an invalid name")
+            continue
+        if not isinstance(width, int) or isinstance(width, bool) or width < 1:
+            reasons.append(f"{side} raw state field {name!r} has an invalid width {width!r}")
+            continue
+        if name in fields:
+            reasons.append(f"{side} raw state field layout repeats {name!r}")
+            continue
+        fields[name] = width
+    return fields
 
 
 def _index_records(trace: Mapping[str, Any], kind: str) -> dict[tuple[int, int], Mapping[str, Any]]:
@@ -338,7 +418,9 @@ def _task_row_events(task_row: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     ]
 
 
-def _row_alignment_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) -> list[str]:
+def _row_alignment_mismatches(
+    task: Mapping[str, Any], ue: Mapping[str, Any], required_fields: Sequence[str]
+) -> list[str]:
     reasons: list[str] = []
     if task.get("phase") != ue.get("phase"):
         reasons.append(f"phase differs (Task={task.get('phase')!r}, UE={ue.get('phase')!r})")
@@ -353,49 +435,67 @@ def _row_alignment_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) ->
         elif not _same_clock(left, right):
             reasons.append(f"{label} differs (Task={left!r}, UE={right!r})")
     reasons.extend(_command_mismatches(task, ue))
-    reasons.extend(_row_shape_mismatches(task, ue))
+    reasons.extend(_row_shape_mismatches(task, ue, required_fields))
     return reasons
 
 
 def _command_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) -> list[str]:
     task_input = cast(Mapping[str, Any], task["input"])
     ue_input = cast(Mapping[str, Any], ue["input"])
-    task_commands = cast(Mapping[str, Sequence[float]], task_input.get("commands", {}))
-    ue_commands = {
-        str(item["channel"]): cast(Sequence[float], item["values"])
-        for item in cast(Sequence[Mapping[str, Any]], ue_input.get("commands", []))
-    }
+    task_commands_value = task_input.get("commands", {})
+    if not isinstance(task_commands_value, Mapping):
+        return ["Task command values are not a channel mapping"]
+    task_commands = cast(Mapping[str, Any], task_commands_value)
+    ue_commands_value = ue_input.get("commands", [])
+    if not isinstance(ue_commands_value, Sequence) or isinstance(ue_commands_value, str | bytes):
+        return ["UE command values are not a sequence"]
+    ue_commands: dict[str, Any] = {}
     reasons: list[str] = []
+    for index, item in enumerate(ue_commands_value):
+        if not isinstance(item, Mapping):
+            reasons.append(f"UE command entry {index} is invalid")
+            continue
+        channel = item.get("channel")
+        if not isinstance(channel, str) or not channel:
+            reasons.append(f"UE command entry {index} has an invalid channel")
+            continue
+        if channel in ue_commands:
+            reasons.append(f"UE command channel {channel!r} is repeated")
+            continue
+        ue_commands[channel] = item.get("values", ())
     if set(task_commands) != set(ue_commands):
         reasons.append(
             f"command channels differ (Task={sorted(task_commands)}, UE={sorted(ue_commands)})"
         )
     for channel in sorted(set(task_commands) & set(ue_commands)):
-        left = list(task_commands[channel])
-        right = list(ue_commands[channel])
-        if len(left) != len(right) or not all(_same_float32(a, b) for a, b in zip(left, right, strict=False)):
+        left, left_error = _numeric_values(task_commands[channel], f"Task command {channel!r}")
+        right, right_error = _numeric_values(ue_commands[channel], f"UE command {channel!r}")
+        if left_error:
+            reasons.append(left_error)
+            continue
+        if right_error:
+            reasons.append(right_error)
+            continue
+        assert left is not None and right is not None
+        if len(left) != len(right) or not all(
+            _same_float32(a, b) for a, b in zip(left, right, strict=False)
+        ):
             reasons.append(f"command {channel!r} differs (Task={left!r}, UE={right!r})")
     return reasons
 
 
-def _row_metrics(task: Mapping[str, Any], ue: Mapping[str, Any]) -> dict[str, object]:
+def _row_metrics(
+    task: Mapping[str, Any], ue: Mapping[str, Any], required_fields: Sequence[str]
+) -> dict[str, object]:
     task_input = cast(Mapping[str, Any], task["input"])
     ue_input = cast(Mapping[str, Any], ue["input"])
     task_action = cast(Mapping[str, Any], task["action"])
     ue_action = cast(Mapping[str, Any], ue["action"])
     task_state = cast(Mapping[str, Sequence[float]], task_input["raw_state"])
-    ue_state_fields = cast(Sequence[Mapping[str, Any]], ue_input["raw_state_fields"])
-    ue_state_flat = cast(Sequence[float], ue_input["raw_state"])
-    ue_state: dict[str, Sequence[float]] = {}
-    offset = 0
-    for field in ue_state_fields:
-        width = int(field["width"])
-        ue_state[str(field["name"])] = ue_state_flat[offset : offset + width]
-        offset += width
+    ue_state = _unpack_ue_state(ue_input)
     state_metrics = {
         name: _difference(task_state[name], ue_state[name])
-        for name in ue_state
-        if name in task_state
+        for name in required_fields
     }
     task_physical = cast(Mapping[str, Sequence[float]], task_action["physical_commands"])
     return {
@@ -422,6 +522,7 @@ def _row_metrics(task: Mapping[str, Any], ue: Mapping[str, Any]) -> dict[str, ob
 def _successor_comparison(
     task: Mapping[str, Any],
     ue_rows: Mapping[tuple[int, int], Mapping[str, Any]],
+    required_fields: Sequence[str],
 ) -> dict[str, object]:
     """Compare pre-reset Task transition state to the next UE decision input."""
 
@@ -447,29 +548,39 @@ def _successor_comparison(
         reasons.append(f"successor phase is not post-window (UE={ue_next.get('phase')!r})")
     if reasons:
         return {"status": "not_comparable", "reasons": reasons}
-    task_state = cast(Mapping[str, Sequence[float]], transition["raw_state"])
+    task_state_value = transition.get("raw_state")
+    if not isinstance(task_state_value, Mapping):
+        return {"status": "not_comparable", "reasons": ["Task successor raw state is invalid"]}
+    task_state = cast(Mapping[str, Sequence[float]], task_state_value)
     ue_input = cast(Mapping[str, Any], ue_next["input"])
-    ue_state = _unpack_ue_state(ue_input)
-    if set(task_state) != set(ue_state):
+    try:
+        ue_state = _unpack_ue_state(ue_input)
+    except (KeyError, TypeError, ValueError) as exc:
         return {
             "status": "not_comparable",
-            "reasons": [
-                f"successor raw state fields differ "
-                f"(Task={sorted(task_state)}, UE={sorted(ue_state)})"
-            ],
+            "reasons": [f"successor UE raw state layout is invalid ({exc})"],
         }
-    width_mismatches = [
-        f"successor raw state field {name!r} width differs "
-        f"(Task={len(task_state[name])}, UE={len(ue_state[name])})"
-        for name in sorted(task_state)
-        if len(task_state[name]) != len(ue_state[name])
-    ]
-    if width_mismatches:
-        return {"status": "not_comparable", "reasons": width_mismatches}
+    state_reasons: list[str] = []
+    for name in required_fields:
+        if name not in task_state or name not in ue_state:
+            state_reasons.append(f"successor deployment-required raw state field {name!r} is missing")
+            continue
+        task_values, task_error = _numeric_values(task_state[name], f"Task successor raw state {name!r}")
+        ue_values, ue_error = _numeric_values(ue_state[name], f"UE successor raw state {name!r}")
+        if task_error:
+            state_reasons.append(task_error)
+        if ue_error:
+            state_reasons.append(ue_error)
+        if task_values is not None and ue_values is not None and len(task_values) != len(ue_values):
+            state_reasons.append(
+                f"successor raw state field {name!r} width differs "
+                f"(Task={len(task_values)}, UE={len(ue_values)})"
+            )
+    if state_reasons:
+        return {"status": "not_comparable", "reasons": state_reasons}
     metrics = {
         name: _difference(task_state[name], ue_state[name])
-        for name in ue_state
-        if name in task_state
+        for name in required_fields
     }
     return {
         "status": "comparable",
@@ -483,18 +594,39 @@ def _successor_comparison(
 
 
 def _unpack_ue_state(ue_input: Mapping[str, Any]) -> dict[str, Sequence[float]]:
-    fields = cast(Sequence[Mapping[str, Any]], ue_input["raw_state_fields"])
-    values = cast(Sequence[float], ue_input["raw_state"])
+    fields_value = ue_input.get("raw_state_fields")
+    values_value = ue_input.get("raw_state")
+    if not isinstance(fields_value, Sequence) or isinstance(fields_value, str | bytes):
+        raise ValueError("raw_state_fields must be a sequence")
+    if not isinstance(values_value, Sequence) or isinstance(values_value, str | bytes):
+        raise ValueError("raw_state must be a flat numeric sequence")
+    fields = fields_value
+    values = cast(Sequence[float], values_value)
     unpacked: dict[str, Sequence[float]] = {}
     offset = 0
-    for field in fields:
-        width = int(field["width"])
-        unpacked[str(field["name"])] = values[offset : offset + width]
+    for index, field in enumerate(fields):
+        if not isinstance(field, Mapping):
+            raise ValueError(f"raw_state_fields entry {index} must be a mapping")
+        name = field.get("name")
+        width = field.get("width")
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"raw_state_fields entry {index} has an invalid name")
+        if name in unpacked:
+            raise ValueError(f"raw_state_fields repeats {name!r}")
+        if not isinstance(width, int) or isinstance(width, bool) or width < 1:
+            raise ValueError(f"raw_state_fields entry {name!r} has an invalid width")
+        if offset + width > len(values):
+            raise ValueError(f"raw_state is too short for field {name!r}")
+        unpacked[name] = values[offset : offset + width]
         offset += width
+    if offset != len(values):
+        raise ValueError(f"raw_state has {len(values) - offset} unassigned values")
     return unpacked
 
 
-def _row_shape_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) -> list[str]:
+def _row_shape_mismatches(
+    task: Mapping[str, Any], ue: Mapping[str, Any], required_fields: Sequence[str]
+) -> list[str]:
     task_input = cast(Mapping[str, Any], task["input"])
     ue_input = cast(Mapping[str, Any], ue["input"])
     task_action = cast(Mapping[str, Any], task["action"])
@@ -508,15 +640,31 @@ def _row_shape_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) -> lis
     except (KeyError, TypeError, ValueError) as exc:
         return [f"UE raw state layout is invalid ({exc})"]
     task_state = cast(Mapping[str, Sequence[float]], task_state_value)
-    if set(task_state) != set(ue_state):
-        reasons.append(
-            f"raw state fields differ (Task={sorted(task_state)}, UE={sorted(ue_state)})"
+    for name in required_fields:
+        if name not in task_state:
+            reasons.append(f"deployment-required raw state field {name!r} is missing from Task input")
+        if name not in ue_state:
+            reasons.append(f"deployment-required raw state field {name!r} is missing from UE input")
+        if name not in task_state or name not in ue_state:
+            continue
+        task_state_values, task_error = _numeric_values(
+            task_state[name], f"Task raw state {name!r}"
         )
-    for name in sorted(set(task_state) & set(ue_state)):
-        if len(task_state[name]) != len(ue_state[name]):
+        ue_state_values, ue_error = _numeric_values(
+            ue_state[name], f"UE raw state {name!r}"
+        )
+        if task_error:
+            reasons.append(task_error)
+        if ue_error:
+            reasons.append(ue_error)
+        if (
+            task_state_values is not None
+            and ue_state_values is not None
+            and len(task_state_values) != len(ue_state_values)
+        ):
             reasons.append(
-                f"raw state field {name!r} width differs "
-                f"(Task={len(task_state[name])}, UE={len(ue_state[name])})"
+                f"deployment-required raw state field {name!r} width differs "
+                f"(Task={len(task_state_values)}, UE={len(ue_state_values)})"
             )
     task_physical = cast(Mapping[str, Sequence[float]], task_action.get("physical_commands", {}))
     task_targets = task_physical.get(ROBOT_ACTUATOR_TARGET_FIELD, ())
@@ -527,13 +675,48 @@ def _row_shape_mismatches(task: Mapping[str, Any], ue: Mapping[str, Any]) -> lis
         ("actuator_targets", task_targets, ue_action.get("actuator_targets", ())),
     )
     for label, task_values, ue_values in comparisons:
-        if len(cast(Sequence[object], task_values)) != len(cast(Sequence[object], ue_values)):
+        task_numbers, task_error = _numeric_values(task_values, f"Task {label}")
+        ue_numbers, ue_error = _numeric_values(ue_values, f"UE {label}")
+        if task_error:
+            reasons.append(task_error)
+        if ue_error:
+            reasons.append(ue_error)
+        if task_numbers is None or ue_numbers is None:
+            continue
+        if len(task_numbers) != len(ue_numbers):
             reasons.append(
                 f"{label} width differs "
-                f"(Task={len(cast(Sequence[object], task_values))}, "
-                f"UE={len(cast(Sequence[object], ue_values))})"
+                f"(Task={len(task_numbers)}, UE={len(ue_numbers)})"
             )
     return reasons
+
+
+def _required_state_fields(trace: Mapping[str, Any]) -> tuple[str, ...]:
+    layout = trace.get("field_layout")
+    if not isinstance(layout, Mapping):
+        return ()
+    required = layout.get("deployment_state_fields")
+    if (
+        not isinstance(required, Sequence)
+        or isinstance(required, str | bytes)
+        or any(not isinstance(name, str) for name in required)
+    ):
+        return ()
+    return tuple(cast(Sequence[str], required))
+
+
+def _numeric_values(value: object, label: str) -> tuple[list[float] | None, str | None]:
+    if not isinstance(value, Sequence) or isinstance(value, str | bytes):
+        return None, f"{label} is not a numeric sequence"
+    numbers: list[float] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, int | float) or isinstance(item, bool):
+            return None, f"{label} value {index} is not numeric ({item!r})"
+        number = float(item)
+        if not math.isfinite(number):
+            return None, f"{label} value {index} is non-finite ({item!r})"
+        numbers.append(number)
+    return numbers, None
 
 
 def _difference(left: Sequence[float], right: Sequence[float]) -> dict[str, object]:
@@ -559,14 +742,18 @@ def _difference(left: Sequence[float], right: Sequence[float]) -> dict[str, obje
 def _task_field_layout(
     records: Sequence[Mapping[str, object]],
     actor_observation_groups: Sequence[str],
+    deployment_state_fields: Sequence[str],
 ) -> dict[str, object]:
+    layout: dict[str, object] = {
+        "deployment_state_fields": list(deployment_state_fields),
+    }
     if not records:
-        return {}
+        return layout
     first = records[0]
     input_row = cast(Mapping[str, Any], first["input"])
     action = cast(Mapping[str, Any], first["action"])
     physical_commands = cast(Mapping[str, Sequence[float]], action["physical_commands"])
-    return {
+    layout.update({
         "raw_state_fields": _named_widths(cast(Mapping[str, Sequence[object]], input_row["raw_state"])),
         "observation_groups": _named_widths(
             cast(Mapping[str, Sequence[object]], input_row["observation_groups"])
@@ -576,7 +763,8 @@ def _task_field_layout(
         "previous_action_width": len(cast(Sequence[object], input_row["previous_action"])),
         "action_width": len(cast(Sequence[object], action["policy_action"])),
         "actuator_target_width": len(physical_commands[ROBOT_ACTUATOR_TARGET_FIELD]),
-    }
+    })
+    return layout
 
 
 def _named_widths(values: Mapping[str, Sequence[object]]) -> list[dict[str, object]]:
