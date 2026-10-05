@@ -19,11 +19,25 @@ uerl config --task Example-CartPole-v0 --json
 
 These commands work from outside the checkout. `check task` validates Python
 configuration and Task construction without starting UE. To develop your own
-package, copy `examples/external-cartpole` outside the repository, change its
-package name, entry-point name, and Task ID, then install that directory. Use
-`uv pip install -e <directory> --no-deps` for editable development in the prepared
-environment. Edit `src/example_cartpole/reward.json` to change
-`pole_position_weight`. Reinstall after editing a non-editable installation.
+package, generate a ready-to-install project outside the repository:
+
+```powershell
+uv run uerl new external-cartpole balance-demo --output-dir ..\balance-demo
+Set-Location ..\balance-demo
+uv pip install -e . --no-deps
+$env:UERL_TASK_PLUGINS = 'balance-demo'
+uerl tasks --filter UERL-BalanceDemo-v0
+uerl check task UERL-BalanceDemo-v0
+uerl config --task UERL-BalanceDemo-v0 --json
+```
+
+The generated project includes entry-point metadata, its own reward resource,
+registration tests, and usage instructions. It reuses the framework CartPole
+Task and changes only `pole_position_weight` in `src/balance_demo/reward.json`.
+Run its tests with `python -m pytest`. The generated package can be installed and
+checked from any current directory; `check task` does not start UE. For editable
+development, use `uv pip install -e <directory> --no-deps` in the prepared
+environment. Reinstall after editing a non-editable installation.
 
 On an already configured Windows/UE host, the same registration is used by:
 
@@ -82,9 +96,9 @@ zipped wheel is not supported by the path-based loaders.
 
 ## Validation boundary
 
-The packaging test builds and installs both wheels into an isolated target,
-changes to an unrelated directory, and checks discovery, all built-in defaults,
-external resource loading, Task construction, and CLI preflight. This does not
-validate UE execution, training quality, or export. A generated minimal Task
-interface, minimal/composed equivalence, and early export capability reporting
-remain work tracked by [Issue #6](https://github.com/zpyc1oud/EmbodiedUE/issues/6).
+The packaging test builds the framework wheel and a freshly generated Task wheel,
+installs them into an isolated target, changes to an unrelated directory, and
+checks discovery, built-in defaults, external resource loading, Task construction,
+and CLI preflight. This does not validate UE execution, training quality, or export.
+Minimal/composed equivalence and early export capability reporting remain work
+tracked by [Issue #6](https://github.com/zpyc1oud/EmbodiedUE/issues/6).
