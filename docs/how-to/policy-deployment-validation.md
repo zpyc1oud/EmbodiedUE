@@ -129,6 +129,14 @@ run log as Task-side results so comparisons share a sequence number and solver
 boundary; this is opt-in and only copies diagnostic arrays when a listener is
 bound.
 
+Run the snapshot alignment regression on the UE host:
+
+```powershell
+& $ueCmd $project '/Engine/Maps/Entry' `
+  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_019;Quit' `
+  -unattended -nullrhi -nosound -NoSplash
+```
+
 Use `GetRequiredCommandChannels` to obtain the channel names and widths rather
 than assuming that another artifact uses PhantomX's `velocity` channel. With
 `bClaimOwnerMesh=false`, the component owner's transform selects the spawn
