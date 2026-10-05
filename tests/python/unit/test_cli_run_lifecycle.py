@@ -8,9 +8,10 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+from tests.python.run_config_files import write_resolved_config
 from uerl import training
 from uerl.cli import train
-from uerl.core.config.canonical import canonical_json
+from uerl.core.config.canonical import to_jsonable
 from uerl.core.mdp.lib.curriculum import TerrainLevelTerm
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID
 
@@ -29,7 +30,7 @@ def test_train_resume_resolves_source_and_writes_new_run_command(
             "task.rew_scale_alive": "0.75",
         },
     )
-    (source / "resolved_config.json").write_text(canonical_json(saved))
+    write_resolved_config(source, to_jsonable(saved))
     terrain = TerrainLevelTerm(num_levels=1, num_envs=saved.worker.slot_count, terrain_size_x=30.0)
     torch.save(
         {

@@ -6,6 +6,8 @@ from collections.abc import Collection, Mapping
 
 from rsl_rl.runners import OnPolicyRunner
 
+from ...core.config import ResolvedRunConfig
+from ...core.config.snapshot import CHECKPOINT_CONFIG_KEY, resolved_config_to_yaml
 from .time_aware_ppo import PHANTOMX_PHYSICAL_TIME_OBJECTIVE, TimeAwarePPO
 from .vecenv import UERLVecEnvWrapper
 
@@ -20,11 +22,14 @@ class UERLOnPolicyRunner(OnPolicyRunner):  # type: ignore[misc]
 
     env: UERLVecEnvWrapper
     training_options: Mapping[str, object] | None = None
+    resolved_config: ResolvedRunConfig | None = None
 
     def save(self, path: str, infos: dict[str, object] | None = None) -> None:
         """Save policy state and the environment's named curriculum terms."""
 
         checkpoint_infos = dict(infos) if infos is not None else {}
+        if self.resolved_config is not None:
+            checkpoint_infos[CHECKPOINT_CONFIG_KEY] = resolved_config_to_yaml(self.resolved_config)
         if self.training_options is not None:
             checkpoint_infos[TRAINING_OPTIONS_KEY] = dict(self.training_options)
         if isinstance(self.alg, TimeAwarePPO):

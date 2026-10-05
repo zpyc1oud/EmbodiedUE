@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
@@ -22,6 +21,7 @@ from uerl import (
     SessionConfig,
     WorkerConfig,
 )
+from uerl.core.config.snapshot import decode_worker_args
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID
 from uerl.tasks.phantomx.evaluation import PhantomXEvaluationResult
 from uerl.training import (
@@ -110,7 +110,7 @@ def test_launch_overrides_keep_worker_port_in_launch_arguments(tmp_path: Path) -
 
     assert overrides["session.port"] == "45678"
     assert overrides["session.map_path"] == "/Engine/Maps/Entry"
-    assert "-uerlport=45678" in json.loads(overrides["session.worker_args"])
+    assert "-uerlport=45678" in decode_worker_args(overrides["session.worker_args"])
 
 
 def test_launch_overrides_default_to_headless_null_rhi(tmp_path: Path) -> None:
@@ -123,7 +123,7 @@ def test_launch_overrides_default_to_headless_null_rhi(tmp_path: Path) -> None:
         port=1,
     )
 
-    worker_args = json.loads(overrides["session.worker_args"])
+    worker_args = decode_worker_args(overrides["session.worker_args"])
     assert overrides["session.presentation_mode"] == "none"
     assert "-uerlpresentation=none" in worker_args
     assert "-nullrhi" in worker_args
@@ -153,7 +153,7 @@ def test_launch_overrides_viewport_open_a_window_without_null_rhi(tmp_path: Path
         window_size=(800, 600),
     )
 
-    worker_args = json.loads(overrides["session.worker_args"])
+    worker_args = decode_worker_args(overrides["session.worker_args"])
     assert overrides["session.presentation_mode"] == "viewport"
     assert "-uerlpresentation=viewport" in worker_args
     assert "-windowed" in worker_args
@@ -177,7 +177,7 @@ def test_launch_overrides_gameplay_preserve_map_player_without_observer(tmp_path
         window_size=(1280, 720),
     )
 
-    worker_args = json.loads(overrides["session.worker_args"])
+    worker_args = decode_worker_args(overrides["session.worker_args"])
     assert overrides["session.presentation_mode"] == "gameplay"
     assert "-uerlpresentation=gameplay" in worker_args
     assert "-windowed" in worker_args

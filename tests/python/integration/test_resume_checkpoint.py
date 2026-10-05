@@ -9,6 +9,8 @@ from typing import Any
 import torch
 from tensordict import TensorDict
 
+from uerl.application.run_config import CHECKPOINT_CONFIG_KEY, load_run_config_source
+from uerl.core.config.snapshot import resolved_config_from_yaml
 from uerl.core.direct.curriculum import CurriculumManager
 from uerl.core.mdp.lib.curriculum import TerrainLevelTerm
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID
@@ -59,7 +61,9 @@ def _runner(env: _CPUEnv) -> UERLOnPolicyRunner:
             "runner.parameters.obs_normalization": "true",
         },
     )
-    return UERLOnPolicyRunner(env, build_rsl_rl_train_config(config), log_dir=None, device="cpu")
+    runner = UERLOnPolicyRunner(env, build_rsl_rl_train_config(config), log_dir=None, device="cpu")
+    runner.resolved_config = config
+    return runner
 
 
 def test_real_rsl_checkpoint_restores_models_statistics_optimizer_iteration_and_python_state(tmp_path: Path) -> None:
@@ -79,6 +83,13 @@ def test_real_rsl_checkpoint_restores_models_statistics_optimizer_iteration_and_
     torch.randint(1, 8, (9,), generator=source_env.generator)
     checkpoint = tmp_path / "model.pt"
     source.save(str(checkpoint))
+    safe_payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    saved_config_text = safe_payload["infos"][CHECKPOINT_CONFIG_KEY]
+    saved_config = resolved_config_from_yaml(saved_config_text)
+    assert saved_config["task_id"] == CARTPOLE_TASK_ID
+    assert saved_config["worker"]["slot_count"] == 2
+    detached_restore = load_run_config_source(None, None, strict=True, checkpoint=checkpoint)
+    assert detached_restore.recorded == source.resolved_config
     expected_draws = torch.randint(1, 8, (8,), generator=source_env.generator)
     expected_actor = source.alg.actor(obs).detach().clone()
     expected_critic = source.alg.critic(obs).detach().clone()

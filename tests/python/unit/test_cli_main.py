@@ -46,6 +46,32 @@ def test_unified_new_command_forwards_arguments(tmp_path: Path, capsys) -> None:
     capsys.readouterr()
 
 
+def test_unified_new_command_generates_external_cartpole_package(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    assert (
+        cli.main(
+            [
+                "new",
+                "external-cartpole",
+                "balance-demo",
+                "--output-dir",
+                str(tmp_path / "balance-demo"),
+            ]
+        )
+        == 0
+    )
+
+    assert (tmp_path / "balance-demo" / "pyproject.toml").exists()
+    assert "generated external-cartpole" in capsys.readouterr().out
+
+
+def test_external_cartpole_help_matches_the_documented_command(capsys) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["new", "external-cartpole", "--help"])
+
+    assert exc.value.code == 0
+    assert "usage: uerl new external-cartpole" in capsys.readouterr().out
+
+
 def test_unified_command_rejects_unknown_subcommand() -> None:
     with pytest.raises(SystemExit):
         cli.main(["unknown"])

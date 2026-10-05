@@ -9,9 +9,10 @@ from typing import NoReturn
 import pytest
 import torch
 
+from tests.python.run_config_files import write_resolved_config
 from uerl.cli import train
 from uerl.core.config import ResolvedRunConfig
-from uerl.core.config.canonical import canonical_json, to_jsonable
+from uerl.core.config.canonical import to_jsonable
 from uerl.core.mdp.lib.curriculum import TerrainLevelTerm
 from uerl.runtime.session import UERLSession
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID, registration
@@ -44,7 +45,7 @@ def test_resume_preserves_semantics_at_final_session_and_reports_exact_budget_di
             "logging.run_directory": str(run),
         },
     )
-    (run / "resolved_config.json").write_text(canonical_json(config))
+    write_resolved_config(run, to_jsonable(config))
     term = TerrainLevelTerm(num_levels=1, num_envs=2, terrain_size_x=30.0)
     torch.save(
         {
@@ -117,7 +118,7 @@ def test_invalid_continuation_stops_before_session_or_output(
     output = tmp_path / "new-run"
     config = build_run_config(CARTPOLE_TASK_ID)
     if case != "missing_config":
-        (run / "resolved_config.json").write_text(canonical_json(config))
+        write_resolved_config(run, to_jsonable(config))
     payload: dict[str, object] = {
         "actor_state_dict": {"weight": torch.zeros(1)},
         "critic_state_dict": {"weight": torch.zeros(1)},
@@ -158,7 +159,7 @@ def test_unreadable_checkpoint_returns_actionable_failure_without_writes(
     output = tmp_path / "new-run"
     checkpoint = run / "model_final.pt"
     config = build_run_config(CARTPOLE_TASK_ID, overrides={"runner.checkpoint": str(checkpoint)})
-    (run / "resolved_config.json").write_text(canonical_json(config))
+    write_resolved_config(run, to_jsonable(config))
     if kind == "truncated_archive":
         torch.save({"weight": torch.ones(16)}, checkpoint)
         checkpoint.write_bytes(checkpoint.read_bytes()[:64])
