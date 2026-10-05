@@ -1,4 +1,4 @@
-"""Resolve repository configuration paths with stable logical identity."""
+"""Resolve packaged configuration paths with stable logical identity."""
 
 from __future__ import annotations
 
@@ -51,12 +51,15 @@ class ConfigPathResolver:
 
 
 def repository_config_root() -> Path:
-    """Return the repository config root without depending on the caller CWD."""
+    """Return the installed package config root without depending on the caller CWD.
 
-    return Path(__file__).resolve().parents[4] / "configs"
+    The historical function name is retained for existing callers. Standard
+    wheel and editable installations both expose these resources as files."""
+
+    return Path(__file__).resolve().parents[2] / "configs"
 
 
 def resolve_repository_config(value: str, *, path: str) -> ResolvedConfigPath:
-    """Resolve one logical path below the repository's canonical config root."""
+    """Resolve one logical path below the package's canonical config root."""
 
     return ConfigPathResolver(repository_config_root()).resolve(value, path=path)

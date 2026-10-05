@@ -20,11 +20,11 @@ from uerl.training import build_rsl_rl_train_config, build_run_config
 
 
 def test_default_cartpole_config_is_in_dedicated_task_folder() -> None:
-    """Load canonical Task/Worker/runner values from configs/tasks/cartpole."""
+    """Load canonical Task/Worker/runner values from the packaged CartPole YAML."""
 
     config = load_cartpole_training_config()
 
-    assert DEFAULT_CARTPOLE_TRAINING_CONFIG == Path("configs/tasks/cartpole/training.yaml").resolve()
+    assert DEFAULT_CARTPOLE_TRAINING_CONFIG == Path("src/uerl/configs/tasks/cartpole/training.yaml").resolve()
     assert config.worker.environment_id == CARTPOLE_ENVIRONMENT_ID
     assert config.worker.robot_id == CARTPOLE_ROBOT_ID
     assert config.worker.robot_asset_path == "/Game/Robots/CartPole/SKM_CartPole"

@@ -6,6 +6,7 @@ Train robot policies in Unreal Engine 5.8 Chaos and deploy the same artifact on 
 - Read `CONTEXT.md` when changing domain contracts or timing semantics.
 - Read `docs/architecture.md` for system boundaries and design rationale.
 - Use `docs/README.md` to locate topic-specific documentation.
+- Follow `docs/contribution-workflow.md` for proposals, validation evidence, review, merge, and release; it does not grant action permissions beyond the user's authorization.
 - Read `docs/how-to/README.md` for robot integration, recording, and deployment workflows.
 
 Integrating a robot adds UE assets, Python robot/task declarations, and a policy artifact; it does not add robot-specific UE runtime code. The product robots are CartPole and PhantomX. Training, evaluation, export, and deployment use `uerl`. A Session owns `physics_dt` and an inclusive `decimation` range; each Step carries a `step_decimation` inside that range. Contact observations are geometric support values (0/1) from the final completed solver step at the end of the control window.

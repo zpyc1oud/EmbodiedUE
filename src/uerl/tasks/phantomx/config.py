@@ -136,7 +136,7 @@ class PhantomXTaskConfig(DirectTaskConfig):
     upright_weight: float = 2.5
     body_clearance_weight: float = 200.0
     # Per 0.02 s reference frame on ||a_k - a_(k-1)||²; derivation beside
-    # ``task.reward.action_rate`` in configs/tasks/phantomx/training.yaml.
+    # ``task.reward.action_rate`` in src/uerl/configs/tasks/phantomx/training.yaml.
     action_rate_weight: float = 2.4e-3
     joint_velocity_penalty: float = 0.005
     fall_penalty: float = 1.0

@@ -76,6 +76,8 @@ uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
 ```
 
 The task check validates Python declarations, not the installed UE binary, content loading, or GPU readiness.
+Use `uv run uerl check host` for static CartPole host file checks and a reusable
+[machine profile](docs/how-to/ue-host-profile.md).
 
 ### Run a small training smoke test
 
@@ -85,7 +87,10 @@ After the Editor build succeeds:
 uv run uerl train --task UERL-CartPole-Direct-v0 --num-envs 2 --max-iterations 1 --device cpu --run-name smoke
 ```
 
-For a non-default engine path, pass `--ue-executable "$ueRoot\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"` to `train`, `play`, and `export`. These commands do not read `UE_ROOT` automatically. This smoke test starts UE and trains a policy; it is not a configuration-only check.
+Save a non-default engine/project path in the [host profile](docs/how-to/ue-host-profile.md)
+once; `train`, `play`, and `export` reuse it in launch mode. `--ue-executable` and
+`--project` override individual profile fields. These commands do not read `UE_ROOT`
+automatically. This smoke test starts UE and trains a policy; it is not a configuration-only check.
 
 ### Train PhantomX
 
