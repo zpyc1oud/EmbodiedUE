@@ -12,6 +12,16 @@ class UUERLPolicyComponentTestEventRecorder : public UObject
 	GENERATED_BODY()
 
 public:
+	int32 ControlFrameCount = 0;
+	FUERLPolicyControlFrameSnapshot LastControlFrame;
+
+	UFUNCTION()
+	void OnControlFrameCompleted(const FUERLPolicyControlFrameSnapshot& Frame)
+	{
+		++ControlFrameCount;
+		LastControlFrame = Frame;
+	}
+
 	int32 OverrunCount = 0;
 	float LastGameSeconds = 0.0f;
 	float LastPhysicsSeconds = 0.0f;

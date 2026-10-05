@@ -120,6 +120,15 @@ comparison commands within the selected Run's training distribution; the
 component checks channel width and finite values, not task-specific units or
 limits. The Egypt chase example uses `[0.45, 0, yaw_rate]`.
 
+Bind `OnControlStepCompleted` to the host's run recorder. Each event carries a
+single post-physics frame with solver frame/time, elapsed game/physics time,
+observation dt, last solver-step dt, named raw-state fields and widths, exact
+network observation, previous action input, raw policy action, actuator
+targets, and named command values with ages. Append these frames to the same
+run log as Task-side results so comparisons share a sequence number and solver
+boundary; this is opt-in and only copies diagnostic arrays when a listener is
+bound.
+
 Use `GetRequiredCommandChannels` to obtain the channel names and widths rather
 than assuming that another artifact uses PhantomX's `velocity` channel. With
 `bClaimOwnerMesh=false`, the component owner's transform selects the spawn
@@ -155,7 +164,7 @@ map, artifact, seed, start, or command schedule. Keep separate evidence for:
 
 | Phase | Record | Interpretation |
 |---|---|---|
-| Computation | fixed input, observation, raw action, actuator targets, and `control_frame_dt` | Plan/network mismatch before physics |
+| Computation | command values, named raw state, network observation, previous action, raw action, actuator targets, `control_frame_dt`, last solver dt, and solver frame | Plan/network mismatch before physics |
 | Fixed action | the action sequence and resulting joint/root state at matching completed solver times | Actuator, unit, or solver response mismatch |
 | Closed loop | command sequence, reset/start pose, completed solver times, fall/base-contact events, speed error, and root-height trace | Accumulated policy/scene behavior difference |
 

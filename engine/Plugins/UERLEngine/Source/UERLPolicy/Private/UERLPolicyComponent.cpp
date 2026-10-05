@@ -214,6 +214,47 @@ void UUERLPolicyComponent::ResetCommandAges()
 	StaleChannels.Reset();
 }
 
+void UUERLPolicyComponent::BroadcastControlFrameSnapshot(
+	double GameSeconds,
+	double PhysicsSeconds,
+	int32 SolverFrame,
+	double SolverTimeSeconds)
+{
+	FUERLPolicyControlFrameSnapshot Snapshot;
+	Snapshot.Sequence = ControlFrameSequence;
+	Snapshot.SolverFrame = SolverFrame;
+	Snapshot.SolverTimeSeconds = SolverTimeSeconds;
+	Snapshot.GameElapsedSeconds = GameSeconds;
+	Snapshot.PhysicsElapsedSeconds = PhysicsSeconds;
+	Snapshot.ObservationDtSeconds = Controller.LastControlTiming().ObservationDtSeconds;
+	Snapshot.LastSolverStepSeconds = Controller.LastControlTiming().LastSolverStepSeconds;
+	Snapshot.RawState = Controller.LastRawState();
+	Snapshot.Observation = Controller.LastObservation();
+	Snapshot.PreviousAction = Controller.LastPreviousAction();
+	Snapshot.Action = Controller.LastAction();
+	Snapshot.ActuatorTargets = Controller.LastActuatorTargets();
+
+	for (const FUERLFieldDescriptor& Field : Controller.GetSelectedStateFields())
+	{
+		Snapshot.RawStateFields.Add(Field.Name);
+		Snapshot.RawStateFieldWidths.Add(Field.Width);
+	}
+	for (const FUERLPolicyCommandChannel& Channel : Controller.RequiredCommands())
+	{
+		const TArray<float>* Values = Controller.LastCommands().Find(Channel.Name);
+		if (!Values)
+		{
+			continue;
+		}
+		FUERLPolicyCommandSample& Command = Snapshot.Commands.AddDefaulted_GetRef();
+		Command.Channel = Channel.Name;
+		Command.Values = *Values;
+		Command.AgeSeconds = CommandAges.FindRef(Channel.Name);
+	}
+
+	OnControlStepCompleted.Broadcast(Snapshot);
+}
+
 void UUERLPolicyComponent::RearmPolicyLoop()
 {
 	++LifecycleGeneration;
@@ -574,6 +615,19 @@ void UUERLPolicyComponent::TickComponent(
 	if (StepGeneration != LifecycleGeneration || !bRunning || bFaulted)
 	{
 		return;
+	}
+	++ControlFrameSequence;
+	if (OnControlStepCompleted.IsBound())
+	{
+		BroadcastControlFrameSnapshot(
+			AccumulatedGameSeconds,
+			AccumulatedPhysicsSeconds,
+			Clock.Frame,
+			Clock.SolverTime);
+		if (StepGeneration != LifecycleGeneration || !bRunning || bFaulted || !Controller.IsInitialized())
+		{
+			return;
+		}
 	}
 	bBootstrapPending = false;
 	AccumulatedPhysicsSeconds = 0.0;

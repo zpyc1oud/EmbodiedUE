@@ -141,6 +141,7 @@ Connect these events to logs, HUD, or gameplay state:
 | Event | Meaning |
 |---|---|
 | `OnControlStepOverrun(GameSeconds, PhysicsSeconds, ObservationSeconds)` | Reports three distinct clocks; inspect each separately |
+| `OnControlStepCompleted(Frame)` | Optional post-physics snapshot aligns commands, raw state, network input, previous action, policy output, actuator targets, and solver/game clocks |
 | `OnCommandStale(Channel, StaleSeconds)` | A channel has not been refreshed |
 | `OnPolicyFault(Reason)` | Policy stops while the robot remains; handle the cause before resetting |
 | `OnPhysicsBaselineMismatch(Report)` | Startup physics validation failed |

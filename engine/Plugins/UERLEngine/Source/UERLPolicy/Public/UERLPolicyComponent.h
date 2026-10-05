@@ -21,6 +21,78 @@ struct UERLPOLICY_API FUERLPolicyCommandChannelInfo
 	int32 Width = 0;
 };
 
+/** One named host command input captured at a completed policy control step. */
+USTRUCT(BlueprintType)
+struct UERLPOLICY_API FUERLPolicyCommandSample
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	FName Channel;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<float> Values;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	double AgeSeconds = 0.0;
+};
+
+/** Inputs, outputs, and clocks aligned to one completed policy control frame. */
+USTRUCT(BlueprintType)
+struct UERLPOLICY_API FUERLPolicyControlFrameSnapshot
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	int64 Sequence = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	int32 SolverFrame = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	double SolverTimeSeconds = 0.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	double GameElapsedSeconds = 0.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	double PhysicsElapsedSeconds = 0.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	double ObservationDtSeconds = 0.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	double LastSolverStepSeconds = 0.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<FName> RawStateFields;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<int32> RawStateFieldWidths;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<float> RawState;
+
+	/** Exact network input after observation-plan transforms, including history and timing features. */
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<float> Observation;
+
+	/** previous_action value consumed by the observation/action plans in this frame. */
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<float> PreviousAction;
+
+	/** Raw network output before action-plan decoding. */
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<float> Action;
+
+	/** Decoded physical targets applied to the Robot actuators. */
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<float> ActuatorTargets;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	TArray<FUERLPolicyCommandSample> Commands;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 	FUERLPolicyControlStepOverrunSignature,
 	float,
@@ -35,6 +107,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	Channel,
 	float,
 	StaleSeconds);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FUERLPolicyControlFrameCompletedSignature,
+	const FUERLPolicyControlFrameSnapshot&,
+	Frame);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FUERLPolicyFaultSignature, FString, Reason);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FUERLPolicyPhysicsBaselineMismatchSignature,
@@ -72,6 +148,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Policy|Events")
 	FUERLPolicyControlStepOverrunSignature OnControlStepOverrun;
+
+	/** Fires after a successful post-physics policy step when a host is bound. */
+	UPROPERTY(BlueprintAssignable, Category = "Policy|Events")
+	FUERLPolicyControlFrameCompletedSignature OnControlStepCompleted;
 
 	UPROPERTY(BlueprintAssignable, Category = "Policy|Events")
 	FUERLPolicyCommandStaleSignature OnCommandStale;
@@ -132,6 +212,11 @@ private:
 	void Fault(const FString& Error);
 	void RefreshSolverBaseline();
 	void ResetCommandAges();
+	void BroadcastControlFrameSnapshot(
+		double GameSeconds,
+		double PhysicsSeconds,
+		int32 SolverFrame,
+		double SolverTimeSeconds);
 	/** Re-arm the running state after Start/SoftReset/ResetToReferencePose. */
 	void RearmPolicyLoop();
 
@@ -147,6 +232,7 @@ private:
 	double AccumulatedPhysicsSeconds = 0.0;
 	double AccumulatedGameSeconds = 0.0;
 	uint64 LifecycleGeneration = 0;
+	int64 ControlFrameSequence = 0;
 	FString LastError;
 	FString LastLoggedSetCommandError;
 };

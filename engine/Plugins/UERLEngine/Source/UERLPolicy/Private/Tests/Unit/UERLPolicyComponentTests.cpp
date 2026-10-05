@@ -131,6 +131,7 @@ bool FUERLPolicyComponentReflectionTest::RunTest(const FString& Parameters)
 	}
 	for (const FName Property : {
 		GET_MEMBER_NAME_CHECKED(UUERLPolicyComponent, OnControlStepOverrun),
+		GET_MEMBER_NAME_CHECKED(UUERLPolicyComponent, OnControlStepCompleted),
 		GET_MEMBER_NAME_CHECKED(UUERLPolicyComponent, OnCommandStale),
 		GET_MEMBER_NAME_CHECKED(UUERLPolicyComponent, OnPolicyFault),
 		GET_MEMBER_NAME_CHECKED(UUERLPolicyComponent, OnPhysicsBaselineMismatch),
@@ -1591,6 +1592,110 @@ bool FUERLPolicyComponentStaleCommandHostFallbackTest::RunTest(const FString& Pa
 
 	AddInfo(TEXT(
 		"[VERIFY] AC_UE_INT_COMPONENT_018: a host StopPolicy stale-command fallback re-latches commands and explicitly restarts"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLPolicyComponentControlFrameDiagnosticsTest,
+	"UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_019.ControlFrameSnapshotAlignsInputsActionsAndClocks",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPolicyComponentControlFrameDiagnosticsTest::RunTest(const FString& Parameters)
+{
+	UUERLPolicyArtifactAsset* Asset = RequirePhantomXAsset(*this);
+	if (!Asset)
+	{
+		return false;
+	}
+	FComponentTestRig Rig;
+	if (!Rig.Build(*this, Asset))
+	{
+		return false;
+	}
+	FDeployPhysicsSettingsGuard Guard(0.005f, 10);
+	if (!StartWithZeroCommand(*this, Rig.Component))
+	{
+		return false;
+	}
+
+	UUERLPolicyComponentTestEventRecorder* Recorder = NewObject<UUERLPolicyComponentTestEventRecorder>();
+	BindRecorderEvent(
+		Rig.Component->OnControlStepCompleted,
+		Recorder,
+		GET_FUNCTION_NAME_CHECKED(UUERLPolicyComponentTestEventRecorder, OnControlFrameCompleted));
+	TickPolicyWorld(Rig.World(), 0.005f);
+
+	TestEqual(TEXT("one completed physics control step emits one diagnostic frame"), Recorder->ControlFrameCount, 1);
+	const FUERLPolicyControlFrameSnapshot& Frame = Recorder->LastControlFrame;
+	TestEqual(TEXT("first diagnostic frame has sequence one"), Frame.Sequence, int64(1));
+	TestTrue(TEXT("diagnostic frame identifies a completed solver frame"), Frame.SolverFrame >= 0);
+	TestTrue(TEXT("diagnostic frame includes the completed solver time"),
+		FMath::IsFinite(Frame.SolverTimeSeconds) && Frame.SolverTimeSeconds > 0.0);
+	TestTrue(TEXT("game time is aligned with the completed control frame"),
+		FMath::IsFinite(Frame.GameElapsedSeconds) && Frame.GameElapsedSeconds > 0.0);
+	TestTrue(TEXT("physics time is aligned with the completed control frame"),
+		FMath::IsFinite(Frame.PhysicsElapsedSeconds) && Frame.PhysicsElapsedSeconds > 0.0);
+	TestTrue(TEXT("bootstrap observation uses the artifact DtMin"),
+		FMath::Abs(Frame.ObservationDtSeconds - 0.005) < 2.0e-3);
+	TestTrue(TEXT("solver denominator reports the completed substep dt"),
+		FMath::Abs(Frame.LastSolverStepSeconds - 0.005) < 1.0e-3);
+
+	int32 RawStateWidth = 0;
+	TestEqual(TEXT("raw state fields and widths have one-to-one entries"),
+		Frame.RawStateFieldWidths.Num(), Frame.RawStateFields.Num());
+	for (int32 Index = 0; Index < Frame.RawStateFields.Num(); ++Index)
+	{
+		if (Frame.RawStateFieldWidths.IsValidIndex(Index))
+		{
+			RawStateWidth += Frame.RawStateFieldWidths[Index];
+		}
+	}
+	TestEqual(TEXT("raw state names and widths cover the packed raw state"), RawStateWidth, Frame.RawState.Num());
+	TestTrue(TEXT("network input, previous action, policy action, and actuator targets are captured"),
+		Frame.Observation.Num() > 0
+		&& Frame.PreviousAction.Num() == Frame.Action.Num()
+		&& Frame.Action.Num() > 0
+		&& Frame.ActuatorTargets.Num() > 0);
+	const auto TestFiniteValues = [this](const TCHAR* Label, const TArray<float>& Values)
+	{
+		for (int32 Index = 0; Index < Values.Num(); ++Index)
+		{
+			TestTrue(*FString::Printf(TEXT("%s[%d] is finite"), Label, Index), FMath::IsFinite(Values[Index]));
+		}
+	};
+	TestFiniteValues(TEXT("raw state"), Frame.RawState);
+	TestFiniteValues(TEXT("network observation"), Frame.Observation);
+	TestFiniteValues(TEXT("previous action"), Frame.PreviousAction);
+	TestFiniteValues(TEXT("policy action"), Frame.Action);
+	TestFiniteValues(TEXT("actuator target"), Frame.ActuatorTargets);
+	TestEqual(TEXT("snapshot command count matches the artifact contract"),
+		Frame.Commands.Num(), Rig.Component->GetRequiredCommandChannels().Num());
+	for (const FUERLPolicyCommandChannelInfo& Required : Rig.Component->GetRequiredCommandChannels())
+	{
+		const FUERLPolicyCommandSample* Command = Frame.Commands.FindByPredicate(
+			[&Required](const FUERLPolicyCommandSample& Candidate)
+			{
+				return Candidate.Channel == Required.Name;
+			});
+		TestNotNull(TEXT("snapshot preserves each required command name"), Command);
+		if (!Command)
+		{
+			continue;
+		}
+		TestEqual(TEXT("snapshot command width matches the artifact contract"),
+			Command->Values.Num(), Required.Width);
+		TestTrue(TEXT("latched command age is finite and non-negative"),
+			FMath::IsFinite(Command->AgeSeconds) && Command->AgeSeconds >= 0.0);
+		TestFiniteValues(TEXT("command value"), Command->Values);
+		for (const float Value : Command->Values)
+		{
+			TestEqual(TEXT("fixture command value is zero"), Value, 0.0f);
+		}
+	}
+
+	AddInfo(TEXT(
+		"[VERIFY] AC_UE_INT_COMPONENT_019: each event snapshot aligns commands, raw state, network input, previous action, action, actuator targets, and solver timing"));
+	Rig.Component->StopPolicy();
 	return true;
 }
 
