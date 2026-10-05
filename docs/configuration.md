@@ -42,23 +42,49 @@ uv run uerl config --task UERL-PhantomX-ContinuousTerrain-v0 --runner.max_iterat
 
 Unknown or non-configurable paths are rejected. Do not combine an everyday flag with a dotted override for the same field. `--run-dir` conflicts with `--logging.run_directory`, and `--resume` conflicts with `--runner.checkpoint`.
 
-Changing dimensions, timing, robot semantics, or the training objective can make an existing checkpoint incompatible. `play --run` and `export --run` load recorded settings from the Run. Prefer Run directories over detached weight files when reproducing results.
+Changing dimensions, timing, robot semantics, or the training objective can make an existing checkpoint incompatible. `play` and `export` restore recorded settings from the Run. Prefer Run directories or checkpoints kept inside their Run over detached weight files when reproducing results.
 
 ## Saved-run configuration
 
 `play --run` and `export --run` use the shared application resolver in
-[`application/run_config.py`](../src/uerl/application/run_config.py). It restores
-Worker, Task, and runner settings from `resolved_config.json`, retains the saved
-training hash, and validates explicit overrides through the typed configuration
-resolver. Session endpoints and logging start from the current registration.
-The saved file is not edited.
+[`application/run_config.py`](../src/uerl/application/run_config.py). They read
+the Task ID from `resolved_config.json`, restore the saved Worker, Task, runner,
+map, and protocol settings, and retain the saved training hash. `--task` is
+optional for an explicit Run directory; when supplied, it must match the saved
+Task. `--run latest` still requires `--task` because latest Runs are selected
+within a Task. A `--checkpoint` located under a directory containing
+`resolved_config.json` also identifies its Run automatically. The saved file is
+not edited.
 
-Map selection is `--map`, then `--session.map_path`, then the recorded map, then
-the registered Task map. The selected map is used both in Worker launch arguments
-and the Session configuration. Existing CLI commands and flags are unchanged.
-Python callers of the former `uerl.cli.run_config` module should import
+Play and export require a complete saved configuration and the same registered
+Task version that trained the checkpoint. A missing snapshot, missing required
+field, or Task version change fails before Session startup; current Task defaults
+are never used to fill those gaps. Evaluation and export preserve the saved Task,
+reward, timing, Robot, plan, and PPO settings. Play allows an explicit `--seed`
+and both commands allow `--device`, one Slot, map, Session connection/launch,
+and presentation settings as evaluation or local-machine choices. Dotted
+overrides that change the saved training semantics are rejected.
+
+Map selection is `--map`, then `--session.map_path`, then the recorded map. The
+selected map is used both in Worker launch arguments and the Session
+configuration. Python callers of the former `uerl.cli.run_config` module should import
 `resolve_run_config` from `uerl.application.run_config` instead; map restoration
 is included in the returned configuration.
+
+### Recovering old Runs and detached checkpoints
+
+For an old Run, first look for its original `resolved_config.json` and place a
+copy beside the checkpoint or in a separate recovery directory. If that file is
+missing or incomplete, rebuild a complete snapshot from the original command,
+archived configuration, Task package/version, and experiment records. Keep the
+historical Run and checkpoint unchanged. A detached checkpoint can be evaluated
+or exported by placing it with the recovered snapshot in a separate directory;
+the CLI infers the Run identity from that snapshot. An explicit `--task` checks
+the recovered identity and does not replace missing settings.
+
+If the original Task, version, or semantic settings cannot be recovered exactly,
+the checkpoint cannot be faithfully evaluated or exported with this CLI. Current
+defaults are not a recovery source.
 
 ## Continue training
 

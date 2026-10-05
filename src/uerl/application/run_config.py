@@ -45,33 +45,51 @@ class RunConfigSource:
 
 
 def resolve_run_config(
-    task_id: str,
+    task_id: str | None,
     run_directory: Path | None,
     overrides: Mapping[str, str],
+    *,
+    strict: bool = False,
 ) -> RunConfig:
-    """Restore saved settings for play/export, retaining their legacy fallback rules."""
+    """Resolve one Task from its Run snapshot or, when allowed, its registration.
 
-    return load_run_config_source(task_id, run_directory).resolve(overrides)
+    ``strict`` requires a complete saved snapshot and an unchanged Task version.
+    It is intended for operations that must reproduce a trained policy rather
+    than rebuild it from current Task defaults.
+    """
+
+    return load_run_config_source(task_id, run_directory, strict=strict).resolve(overrides)
 
 
 def load_run_config_source(
-    task_id: str,
+    task_id: str | None,
     run_directory: Path | None,
     *,
     strict: bool = False,
 ) -> RunConfigSource:
-    """Capture configuration once; strict continuation never fills semantic fields.
+    """Capture configuration once; strict restore never fills semantic fields.
 
     Session endpoint and logging defaults are local to the new command. The
     recorded map and protocol are semantic settings, not machine settings.
-    Play/export retain their existing non-strict missing-field behavior.
+    Strict callers require saved identity and every typed configuration field.
     """
 
     registry = create_default_registry()
     path = None if run_directory is None else run_directory / RESOLVED_CONFIG_FILENAME
     if path is None or not path.is_file():
         if strict:
-            raise ConfigError("continuation requires resolved_config.json", code="MISSING_RUN_CONFIG", path=str(path))
+            location = "resolved_config.json" if path is None else str(path)
+            raise ConfigError(
+                "strict Run restoration requires the complete resolved_config.json; restore it from the original "
+                "Run or reconstruct it from recorded experiment evidence. Current Task defaults cannot recover a Run",
+                code="MISSING_RUN_CONFIG",
+                path=location,
+            )
+        if task_id is None:
+            raise ConfigError(
+                "Task identity is unavailable; provide --task or a Run with resolved_config.json",
+                code="MISSING_RUN_CONFIG",
+            )
         return RunConfigSource(registry.resolve(task_id))
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -79,18 +97,34 @@ def load_run_config_source(
         raise ConfigError("invalid saved JSON", code="INVALID_RUN_CONFIG", path=str(path)) from exc
     if not isinstance(payload, dict):
         raise ConfigError("resolved config must be a JSON object", code="INVALID_RUN_CONFIG", path=str(path))
-    if payload.get("task_id") != task_id:
+    recorded_task_id = payload.get("task_id")
+    if not isinstance(recorded_task_id, str) or not recorded_task_id:
+        if strict:
+            raise ConfigError(
+                "saved config has no Task identity; recover a complete resolved_config.json from the Run",
+                code="MISSING_RUN_CONFIG",
+                path="task_id",
+            )
+        if task_id is not None:
+            raise ConfigError(
+                f"Run was trained for {recorded_task_id!r}, not {task_id!r}",
+                code="RUN_TASK_MISMATCH",
+                path=str(path),
+            )
+        raise ConfigError("saved config has no Task identity", code="INVALID_RUN_CONFIG", path="task_id")
+    if task_id is not None and recorded_task_id != task_id:
         raise ConfigError(
-            f"Run was trained for {payload.get('task_id')!r}, not {task_id!r}",
+            f"Run was trained for {recorded_task_id!r}, not {task_id!r}",
             code="RUN_TASK_MISMATCH",
             path=str(path),
         )
+    task_id = recorded_task_id
     run_hash = payload.get("normalized_hash")
     task_version = payload.get("task_version")
-    if not isinstance(run_hash, str) or not run_hash or not isinstance(task_version, str):
+    if not isinstance(run_hash, str) or not run_hash or not isinstance(task_version, str) or not task_version:
         raise ConfigError(
-            "resolved config has no normalized_hash or task_version",
-            code="INVALID_RUN_CONFIG",
+            "resolved config requires a non-empty normalized_hash and task_version",
+            code="MISSING_RUN_CONFIG" if strict else "INVALID_RUN_CONFIG",
             path=str(path),
         )
     registration = registry.resolve(task_id)
@@ -107,7 +141,9 @@ def load_run_config_source(
     if strict:
         if not isinstance(map_path, str) or not map_path:
             raise ConfigError(
-                "continuation requires the recorded map", code="MISSING_RUN_CONFIG", path="session.map_path"
+                "saved Run config is missing its map; recover the complete original snapshot",
+                code="MISSING_RUN_CONFIG",
+                path="session.map_path",
             )
         from_mapping(RslRlRunnerParametersCfg, dict(runner.parameters), path="runner.parameters")
     session_config = registration.session_config
@@ -153,6 +189,16 @@ def load_run_config_source(
     return RunConfigSource(run_registration, recorded, run_hash)
 
 
+def find_run_directory_for_checkpoint(checkpoint: Path) -> Path | None:
+    """Find a checkpoint's nearest ancestor containing its saved Run config."""
+
+    resolved_checkpoint = checkpoint.resolve()
+    return next(
+        (parent for parent in resolved_checkpoint.parents if (parent / RESOLVED_CONFIG_FILENAME).is_file()),
+        None,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _SingleRegistration:
     registration: TaskRegistration
@@ -180,6 +226,8 @@ def _typed(annotation: Any, template: Any, value: Any, path: str, *, strict: boo
         return _typed(members[0], template, value, path, strict=strict)
     if isinstance(annotation, type) and is_dataclass(annotation):
         if not isinstance(value, dict):
+            if strict and value is None:
+                raise ConfigError("saved config is missing this section", code="MISSING_RUN_CONFIG", path=path)
             raise ConfigError("expected a JSON object", code="INVALID_RUN_CONFIG", path=path)
         declared = {item.name: item for item in fields(annotation) if item.init}
         unknown = sorted(set(value) - set(declared))
@@ -237,4 +285,11 @@ def _typed(annotation: Any, template: Any, value: Any, path: str, *, strict: boo
     raise ConfigError(f"cannot read {value!r} as {annotation!r}", code="INVALID_RUN_CONFIG", path=path)
 
 
-__all__ = ["RESOLVED_CONFIG_FILENAME", "RunConfig", "RunConfigSource", "load_run_config_source", "resolve_run_config"]
+__all__ = [
+    "RESOLVED_CONFIG_FILENAME",
+    "RunConfig",
+    "RunConfigSource",
+    "find_run_directory_for_checkpoint",
+    "load_run_config_source",
+    "resolve_run_config",
+]

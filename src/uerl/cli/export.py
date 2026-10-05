@@ -6,8 +6,12 @@ import argparse
 import json
 from pathlib import Path
 
-from uerl.application.run_config import RESOLVED_CONFIG_FILENAME, resolve_run_config
-from uerl.cli.boundary import guard, parse_overrides
+from uerl.application.run_config import (
+    RESOLVED_CONFIG_FILENAME,
+    find_run_directory_for_checkpoint,
+    load_run_config_source,
+)
+from uerl.cli.boundary import guard, parse_overrides, validate_saved_run_overrides
 from uerl.cli.flags import EXPORT_FLAGS, add_common_flags, apply_common_flags
 from uerl.cli.host_flags import add_host_flags, resolve_host_flags
 from uerl.training.export import export_policy
@@ -20,14 +24,21 @@ def _parser() -> argparse.ArgumentParser:
             "(plans + ONNX from runner.export_policy_to_onnx)."
         ),
     )
-    parser.add_argument("--task", required=True, help="Registered Task ID.")
+    parser.add_argument(
+        "--task",
+        help="Optional with a Run snapshot; required for 'latest' and must match the saved Task ID.",
+    )
     add_common_flags(parser, EXPORT_FLAGS)
-    parser.add_argument("--checkpoint", type=Path, help="RSL-RL checkpoint to load.")
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="RSL-RL checkpoint to load; its ancestor Run must contain resolved_config.json.",
+    )
     parser.add_argument(
         "--run",
         help=(
             "Run directory or 'latest'. Uses model_final.pt, else the highest rsl_rl/model_<iteration>.pt, "
-            "and the Run's resolved_config.json for Robot, timing and Task settings."
+            "and the Run's resolved_config.json for Task identity and trained settings. 'latest' requires --task."
         ),
     )
     parser.add_argument("--output", type=Path, help="Destination .uerlpol2 path.")
@@ -82,28 +93,29 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--run cannot be combined with --checkpoint")
     if args.run is None and args.checkpoint is None:
         parser.error("one of --run or --checkpoint is required")
-    if args.checkpoint is not None:
+    if args.run == "latest" and args.task is None:
+        parser.error("--task is required with --run latest because latest is selected within a Task")
+    if args.run is None:
         checkpoint = args.checkpoint
-        run_directory = None
+        assert checkpoint is not None
+        run_directory = find_run_directory_for_checkpoint(checkpoint)
     else:
         run_directory = resolve_run_directory(args.run, task_id=args.task)
         checkpoint = resolve_resume_checkpoint(run_directory, task_id=args.task)
     if not checkpoint.is_file():
         parser.error(f"checkpoint not found: {checkpoint}")
     print(f"[RUN] checkpoint={checkpoint}")
-    if args.output is None:
-        if run_directory is None:
-            parser.error("--output is required when --checkpoint is used")
-        output = run_directory / "exported" / f"{args.task}.uerlpol2"
-    else:
-        output = args.output
 
     direct_overrides = apply_common_flags(parser, args, parse_overrides(parser, remaining), EXPORT_FLAGS)
     # The artifact does not depend on the Slot count; one Robot is enough to build the policy graph.
     direct_overrides.setdefault("worker.slot_count", "1")
     if args.map_name:
         direct_overrides["session.map_path"] = args.map_name
-    base_config = resolve_run_config(args.task, run_directory, direct_overrides).config
+    validate_saved_run_overrides(parser, direct_overrides, operation="export")
+    run_config_source = load_run_config_source(args.task, run_directory, strict=True)
+    base_config = run_config_source.resolve(direct_overrides).config
+    if base_config.worker.slot_count != 1:
+        parser.error("export uses one robot to build the artifact")
     map_name = base_config.session.map_path
     launch_overrides: dict[str, str] = {}
     if direct_overrides.get("session.mode") != "attach":
@@ -124,14 +136,18 @@ def main(argv: list[str] | None = None) -> int:
                     for item in worker_args
                 ]
             )
-    resolved = resolve_run_config(
-        args.task,
-        run_directory,
-        {**launch_overrides, **direct_overrides, "session.map_path": map_name},
+    resolved = run_config_source.resolve(
+        {**launch_overrides, **direct_overrides, "session.map_path": map_name}
     )
     config = resolved.config
     config_source = f"{run_directory}/{RESOLVED_CONFIG_FILENAME}" if resolved.from_run else "task defaults"
     print(f"[RUN] config={config_source} run_hash={resolved.run_hash}")
+    if args.output is None:
+        if run_directory is None:
+            parser.error("--output is required when --checkpoint is detached from a saved Run")
+        output = run_directory / "exported" / f"{config.task_id}.uerlpol2"
+    else:
+        output = args.output
     if args.robot_runtime is None:
         robot_runtime = robot_runtime_from_config(config)
     else:
@@ -142,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     registry = create_default_registry()
-    registration = registry.resolve(args.task)
+    registration = registry.resolve(config.task_id)
     task = registry.create_task(config.task_id, config.task)
     metadata = ArtifactMetadata(
         run_hash=resolved.run_hash,

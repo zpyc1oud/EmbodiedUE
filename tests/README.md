@@ -35,7 +35,9 @@ Parity cases compare both implementations against reviewed expected values. Depl
 Saved-run configuration tests exercise the application resolver and the play/export
 CLI through the Session-open boundary (`python/integration/test_saved_run_cli_config.py`).
 They check recorded settings, map precedence, launch arguments, and snapshot preservation
-without starting a Worker. Continuation cases additionally cover strict metadata,
+without starting a Worker. Play/export cases also check Task inference from Run identity,
+explicit identity conflicts, strict rejection of incomplete snapshots, semantic override
+rejection, and external Task registry resolution. Continuation cases additionally cover strict metadata,
 allowed changes, source preservation and both training configuration builds.
 `python/integration/test_resume_checkpoint.py` exercises real small CPU RSL
 models, normalization, non-empty optimizer state, iteration and Python curriculum/

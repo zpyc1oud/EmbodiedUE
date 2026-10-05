@@ -11,6 +11,7 @@ Start with `uv run uerl tasks`, `uv run uerl config --task <TaskID>`, and `uv ru
 | CUDA unavailable | Check `nvidia-smi` and the active environment's `torch.cuda.is_available()`. A CUDA wheel does not supply an NVIDIA device or driver. Use `--device cpu` when appropriate; UE is still required. |
 | Old PhantomX checkpoint refuses to resume | Read the [objective and curriculum compatibility rules](how-to/phantomx-robust-training.md#start-and-resume-a-run). Select a compatible Run or train a new one. |
 | Terrain playback restores incompatible curriculum state | Playback starts with registered Task curriculum settings; pass `--terrain-level N` to select a fixed procedural tier. |
+| Play/export reports missing or incomplete saved Run config | Recover the complete `resolved_config.json` from the source Run or original experiment records and place a copy beside the checkpoint; Task defaults cannot faithfully restore the saved policy. |
 | Evaluation reports success but the robot barely moves | Inspect forward velocity and speed error along with episode counts. Success is based on completed episodes without base contact. |
 | Worker initialization times out | Inspect UE build/content errors and Worker logs first. Session connection/request defaults are 120 seconds. A timeout invalidates the Session; do not blindly replay a Step. |
 | Deployment fails its physics gate | Run `UERL.CheckProject` in the Editor and use the [synchronous substep settings](in-game-deployment-guide.md#game-physics-settings). The runtime gate reads the actual solver. |

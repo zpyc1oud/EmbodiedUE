@@ -7,12 +7,16 @@ import json
 from pathlib import Path
 from typing import cast
 
-from ..application.run_config import RESOLVED_CONFIG_FILENAME, resolve_run_config
+from ..application.run_config import (
+    RESOLVED_CONFIG_FILENAME,
+    find_run_directory_for_checkpoint,
+    load_run_config_source,
+)
 from ..core.config.canonical import canonical_json
 from ..core.config.manifest import capture_git_identity
 from ..host.profile import DEFAULT_UE_EXECUTABLE
 from ..presentation import InternalViewportRecorder
-from .boundary import guard, parse_overrides
+from .boundary import guard, parse_overrides, validate_saved_run_overrides
 from .flags import PLAY_FLAGS, add_common_flags, apply_common_flags
 from .host_flags import add_host_flags, resolve_host_flags
 
@@ -48,14 +52,21 @@ def _write_record_evidence(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a trained UE-RL policy deterministically.")
-    parser.add_argument("--task", required=True, help="Registered Task ID.")
+    parser.add_argument(
+        "--task",
+        help="Optional with a Run snapshot; required for 'latest' and must match the saved Task ID.",
+    )
     add_common_flags(parser, PLAY_FLAGS)
-    parser.add_argument("--checkpoint", type=Path, help="RSL-RL checkpoint to load.")
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="RSL-RL checkpoint to load; its ancestor Run must contain resolved_config.json.",
+    )
     parser.add_argument(
         "--run",
         help=(
             "Run directory or 'latest'. Uses model_final.pt, else the highest rsl_rl/model_<iteration>.pt, "
-            "and the Run's resolved_config.json for Robot, timing and Task settings."
+            "and the Run's resolved_config.json for Task identity and trained settings. 'latest' requires --task."
         ),
     )
     parser.add_argument("--steps", type=int, default=500, help="Fixed evaluation horizon.")
@@ -114,29 +125,31 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--run cannot be combined with --checkpoint")
     if args.run is None and args.checkpoint is None:
         parser.error("one of --run or --checkpoint is required")
-    checkpoint = (
-        args.checkpoint
-        if args.checkpoint is not None
-        else resolve_resume_checkpoint(args.run, task_id=args.task)
-    )
-    run_directory = (
-        None
-        if args.run is None or Path(args.run).is_file()
-        else resolve_run_directory(args.run, task_id=args.task)
-    )
+    if args.run == "latest" and args.task is None:
+        parser.error("--task is required with --run latest because latest is selected within a Task")
+    if args.run is None:
+        checkpoint = args.checkpoint
+        assert checkpoint is not None
+        run_directory = find_run_directory_for_checkpoint(checkpoint)
+    else:
+        run_directory = resolve_run_directory(args.run, task_id=args.task)
+        checkpoint = resolve_resume_checkpoint(run_directory, task_id=args.task)
+    if not checkpoint.is_file():
+        parser.error(f"checkpoint not found: {checkpoint}")
     print(f"[RUN] checkpoint={checkpoint}")
     direct_overrides = apply_common_flags(parser, args, parse_overrides(parser, remaining), PLAY_FLAGS)
-    requested_slots = direct_overrides.get("worker.slot_count")
-    if requested_slots is not None and int(requested_slots) != 1:
-        parser.error("play controls one robot")
-    direct_overrides["worker.slot_count"] = "1"
+    direct_overrides.setdefault("worker.slot_count", "1")
     from ..tasks.controllers import known_play_controllers
 
     if args.controller not in known_play_controllers():
         parser.error(f"unknown play controller {args.controller!r}")
     if args.map_name:
         direct_overrides["session.map_path"] = args.map_name
-    base_config = resolve_run_config(args.task, run_directory, direct_overrides).config
+    validate_saved_run_overrides(parser, direct_overrides, operation="play")
+    run_config_source = load_run_config_source(args.task, run_directory, strict=True)
+    base_config = run_config_source.resolve(direct_overrides).config
+    if base_config.worker.slot_count != 1:
+        parser.error("play controls one robot")
     map_name = base_config.session.map_path
     recorder = None
     if args.record is not None:
@@ -180,10 +193,8 @@ def main(argv: list[str] | None = None) -> int:
                 if recorder is not None:
                     worker_args.extend(recorder.worker_arguments())
                 launch_overrides["session.worker_args"] = json.dumps(worker_args)
-        resolved = resolve_run_config(
-            args.task,
-            run_directory,
-            {**launch_overrides, **direct_overrides, "session.map_path": map_name},
+        resolved = run_config_source.resolve(
+            {**launch_overrides, **direct_overrides, "session.map_path": map_name}
         )
         config = resolved.config
         config_source = f"{run_directory}/{RESOLVED_CONFIG_FILENAME}" if resolved.from_run else "task defaults"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import NoReturn
 
@@ -25,6 +26,14 @@ def command_args(command: str, root: Path) -> list[str]:
     args = ["--task", CARTPOLE_TASK_ID, "--device", "cpu", "--session.port", "44555"]
     if command == "train":
         return args + ["--run-dir", str(root / "output"), "--num-envs", "1"]
+    from uerl.core.config.canonical import to_jsonable
+    from uerl.training import build_run_config
+
+    payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
+    payload["worker"]["decimation"] = [3, 3]
+    payload["task"]["rew_scale_alive"] = 0.75
+    payload["runner"]["parameters"]["hidden_dims"] = [64, 64]
+    (root / "resolved_config.json").write_text(json.dumps(payload), encoding="utf-8")
     args += ["--checkpoint", str(checkpoint)]
     if command == "export":
         args += ["--output", str(root / "output.uerlpol2")]
@@ -273,11 +282,9 @@ def test_changing_host_profile_changes_only_session_settings(
         args = command_args(command, tmp_path) + [
             "--host-profile",
             str(profile),
-            "--worker.decimation",
-            "[3,3]",
-            "--task.rew_scale_alive",
-            "0.75",
         ]
+        if command == "train":
+            args += ["--worker.decimation", "[3,3]", "--task.rew_scale_alive", "0.75"]
         with pytest.raises(SessionBoundaryReached):
             COMMANDS[command](args)
     first, second = captured
