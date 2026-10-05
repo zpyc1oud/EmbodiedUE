@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import socket
 from collections.abc import Sequence
 from dataclasses import replace
@@ -23,6 +22,7 @@ from uerl import (
 )
 from uerl.core.codec import BridgeProtocolError, Layout, sha256_json
 from uerl.core.config.canonical import canonical_json, sha256_hex, to_jsonable
+from uerl.core.config.yaml_loader import load_unique_yaml
 from uerl.core.direct.curriculum import TerrainCurriculum
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.phantomx import PHANTOMX_TERRAIN_TASK_ID
@@ -159,8 +159,8 @@ def test_real_ue_negotiates_all_terrain_tiers_and_resets_each_slot(tmp_path: Pat
         effective_config: dict[str, Any] = result.response["effective_worker_config"]
         assert effective_config["environment"]["terrain"] == terrain
         assert result.response["effective_worker_config_hash"] == sha256_json(effective_config)
-        manifest_path = config.logging.run_directory / "manifest.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_path = config.logging.run_directory / "manifest.yaml"
+        manifest = load_unique_yaml(manifest_path.read_text(encoding="utf-8"))
         assert manifest["resolved_config"]["normalized_hash"] == config.normalized_hash
         assert manifest["effective_worker_config"] == effective_config
         assert manifest["layout_hashes"]["reset_request"] == reset_layout.layout_hash

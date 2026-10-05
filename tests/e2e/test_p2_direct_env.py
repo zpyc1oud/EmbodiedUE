@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import torch
@@ -17,6 +16,7 @@ from uerl import (
     UERLSession,
     UERLSessionAdapter,
 )
+from uerl.core.config.yaml_loader import load_unique_yaml
 from uerl.core.direct.task import DirectTask
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.cartpole import (
@@ -89,7 +89,7 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path) 
         resolved_config=config,
     )
     try:
-        manifest = json.loads((config.logging.run_directory / "manifest.json").read_text(encoding="utf-8"))
+        manifest = load_unique_yaml((config.logging.run_directory / "manifest.yaml").read_text(encoding="utf-8"))
         state_names = tuple(field["name"] for field in task.schema.state_requirements)
         action_names = tuple(field["name"] for field in task.schema.action_schema)
         assert raw_session.state is SessionState.READY

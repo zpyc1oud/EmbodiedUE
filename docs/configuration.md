@@ -19,7 +19,7 @@ These commands do not start UE. A successful task check validates declarations, 
 | `src/uerl/configs/tasks/*/training.yaml` | Base task, Worker, and runner settings |
 | `src/uerl/tasks/*/registration.py` | Task-specific factories and defaults |
 | `src/uerl/configs/environments/terrains/phantomx/*.yaml` | Terrain tiers and generation parameters |
-| Run `resolved_config.json` and manifest | The configuration and identities recorded for an actual run |
+| Run `resolved_config.yaml` and `manifest.yaml` | The configuration and identities recorded for an actual run |
 
 Robot declarations support derivation and regular-expression joint selection. Runtime Worker projections are generated from those declarations and reflected topology; they are not a second configuration to edit.
 
@@ -48,13 +48,16 @@ Changing dimensions, timing, robot semantics, or the training objective can make
 
 `play --run` and `export --run` use the shared application resolver in
 [`application/run_config.py`](../src/uerl/application/run_config.py). They read
-the Task ID from `resolved_config.json`, restore the saved Worker, Task, runner,
-map, and protocol settings, and retain the saved training hash. `--task` is
+the Task ID from `resolved_config.yaml`, the checkpoint's embedded config, or
+the Run manifest, then restore the saved Worker, Task, runner, map, and protocol
+settings and retain the saved training hash. `--task` is
 optional for an explicit Run directory; when supplied, it must match the saved
 Task. `--run latest` still requires `--task` because latest Runs are selected
-within a Task. A `--checkpoint` located under a directory containing
-`resolved_config.json` also identifies its Run automatically. The saved file is
-not edited.
+within a Task. A `--checkpoint` located under a directory containing saved Run
+config or manifest also identifies its Run automatically. A checkpoint copied
+outside its Run can restore Task identity and settings from its embedded
+versioned YAML config. When checkpoint and Run metadata both exist, their typed
+config values must agree. Saved files are not edited.
 
 Play and export require a complete saved configuration and the same registered
 Task version that trained the checkpoint. A missing snapshot, missing required
@@ -71,28 +74,81 @@ configuration. Python callers of the former `uerl.cli.run_config` module should 
 `resolve_run_config` from `uerl.application.run_config` instead; map restoration
 is included in the returned configuration.
 
-### Recovering old Runs and detached checkpoints
+### Recovering historical Runs and detached checkpoints
 
-For an old Run, first look for its original `resolved_config.json` and place a
-copy beside the checkpoint or in a separate recovery directory. If that file is
-missing or incomplete, rebuild a complete snapshot from the original command,
-archived configuration, Task package/version, and experiment records. Keep the
-historical Run and checkpoint unchanged. A detached checkpoint can be evaluated
-or exported by placing it with the recovered snapshot in a separate directory;
-the CLI infers the Run identity from that snapshot. An explicit `--task` checks
-the recovered identity and does not replace missing settings.
+The current reader accepts schema version 1 YAML in `resolved_config.yaml`, the
+same versioned YAML embedded in new RSL-RL checkpoints, and the current YAML Run
+manifest. Embedded checkpoint metadata is read through PyTorch's weights-only
+loader. Historical JSON files and earlier YAML sidecar schemas are not read by
+training, play, or export.
 
-If the original Task, version, or semantic settings cannot be recovered exactly,
-the checkpoint cannot be faithfully evaluated or exported with this CLI. Current
-defaults are not a recovery source.
+The one-time migration command previews a new recovery copy by default. It
+accepts a historical JSON or unversioned YAML config, or a JSON/YAML manifest
+that contains the resolved config. It requires every saved field and the exact
+registered Task version; it never fills gaps from current defaults. On apply,
+it writes current `resolved_config.yaml`, converts a manifest when present,
+copies the source config/manifest into `legacy/`, and copies the selected
+checkpoint byte-for-byte without loading or changing it. The source Run stays
+untouched. This default creates a recovery directory whose sidecar supplies
+the config; it does not make the checkpoint self-contained or certify that it
+is loadable for detached play/export.
+
+```powershell
+uv run python -m uerl.application.run_migration `
+  --source runs/old-run --output runs/recovered-run
+
+# Review the [PLAN] entries, then run the same command with --apply.
+uv run python -m uerl.application.run_migration `
+  --source runs/old-run --output runs/recovered-run --apply
+
+uv run uerl play --run runs/recovered-run
+```
+
+The output must not already contain different files. A repeated apply to an
+identical output is a no-op. If configuration is incomplete, conflicting, or
+does not match an installed Task version, the command stops without writing.
+Recover missing values from the original command, exact Task package and source
+revision, archived configuration, and experiment records, then retry with a
+complete snapshot. If those values cannot be established, retrain and evaluate
+a new Run. A detached checkpoint can be handled by making a small recovery Run
+directory containing the checkpoint and the complete historical metadata, then
+running the same migration command.
+
+For a weights-only-compatible checkpoint, the explicit
+`--embed-checkpoint-config` option creates a checkpoint copy with the migrated
+YAML embedded. Preview this separately, then apply only after reviewing the
+plan:
+
+```powershell
+uv run python -m uerl.application.run_migration `
+  --source runs/old-run --output runs/recovered-self-contained `
+  --embed-checkpoint-config
+
+uv run python -m uerl.application.run_migration `
+  --source runs/old-run --output runs/recovered-self-contained `
+  --embed-checkpoint-config --apply
+```
+
+This mode only uses PyTorch's `weights_only=True` loader; there is no pickle
+fallback. It rejects unsupported state and verifies that model, optimizer,
+iteration, and all other loaded checkpoint data remain unchanged after saving.
+The original checkpoint bytes are retained under `legacy_checkpoint/` in the
+recovery copy, and the source Run is left untouched. If the checkpoint cannot
+be safely inspected or verified, sidecar migration can preserve the config but
+cannot make that checkpoint readable by the current safe loader. Keep the Run
+metadata with it and recover a weights-only-compatible checkpoint, or retrain;
+do not treat the copied checkpoint as self-contained.
 
 ## Continue training
 
 `train --resume` restores the source Run's Worker, Task, runner, map and protocol
 settings, then applies permitted machine, output and budget changes. A Run
 reference, `latest`, or a checkpoint within the Run root, `rsl_rl/`, or
-`checkpoints/` is supported. A detached checkpoint needs its original
-`resolved_config.json`; weights alone cannot establish the training semantics.
+`checkpoints/` is supported. A new detached checkpoint carries its config
+snapshot; a historical detached checkpoint needs a complete historical config
+or manifest copied into a small source directory and migrated into a separate
+recovery directory because weights alone cannot establish the training
+semantics.
 The dotted `--runner.checkpoint` option follows the same continuation rules.
 
 ```powershell
@@ -111,6 +167,8 @@ presentation, runner device, output directory, iteration budget, and runner
 `run_name`, `experiment_name` and `save_interval`. The project and window size
 are supplied through the ordinary launch flags. Arbitrary
 `--session.worker_args` changes are rejected; use the launch flags instead.
+When supplied directly as a dotted override, `session.worker_args` is a YAML
+sequence of strings; legacy JSON string arrays remain valid YAML input.
 The destination must be empty or new, outside the source Run.
 
 Changes to Slot count, seed, map, rewards, timing, Robot/terrain semantics,
@@ -139,10 +197,12 @@ New training checkpoints record `terrain_level` and
 `freeze_observation_normalization` in `infos.uerl_training_options`; continuation
 recovers them automatically. `[RESTORE]` prints the selected state policy.
 
-Complete, compatible old Run snapshots remain supported. Missing semantic
-fields (including required runner parameter keys), a different Task/version,
-or missing required checkpoint state fail before Session startup. Continuation
-never fills those gaps with current Task defaults. For legacy runtime options:
+Complete current-schema Run snapshots can resume when their checkpoint state is
+compatible. Historical JSON and earlier YAML schemas must first be migrated.
+Missing semantic fields (including required runner parameter keys), a different
+Task/version, or missing required checkpoint state fail before Session startup.
+Continuation never fills those gaps with current Task defaults. For saved
+runtime options:
 
 - A saved terrain curriculum term identifies adaptive terrain. Without that
   term, a Run with terrain requires its original explicit `--terrain-level N`.
@@ -163,12 +223,11 @@ resolved configuration and recovered options to `run_training`.
 
 ### Evaluation and export limitations
 
-`play --run` and `export --run` retain their existing compatibility rules: a missing
-snapshot uses current defaults, and missing dataclass fields use the current
-template. Unknown fields, invalid field types and a different Task identity are
-rejected. These fallbacks do not establish faithful recovery of incomplete runs.
-Broader run intent, warm start and deployment validation remain tracked in
-[Issue #7](https://github.com/zpyc1oud/EmbodiedUE/issues/7).
+`play` and `export` require a complete current-schema saved configuration. They
+reject missing fields, unsupported schema versions, and a Task identity or
+version mismatch before Session startup. Current defaults never fill missing
+saved settings. Broader run intent, warm start and deployment validation remain
+tracked in [Issue #7](https://github.com/zpyc1oud/EmbodiedUE/issues/7).
 
 ## Timing and parallelism
 

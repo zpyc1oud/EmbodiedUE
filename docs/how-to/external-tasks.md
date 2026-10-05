@@ -22,7 +22,7 @@ configuration and Task construction without starting UE. To develop your own
 package, copy `examples/external-cartpole` outside the repository, change its
 package name, entry-point name, and Task ID, then install that directory. Use
 `uv pip install -e <directory> --no-deps` for editable development in the prepared
-environment. Edit `src/example_cartpole/reward.json` to change
+environment. Edit `src/example_cartpole/reward.yaml` to change
 `pole_position_weight`. Reinstall after editing a non-editable installation.
 
 On an already configured Windows/UE host, the same registration is used by:

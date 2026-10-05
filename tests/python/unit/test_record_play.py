@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from importlib.metadata import entry_points
 from pathlib import Path
 
@@ -29,11 +28,10 @@ def _saved_checkpoint(tmp_path: Path, task_id: str) -> Path:
     run = tmp_path / "run"
     run.mkdir()
     checkpoint = run / "model.pt"
-    checkpoint.write_bytes(b"checkpoint")
-    (run / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(build_run_config(task_id))),
-        encoding="utf-8",
-    )
+    torch.save({"infos": {}}, checkpoint)
+    from tests.python.run_config_files import write_resolved_config
+
+    write_resolved_config(run, to_jsonable(build_run_config(task_id)))
     return checkpoint
 
 

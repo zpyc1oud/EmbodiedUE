@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
+from ..core.config.snapshot import resolved_config_from_yaml
+from ..core.config.yaml_loader import load_unique_yaml
+from ..errors import ConfigError
+
 _UNSAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 _ITERATION_CHECKPOINT = re.compile(r"model_(\d+)\.pt")
 _DEFAULT_CHECKPOINT = "model_final.pt"
-_RUN_MARKERS = ("command.txt", "resolved_config.json", "manifest.json", _DEFAULT_CHECKPOINT, "rsl_rl")
+_RUN_MARKERS = ("command.txt", "resolved_config.yaml", "manifest.yaml", _DEFAULT_CHECKPOINT, "rsl_rl")
 _LATEST = "latest"
 
 
@@ -200,15 +205,28 @@ def _summarize(directory: Path, *, fallback_task: str) -> RunSummary:
 
 
 def _task_id_from_config(directory: Path) -> str | None:
-    path = directory / "resolved_config.json"
-    if not path.is_file():
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    task_id = payload.get("task_id") if isinstance(payload, dict) else None
-    return task_id if isinstance(task_id, str) and task_id else None
+    for name in ("resolved_config.yaml", "manifest.yaml"):
+        path = directory / name
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+            if name == "resolved_config.yaml":
+                raw_payload: object = resolved_config_from_yaml(text, path=str(path))
+            else:
+                raw_payload = load_unique_yaml(text)
+        except (OSError, UnicodeDecodeError, yaml.YAMLError, TypeError, ValueError, ConfigError):
+            continue
+        if not isinstance(raw_payload, dict):
+            continue
+        if name.startswith("manifest."):
+            config_payload = raw_payload.get("resolved_config")
+        else:
+            config_payload = raw_payload
+        task_id = config_payload.get("task_id") if isinstance(config_payload, dict) else None
+        if isinstance(task_id, str) and task_id:
+            return task_id
+    return None
 
 
 __all__ = [

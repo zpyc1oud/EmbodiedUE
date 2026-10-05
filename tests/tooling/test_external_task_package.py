@@ -74,8 +74,8 @@ assert main(['check', 'task', 'Example-CartPole-v0']) == 0
 assert main(['config', '--task', 'Example-CartPole-v0', '--json']) == 0
 assert main(['tasks', '--filter', 'Example-CartPole-v0']) == 0
 # Package-owned resource changes feed the next fresh config without affecting built-ins.
-resource = Path(sys.argv[1]) / 'example_cartpole' / 'reward.json'
-resource.write_text('{"pole_position_weight": -3.0}', encoding='utf-8')
+resource = Path(sys.argv[1]) / 'example_cartpole' / 'reward.yaml'
+resource.write_text('pole_position_weight: -3.0\\n', encoding='utf-8')
 assert registry.create_task_config('Example-CartPole-v0').rew_scale_pole_pos == -3.0
 assert registry.create_task_config('UERL-CartPole-Direct-v0').rew_scale_pole_pos == -1.0
 os.environ['UERL_TASK_PLUGINS'] = 'example-cartpole,example-cartpole'

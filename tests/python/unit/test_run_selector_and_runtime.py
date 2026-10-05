@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
+import torch
 
+from tests.python.run_config_files import write_resolved_config
 from uerl import training
 from uerl.application import run_config
 from uerl.cli import export, play
@@ -25,11 +26,8 @@ def test_play_run_selector_resolves_model_before_evaluation(
     run_directory = tmp_path / "run"
     run_directory.mkdir()
     checkpoint = run_directory / "model_final.pt"
-    checkpoint.write_bytes(b"checkpoint")
-    (run_directory / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(training.build_run_config(CARTPOLE_TASK_ID))),
-        encoding="utf-8",
-    )
+    torch.save({"infos": {}}, checkpoint)
+    write_resolved_config(run_directory, to_jsonable(training.build_run_config(CARTPOLE_TASK_ID)))
     captured = []
 
     def fake_evaluation(config, *, checkpoint, steps, **kwargs):  # type: ignore[no-untyped-def]
@@ -68,12 +66,9 @@ def test_play_latest_uses_the_interrupted_checkpoint(
     run_directory = tmp_path / "runs" / CARTPOLE_TASK_ID / "20260923-150000-smoke"
     checkpoint = run_directory / "rsl_rl" / "model_50.pt"
     checkpoint.parent.mkdir(parents=True)
-    checkpoint.write_bytes(b"checkpoint")
+    torch.save({"infos": {}}, checkpoint)
     (run_directory / "command.txt").write_text("train\n", encoding="utf-8")
-    (run_directory / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(training.build_run_config(CARTPOLE_TASK_ID))),
-        encoding="utf-8",
-    )
+    write_resolved_config(run_directory, to_jsonable(training.build_run_config(CARTPOLE_TASK_ID)))
     captured = []
 
     def fake_evaluation(config, *, checkpoint, steps, **kwargs):  # type: ignore[no-untyped-def]
@@ -108,11 +103,8 @@ def test_play_infers_enabled_external_task_from_saved_run(
     run_directory = tmp_path / "external-run"
     run_directory.mkdir()
     checkpoint = run_directory / "model_final.pt"
-    checkpoint.write_bytes(b"checkpoint")
-    (run_directory / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(config)),
-        encoding="utf-8",
-    )
+    torch.save({"infos": {}}, checkpoint)
+    write_resolved_config(run_directory, to_jsonable(config))
     captured = []
 
     def fake_evaluation(config, *, checkpoint, steps, **kwargs):  # type: ignore[no-untyped-def]

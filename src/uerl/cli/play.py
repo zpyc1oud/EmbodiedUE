@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import cast
 
 from ..application.run_config import (
-    RESOLVED_CONFIG_FILENAME,
     find_run_directory_for_checkpoint,
     load_run_config_source,
 )
 from ..core.config.canonical import canonical_json
 from ..core.config.manifest import capture_git_identity
+from ..core.config.snapshot import decode_worker_args, encode_worker_args
 from ..host.profile import DEFAULT_UE_EXECUTABLE
 from ..presentation import InternalViewportRecorder
 from .boundary import guard, parse_overrides, validate_saved_run_overrides
@@ -60,13 +59,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--checkpoint",
         type=Path,
-        help="RSL-RL checkpoint to load; its ancestor Run must contain resolved_config.json.",
+        help="RSL-RL checkpoint; its saved Run config may be embedded or found in an ancestor Run.",
     )
     parser.add_argument(
         "--run",
         help=(
             "Run directory or 'latest'. Uses model_final.pt, else the highest rsl_rl/model_<iteration>.pt, "
-            "and the Run's resolved_config.json for Task identity and trained settings. 'latest' requires --task."
+            "and saved Run config for Task identity and trained settings. 'latest' requires --task."
         ),
     )
     parser.add_argument("--steps", type=int, default=500, help="Fixed evaluation horizon.")
@@ -146,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.map_name:
         direct_overrides["session.map_path"] = args.map_name
     validate_saved_run_overrides(parser, direct_overrides, operation="play")
-    run_config_source = load_run_config_source(args.task, run_directory, strict=True)
+    run_config_source = load_run_config_source(args.task, run_directory, strict=True, checkpoint=checkpoint)
     base_config = run_config_source.resolve(direct_overrides).config
     if base_config.worker.slot_count != 1:
         parser.error("play controls one robot")
@@ -184,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             explicit_port = direct_overrides.get("session.port")
             if explicit_port is not None or recorder is not None:
-                worker_args = json.loads(launch_overrides["session.worker_args"])
+                worker_args = decode_worker_args(launch_overrides["session.worker_args"])
                 if explicit_port is not None:
                     worker_args = [
                         f"-uerlport={explicit_port}" if item.startswith("-uerlport=") else item
@@ -192,12 +191,12 @@ def main(argv: list[str] | None = None) -> int:
                     ]
                 if recorder is not None:
                     worker_args.extend(recorder.worker_arguments())
-                launch_overrides["session.worker_args"] = json.dumps(worker_args)
+                launch_overrides["session.worker_args"] = encode_worker_args(worker_args)
         resolved = run_config_source.resolve(
             {**launch_overrides, **direct_overrides, "session.map_path": map_name}
         )
         config = resolved.config
-        config_source = f"{run_directory}/{RESOLVED_CONFIG_FILENAME}" if resolved.from_run else "task defaults"
+        config_source = resolved.source_path or "task defaults"
         print(f"[RUN] config={config_source}")
     except BaseException:
         if recorder is not None:

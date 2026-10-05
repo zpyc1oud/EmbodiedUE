@@ -55,7 +55,17 @@ class Continuation:
         directory = checkpoint.parent
         if not (directory / RESOLVED_CONFIG_FILENAME).is_file() and directory.name in ("rsl_rl", "checkpoints"):
             directory = directory.parent
-        return cls(directory, checkpoint, load_run_config_source(task_id, directory, strict=True))
+        return cls(
+            directory,
+            checkpoint,
+            load_run_config_source(
+                task_id,
+                directory,
+                strict=True,
+                checkpoint=checkpoint,
+                allow_unreadable_checkpoint=True,
+            ),
+        )
 
     def resolve(
         self,

@@ -288,7 +288,7 @@ def test_session_persists_manifest_before_ready_and_closes_in_order(tmp_path: Pa
     assert session.robot_spec is None
     assert session.state.value == SessionState.INITIALIZED.value
     assert bridge.events == ["connect", "describe", "initialize"]
-    assert (tmp_path / "run" / "manifest.json").exists()
+    assert (tmp_path / "run" / "manifest.yaml").exists()
     assert session.acknowledge_ready() == {"ready": True}
     assert session.step(0x42, b"action")[1] == b"step"
     assert session.reset(0x42, b"mask")[1] == b"reset"

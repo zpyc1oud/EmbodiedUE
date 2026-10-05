@@ -7,13 +7,20 @@ from pathlib import Path
 from typing import NoReturn
 
 import pytest
+import torch
 
+from tests.python.run_config_files import write_resolved_config
 from uerl.cli import export, play
 from uerl.core.config import ResolvedRunConfig
 from uerl.core.config.canonical import to_jsonable
+from uerl.core.config.snapshot import CHECKPOINT_CONFIG_KEY, resolved_config_to_yaml
 from uerl.runtime.session import UERLSession
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID
 from uerl.training import build_run_config
+
+
+def _write_checkpoint(path: Path) -> None:
+    torch.save({"infos": {}}, path)
 
 
 @pytest.mark.parametrize("command", ["play", "export"])
@@ -24,14 +31,13 @@ def test_saved_configuration_reaches_session_after_launch_overrides(
 ) -> None:
     run = tmp_path / "run"
     run.mkdir()
-    (run / "model_final.pt").write_bytes(b"not loaded before Session.open")
+    _write_checkpoint(run / "model_final.pt")
     payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
     payload["session"]["map_path"] = "/Game/Maps/Recorded"
     payload["worker"]["decimation"] = [3, 3]
     payload["task"]["rew_scale_alive"] = 0.75
     payload["runner"]["parameters"]["hidden_dims"] = [64, 64]
-    snapshot = run / "resolved_config.json"
-    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    snapshot = write_resolved_config(run, payload)
     before = snapshot.read_bytes()
     captured: list[ResolvedRunConfig] = []
 
@@ -76,11 +82,10 @@ def test_run_path_infers_task_and_checkpoint_identity(
     run = tmp_path / "run"
     run.mkdir()
     checkpoint = run / "model_final.pt"
-    checkpoint.write_bytes(b"not loaded before Session.open")
+    _write_checkpoint(checkpoint)
     checkpoint_before = checkpoint.read_bytes()
     payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
-    snapshot = run / "resolved_config.json"
-    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    snapshot = write_resolved_config(run, payload)
     before = snapshot.read_bytes()
     captured: list[ResolvedRunConfig] = []
 
@@ -107,6 +112,43 @@ def test_run_path_infers_task_and_checkpoint_identity(
 
 
 @pytest.mark.parametrize("command", ["play", "export"])
+def test_detached_checkpoint_infers_task_and_saved_settings_from_embedded_yaml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+) -> None:
+    config = build_run_config(
+        CARTPOLE_TASK_ID,
+        overrides={"worker.decimation": "[3, 3]", "task.rew_scale_alive": "0.75"},
+    )
+    checkpoint = tmp_path / "detached.pt"
+    torch.save({"infos": {CHECKPOINT_CONFIG_KEY: resolved_config_to_yaml(config)}}, checkpoint)
+    before = checkpoint.read_bytes()
+    captured: list[ResolvedRunConfig] = []
+
+    class SessionBoundaryReached(Exception):
+        pass
+
+    def capture(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
+        captured.append(config)
+        raise SessionBoundaryReached
+
+    monkeypatch.setattr(UERLSession, "open", capture)
+    argv = ["--checkpoint", str(checkpoint), "--session.mode", "attach"]
+    if command == "export":
+        argv.extend(("--output", str(tmp_path / "policy.uerlpol2")))
+
+    with pytest.raises(SessionBoundaryReached):
+        (play.main if command == "play" else export.main)(argv)
+
+    (restored,) = captured
+    assert restored.task_id == CARTPOLE_TASK_ID
+    assert restored.worker.decimation == (3, 3)
+    assert to_jsonable(restored.task)["rew_scale_alive"] == 0.75
+    assert checkpoint.read_bytes() == before
+
+
+@pytest.mark.parametrize("command", ["play", "export"])
 def test_explicit_task_conflict_fails_before_session(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -114,11 +156,8 @@ def test_explicit_task_conflict_fails_before_session(
 ) -> None:
     run = tmp_path / "run"
     run.mkdir()
-    (run / "model_final.pt").write_bytes(b"checkpoint")
-    (run / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(build_run_config(CARTPOLE_TASK_ID))),
-        encoding="utf-8",
-    )
+    _write_checkpoint(run / "model_final.pt")
+    write_resolved_config(run, to_jsonable(build_run_config(CARTPOLE_TASK_ID)))
     calls: list[ResolvedRunConfig] = []
 
     def capture(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
@@ -144,7 +183,7 @@ def test_missing_run_config_fails_before_session_with_recovery_guidance(
 ) -> None:
     run = tmp_path / "old-run"
     run.mkdir()
-    (run / "model_final.pt").write_bytes(b"checkpoint")
+    _write_checkpoint(run / "model_final.pt")
     calls: list[ResolvedRunConfig] = []
 
     def capture(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
@@ -163,6 +202,29 @@ def test_missing_run_config_fails_before_session_with_recovery_guidance(
 
 
 @pytest.mark.parametrize("command", ["play", "export"])
+def test_checkpoint_inside_historical_json_run_gets_migration_guidance(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    run = tmp_path / "old-run"
+    run.mkdir()
+    checkpoint = run / "model_final.pt"
+    _write_checkpoint(checkpoint)
+    (run / "resolved_config.json").write_text(
+        json.dumps(to_jsonable(build_run_config(CARTPOLE_TASK_ID))),
+        encoding="utf-8",
+    )
+
+    result = (play.main if command == "play" else export.main)(
+        ["--checkpoint", str(checkpoint), "--session.mode", "attach"]
+    )
+
+    assert result == 1
+    assert "run_migration" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("command", ["play", "export"])
 def test_missing_saved_session_protocol_fails_before_session(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -171,11 +233,10 @@ def test_missing_saved_session_protocol_fails_before_session(
 ) -> None:
     run = tmp_path / "run"
     run.mkdir()
-    (run / "model_final.pt").write_bytes(b"checkpoint")
+    _write_checkpoint(run / "model_final.pt")
     payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
     del payload["session"]["protocol"]
-    snapshot = run / "resolved_config.json"
-    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    snapshot = write_resolved_config(run, payload)
     before = snapshot.read_bytes()
 
     def unexpected_session_open(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
@@ -231,11 +292,10 @@ def test_checkpoint_rejects_task_from_unrelated_ancestor_snapshot(
     run = tmp_path / "unrelated-run"
     checkpoint = run / "rsl_rl" / "model_10.pt"
     checkpoint.parent.mkdir(parents=True)
-    checkpoint.write_bytes(b"checkpoint")
+    _write_checkpoint(checkpoint)
     checkpoint_before = checkpoint.read_bytes()
     payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
-    snapshot = run / "resolved_config.json"
-    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    snapshot = write_resolved_config(run, payload)
     snapshot_before = snapshot.read_bytes()
 
     def unexpected_session_open(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
@@ -269,11 +329,8 @@ def test_semantic_override_cannot_change_a_saved_run(
 ) -> None:
     run = tmp_path / "run"
     run.mkdir()
-    (run / "model_final.pt").write_bytes(b"checkpoint")
-    (run / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(build_run_config(CARTPOLE_TASK_ID))),
-        encoding="utf-8",
-    )
+    _write_checkpoint(run / "model_final.pt")
+    write_resolved_config(run, to_jsonable(build_run_config(CARTPOLE_TASK_ID)))
 
     with pytest.raises(SystemExit):
         (play.main if command == "play" else export.main)(
@@ -288,11 +345,8 @@ def test_saved_run_commands_reject_multiple_slots(
 ) -> None:
     run = tmp_path / "run"
     run.mkdir()
-    (run / "model_final.pt").write_bytes(b"checkpoint")
-    (run / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(build_run_config(CARTPOLE_TASK_ID))),
-        encoding="utf-8",
-    )
+    _write_checkpoint(run / "model_final.pt")
+    write_resolved_config(run, to_jsonable(build_run_config(CARTPOLE_TASK_ID)))
 
     with pytest.raises(SystemExit):
         (play.main if command == "play" else export.main)(

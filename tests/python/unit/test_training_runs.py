@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+import yaml
 
 from uerl import (
     DirectTaskConfig,
@@ -95,6 +96,20 @@ def test_latest_selects_the_newest_task_run(tmp_path: Path) -> None:
     assert resolve_resume_checkpoint("latest", task_id=task_id, root=tmp_path) == newer / "rsl_rl" / "model_100.pt"
     listed = list_runs(task_id=task_id, root=tmp_path)
     assert [item.directory for item in listed] == [newer, older]
+
+
+def test_run_discovery_reads_task_identity_from_yaml_manifest(tmp_path: Path) -> None:
+    task_id = "example.external-cartpole-v0"
+    run_directory = tmp_path / "misc" / "20261005-generated"
+    run_directory.mkdir(parents=True)
+    (run_directory / "manifest.yaml").write_text(
+        yaml.safe_dump({"resolved_config": {"task_id": task_id}}, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    runs = list_runs(task_id=task_id, root=tmp_path)
+    assert len(runs) == 1
+    assert runs[0].task_id == task_id
 
 
 def test_record_command_writes_one_replayable_line(tmp_path: Path) -> None:

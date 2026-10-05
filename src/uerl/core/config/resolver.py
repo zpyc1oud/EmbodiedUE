@@ -25,6 +25,7 @@ from .models import (
     SessionConfig,
     WorkerConfig,
 )
+from .snapshot import decode_worker_args
 
 
 class ConfigRegistration(Protocol):
@@ -242,6 +243,11 @@ def _coerce_value(annotation: Any, raw_value: str, path: str) -> Any:
     if annotation is str:
         return raw_value
     if origin is tuple:
+        if path == "session.worker_args":
+            try:
+                return tuple(decode_worker_args(raw_value, path=path))
+            except ConfigError as exc:
+                raise ConfigError("Expected a YAML list of strings", code="INVALID_TYPE", path=path) from exc
         try:
             value = json.loads(raw_value)
         except json.JSONDecodeError as exc:

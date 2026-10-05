@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import NoReturn
 
 import pytest
+import torch
 
+from tests.python.run_config_files import write_resolved_config
 from uerl.cli import export, play, train
 from uerl.core.config import ResolvedRunConfig
 from uerl.runtime.session import UERLSession
@@ -16,13 +17,17 @@ from uerl.tasks.cartpole import CARTPOLE_TASK_ID
 COMMANDS = {"train": train.main, "play": play.main, "export": export.main}
 
 
+def _write_checkpoint(path: Path) -> None:
+    torch.save({"infos": {}}, path)
+
+
 class SessionBoundaryReached(Exception):
     pass
 
 
 def command_args(command: str, root: Path) -> list[str]:
     checkpoint = root / "model.pt"
-    checkpoint.write_bytes(b"not loaded before Session.open")
+    _write_checkpoint(checkpoint)
     args = ["--task", CARTPOLE_TASK_ID, "--device", "cpu", "--session.port", "44555"]
     if command == "train":
         return args + ["--run-dir", str(root / "output"), "--num-envs", "1"]
@@ -33,7 +38,7 @@ def command_args(command: str, root: Path) -> list[str]:
     payload["worker"]["decimation"] = [3, 3]
     payload["task"]["rew_scale_alive"] = 0.75
     payload["runner"]["parameters"]["hidden_dims"] = [64, 64]
-    (root / "resolved_config.json").write_text(json.dumps(payload), encoding="utf-8")
+    write_resolved_config(root, payload)
     args += ["--checkpoint", str(checkpoint)]
     if command == "export":
         args += ["--output", str(root / "output.uerlpol2")]
@@ -132,7 +137,7 @@ def test_dotted_launch_overrides_still_win_over_profile_and_flags(
         "--session.worker_executable",
         "dotted.exe",
         "--session.worker_args",
-        '["dotted.uproject", "-custom"]',
+        "['dotted.uproject', '-custom']",
     ]
     with pytest.raises(SessionBoundaryReached):
         COMMANDS[command](args)
@@ -215,22 +220,20 @@ def test_machine_paths_do_not_replace_saved_task_semantics(
     command: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    import json
 
     from uerl.core.config.canonical import to_jsonable
     from uerl.training import build_run_config
 
     source = tmp_path / "saved-run"
     source.mkdir()
-    (source / "model_final.pt").write_bytes(b"not loaded before Session.open")
+    _write_checkpoint(source / "model_final.pt")
     payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
     payload["worker"]["decimation"] = [3, 3]
     payload["task"]["rew_scale_alive"] = 0.75
     payload["runner"]["parameters"]["hidden_dims"] = [64, 64]
     payload["session"]["worker_executable"] = "old-machine.exe"
     payload["session"]["worker_args"] = ["old-machine.uproject"]
-    snapshot = source / "resolved_config.json"
-    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    snapshot = write_resolved_config(source, payload)
     before = snapshot.read_bytes()
     profile = tmp_path / "host.toml"
     profile.write_text("ue_executable = 'new-machine.exe'\nproject = 'new-machine.uproject'", encoding="utf-8")

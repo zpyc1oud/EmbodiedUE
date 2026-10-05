@@ -74,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from ..application.continuation import Continuation
     from ..core.config import PresentationMode
+    from ..core.config.snapshot import decode_worker_args, encode_worker_args
     from ..training import (
         build_launch_overrides,
         build_run_config,
@@ -125,12 +126,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         explicit_port = direct_overrides.get("session.port")
         if explicit_port is not None:
-            worker_args = json.loads(launch_overrides["session.worker_args"])
-            launch_overrides["session.worker_args"] = json.dumps(
-                [
-                    f"-uerlport={explicit_port}" if item.startswith("-uerlport=") else item
-                    for item in worker_args
-                ]
+            worker_args = decode_worker_args(launch_overrides["session.worker_args"])
+            launch_overrides["session.worker_args"] = encode_worker_args(
+                [f"-uerlport={explicit_port}" if item.startswith("-uerlport=") else item for item in worker_args]
             )
     generated_output = False
     if args.run_dir is not None:
@@ -150,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if continuation is not None:
         continuation.validate_output(config.logging.run_directory)
-        print(f"[RUN] config={continuation.directory / 'resolved_config.json'} intent=continuation")
+        print(f"[RUN] config={continuation.source.source_path} intent=continuation")
         report_overrides = dict(direct_overrides)
         if generated_output:
             del report_overrides["logging.run_directory"]

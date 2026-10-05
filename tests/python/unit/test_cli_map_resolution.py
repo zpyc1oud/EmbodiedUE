@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import torch
 
 from uerl import training
 from uerl.cli import play, train
@@ -100,11 +100,10 @@ def test_play_map_flag_sets_expected_map_in_attach_mode(
     run = tmp_path / "run"
     run.mkdir()
     checkpoint = run / "model.pt"
-    checkpoint.write_bytes(b"checkpoint")
-    (run / "resolved_config.json").write_text(
-        json.dumps(to_jsonable(build_run_config(PHANTOMX_TERRAIN_TASK_ID))),
-        encoding="utf-8",
-    )
+    torch.save({"infos": {}}, checkpoint)
+    from tests.python.run_config_files import write_resolved_config
+
+    write_resolved_config(run, to_jsonable(build_run_config(PHANTOMX_TERRAIN_TASK_ID)))
 
     result = play.main(
         [
