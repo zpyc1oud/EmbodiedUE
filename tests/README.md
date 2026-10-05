@@ -78,15 +78,21 @@ uv run python scripts/run_e2e.py --suite ue -k "u5_007 or u5_008 or u5_009 or u5
 
 For a custom UE installation, set `$env:UE_ROOT` (or `$env:UE_58_ROOT`) before running the full suite or E2E scripts. These runners use the repository host project.
 
-To invoke UE Automation directly:
+To invoke UE Automation directly, run the complete core and extended filters. The groups use separate editor processes; the terrain group starts fresh to avoid order-dependent preview-scene physics. `PIEAttach` runs in `scripts/run_e2e.py --suite all`, which supplies its required port and Python client.
 
 ```powershell
-& '<UE-root>/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' `
-  engine/UERLHost.uproject /Engine/Maps/Entry `
-  '-ExecCmds=Automation RunTests UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component;Quit' `
-  -unattended -nullrhi
+$automationGroups = @(
+  'UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.VariableDt+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component',
+  'UERL.Integration.Robot.GenericDrive+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+UERL.Integration.Robot.TopologyReflector+UERL.Integration.Worker.EnvironmentPool+UERL.Integration.Worker.Terrain'
+)
+foreach ($group in $automationGroups) {
+  & '<UE-root>/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' `
+    engine/UERLHost.uproject /Engine/Maps/Entry `
+    "-ExecCmds=Automation RunTests $group;Quit" `
+    -unattended -nullrhi -nosound -NoSplash
+  if ($LASTEXITCODE -ne 0) { throw "UE Automation failed: $group" }
+}
 ```
-
 ## Engine behavior covered
 
 Automation/E2E cases exercise transport layouts, seed and safety behavior, binding, physics gates, variable-decimation Step contracts, topology reflection, kinematics, window-end contact, 35-point terrain observations, asset import/reimport, policy plans/NNE, and live component control. Integration cases cover deployment contact/ground queries, cached hits and errors, completed solver clocks and pause, command latching, Start/Stop, and collision isolation.

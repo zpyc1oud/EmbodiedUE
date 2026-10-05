@@ -8,13 +8,47 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# PIEAttach is run by the E2E suite, which supplies its required loopback port
+# and Python client. Keep the remaining Automation filters complete for the
+# currently registered Unit and Integration families. Run the added terrain
+# group in a fresh process so preview-scene physics is independent of prior
+# Automation state.
+UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
+    (
+        "unit and core integration",
+        "UERL.Unit+"
+        "UERL.Integration.Worker.SlotCollision+"
+        "UERL.Integration.Worker.VariableDt+"
+        "UERL.Integration.Worker.SharedWorldCollision+"
+        "UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+"
+        "UERL.Integration.Policy.Contact+"
+        "UERL.Integration.Policy.Ground+"
+        "UERL.Integration.Policy.Clock+"
+        "UERL.Integration.Policy.Controller+"
+        "UERL.Integration.Policy.Component",
+        135,
+    ),
+    (
+        "additional robot, environment-pool, and terrain integration",
+        "UERL.Integration.Robot.GenericDrive+"
+        "UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+"
+        "UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+"
+        "UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+"
+        "UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+"
+        "UERL.Integration.Robot.TopologyReflector+"
+        "UERL.Integration.Worker.EnvironmentPool+"
+        "UERL.Integration.Worker.Terrain",
+        13,
+    ),
+)
+
 
 def _run(command: list[str]) -> int:
     return subprocess.run(command, cwd=REPO_ROOT, check=False).returncode
 
 
 def _run_ue_automation() -> int:
-    """Run the compiled Unreal Automation gates before external E2E."""
+    """Run every Unit and Integration Automation group before external E2E."""
     sys.path.insert(0, str(REPO_ROOT))
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
@@ -26,38 +60,41 @@ def _run_ue_automation() -> int:
             print(f"  {path}", file=sys.stderr)
         return 2
 
-    status = _run([
-        UE_CMD,
-        UPROJECT,
-        "/Engine/Maps/Entry",
-        (
-			"-ExecCmds=Automation RunTests "
-            "UERL.Unit+"
-            "UERL.Integration.Worker.SlotCollision+"
-            "UERL.Integration.Worker.VariableDt+"
-            "UERL.Integration.Worker.SharedWorldCollision+"
-            "UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+"
-            "UERL.Integration.Policy.Contact+"
-            "UERL.Integration.Policy.Ground+"
-            "UERL.Integration.Policy.Clock+"
-            "UERL.Integration.Policy.Controller+"
-            "UERL.Integration.Policy.Component;Quit"
-        ),
-        "-unattended",
-        "-nullrhi",
-        "-nosound",
-        "-NoSplash",
-    ])
-    if status:
-        return status
-
     log_path = REPO_ROOT / "engine" / "Saved" / "Logs" / "UERLHost.log"
-    if not log_path.is_file():
-        print(f"UE Automation log is missing: {log_path}", file=sys.stderr)
-        return 2
-    if "**** TEST COMPLETE. EXIT CODE: 0 ****" not in log_path.read_text(encoding="utf-8", errors="replace"):
-        print("UE Automation did not report a successful test completion.", file=sys.stderr)
-        return 1
+    for group_name, filters, minimum_completed in UE_AUTOMATION_GROUPS:
+        print(f"Running UE Automation group: {group_name}", flush=True)
+        status = _run([
+            UE_CMD,
+            UPROJECT,
+            "/Engine/Maps/Entry",
+            f"-ExecCmds=Automation RunTests {filters};Quit",
+            "-unattended",
+            "-nullrhi",
+            "-nosound",
+            "-NoSplash",
+        ])
+        if status:
+            return status
+
+        if not log_path.is_file():
+            print(f"UE Automation log is missing: {log_path}", file=sys.stderr)
+            return 2
+        log_text = log_path.read_text(encoding="utf-8", errors="replace")
+        if "**** TEST COMPLETE. EXIT CODE: 0 ****" not in log_text:
+            print(
+                f"UE Automation group '{group_name}' did not report a successful completion.",
+                file=sys.stderr,
+            )
+            return 1
+        completed = log_text.count("Test Completed. Result={")
+        if completed < minimum_completed:
+            print(
+                f"UE Automation group '{group_name}' selected only {completed} tests; "
+                f"expected at least {minimum_completed}.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"UE Automation group '{group_name}': {completed} tests completed.", flush=True)
     return 0
 
 
