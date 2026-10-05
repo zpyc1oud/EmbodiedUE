@@ -48,6 +48,7 @@ The deployment controller does not need a Python training process, Worker sessio
 | Path under `src/uerl/` | Responsibility |
 |---|---|
 | `cli/` | Task inspection, training, playback, recording, export, deployment, and scaffolding |
+| `application/` | Shared registered-default and saved-Run configuration resolution |
 | `core/config/` | Typed configuration, overrides, topology/semantics merge, identities, manifests |
 | `core/codec/` | Headers, strict JSON, binary layouts, transport, protocol state |
 | `core/mdp/` | Term declarations, plan compilation/execution, six managers, operators |
@@ -55,7 +56,7 @@ The deployment controller does not need a Python training process, Worker sessio
 | `runtime/session/` | Worker launch/attach/stop, runtime projection, tensor/segment conversion |
 | `assets/robots/` | CartPole and PhantomX declarations, with derivation and regex pose selection |
 | `tasks/` | Explicit task registry and task-specific factories |
-| `training/` | Run configuration, PPO, evaluation, vector environment, checkpoint state, export |
+| `training/` | Run orchestration, PPO, evaluation, vector environment, checkpoint state, export |
 | `policy/` | Artifact reading/validation and reference inference for parity |
 | `presentation/` | UE frame consumption and video encoding |
 

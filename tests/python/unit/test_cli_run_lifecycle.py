@@ -45,9 +45,18 @@ def test_train_resume_resolves_source_and_writes_new_run_command(
             str(output),
             "--resume",
             str(source),
+            "--worker.decimation",
+            "[3,3]",
+            "--task.rew_scale_alive",
+            "0.75",
+            "--max-iterations",
+            "7",
         ]
     ) == 0
 
     assert captured[0].logging.run_directory == output
     assert captured[0].runner.checkpoint == source_checkpoint
+    assert captured[0].worker.decimation == (3, 3)
+    assert captured[0].task.rew_scale_alive == 0.75
+    assert captured[0].runner.max_iterations == 7
     assert (output / "command.txt").is_file()

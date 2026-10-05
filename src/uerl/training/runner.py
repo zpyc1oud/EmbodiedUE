@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from ..core.config import PresentationMode, ResolvedRunConfig, RunConfigResolver
+from ..application.run_config import resolve_run_config
+from ..core.config import PresentationMode, ResolvedRunConfig
 from ..core.config.robot import RobotSpec
 from ..core.direct.curriculum import CurriculumManager
 from ..core.direct.env import UERLDirectEnv
@@ -184,7 +185,7 @@ def build_run_config(
 ) -> ResolvedRunConfig:
     """Resolve one registered Task through the shared Config boundary."""
 
-    return RunConfigResolver(create_default_registry()).resolve(task_id, overrides)
+    return resolve_run_config(task_id, None, overrides or {}).config
 
 
 def build_rsl_rl_train_config(config: ResolvedRunConfig) -> dict[str, Any]:

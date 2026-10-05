@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from uerl.cli.run_config import resolve_run_config
+from uerl.application.run_config import resolve_run_config
 from uerl.core.config.canonical import to_jsonable
 from uerl.errors import ConfigError
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID
@@ -64,3 +64,70 @@ def test_resolve_run_config_rejects_a_different_task(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="not 'UERL-PhantomX-Walk-v0'"):
         resolve_run_config("UERL-PhantomX-Walk-v0", run, {})
+
+
+@pytest.mark.parametrize("explicit_map", [None, "/Game/Maps/Override"])
+def test_saved_map_is_restored_without_reusing_training_endpoint(
+    tmp_path: Path, explicit_map: str | None,
+) -> None:
+    config = build_run_config(CARTPOLE_TASK_ID)
+    payload = to_jsonable(config)
+    payload["session"]["map_path"] = "/Game/Maps/Recorded"
+    payload["session"]["port"] = 44000
+    payload["logging"]["run_directory"] = "training-evidence"
+    run = _write_run(tmp_path, payload)
+    before = (run / "resolved_config.json").read_bytes()
+    overrides = {} if explicit_map is None else {"session.map_path": explicit_map}
+
+    resolved = resolve_run_config(CARTPOLE_TASK_ID, run, overrides)
+
+    assert resolved.config.session.map_path == (explicit_map or "/Game/Maps/Recorded")
+    assert resolved.config.session.port == config.session.port
+    assert resolved.config.logging.run_directory == config.logging.run_directory
+    assert (run / "resolved_config.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("missing_reward", [False, True])
+def test_saved_fields_survive_changed_defaults_but_missing_fields_use_current_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing_reward: bool,
+) -> None:
+    from dataclasses import replace
+
+    from uerl.tasks.cartpole import registration
+    from uerl.tasks.cartpole.config import load_cartpole_training_config
+
+    original = load_cartpole_training_config()
+    payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
+    payload["task"]["rew_scale_alive"] = 0.75
+    payload["worker"]["decimation"] = [3, 3]
+    payload["runner"]["parameters"]["hidden_dims"] = [64, 64]
+    if missing_reward:
+        del payload["task"]["rew_scale_alive"]
+    run = _write_run(tmp_path, payload)
+    changed = replace(original, task=replace(original.task, rew_scale_alive=9.0))
+    monkeypatch.setattr(registration, "load_cartpole_training_config", lambda: changed)
+
+    resolved = resolve_run_config(CARTPOLE_TASK_ID, run, {})
+
+    assert to_jsonable(resolved.config.task)["rew_scale_alive"] == (9.0 if missing_reward else 0.75)
+    assert resolved.config.worker.decimation == (3, 3)
+    assert resolved.config.runner.parameters["hidden_dims"] == (64, 64)
+
+
+@pytest.mark.parametrize("case", ["identity", "unknown_field", "wrong_type", "missing_partition"])
+def test_invalid_saved_configuration_is_rejected(tmp_path: Path, case: str) -> None:
+    payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
+    if case == "identity":
+        del payload["normalized_hash"]
+    elif case == "unknown_field":
+        payload["task"]["unknown_reward"] = 1.0
+    elif case == "wrong_type":
+        payload["worker"]["slot_count"] = "eight"
+    else:
+        del payload["worker"]
+    run = _write_run(tmp_path, payload)
+
+    with pytest.raises(ConfigError) as error:
+        resolve_run_config(CARTPOLE_TASK_ID, run, {})
+
+    assert error.value.code == "INVALID_RUN_CONFIG"

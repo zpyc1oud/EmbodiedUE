@@ -32,6 +32,11 @@ Default pytest collection excludes real UE E2E. Python coverage includes task ma
 
 Parity cases compare both implementations against reviewed expected values. Deployment cases compare Python reference execution and UE plan/NNE/action execution with their specified tolerances, including `atol=rtol=2e-5` for deployment inference cases.
 
+Saved-run configuration tests exercise the application resolver and the play/export
+CLI through the Session-open boundary (`python/integration/test_saved_run_cli_config.py`).
+They check recorded settings, map precedence, launch arguments, and snapshot preservation
+without starting a Worker. They do not test checkpoint loading or physical behavior.
+
 ## Windows and UE checks
 
 These commands require the UE 5.8 Windows host and a built `UERLHostEditor`. They have not been rerun in the Linux documentation-editing environment. The E2E support runner currently uses the default Epic `UE_5.8` executable path in `tests/e2e/support/worker_runner.py`; custom installations need that test setup reviewed separately from product CLI overrides.
