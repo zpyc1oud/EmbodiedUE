@@ -388,10 +388,12 @@ def run_evaluation(
     *,
     checkpoint: Path,
     steps: int,
+    trace_path: Path | None = None,
     terrain_level: int | None = None,
     evaluator_factory: Callable[[float], TaskEvaluator | None] | None = None,
     restore_curriculum: bool = True,
     play_controller: str = "task",
+    fixed_velocity: tuple[float, float, float] | None = None,
 ) -> object:
     """Run a checkpoint deterministically and aggregate fixed-horizon metrics.
 
@@ -402,45 +404,83 @@ def run_evaluation(
     import torch
     if steps < 1:
         raise ValueError("steps must be positive")
+    if fixed_velocity is not None and play_controller != "fixed":
+        raise ValueError("fixed_velocity requires play_controller='fixed'")
     if not checkpoint.is_file():
         raise FileNotFoundError(checkpoint)
     torch.manual_seed(config.worker.run_seed)
 
-    registry = create_default_registry()
-    task = registry.create_task(config.task_id, config.task)
-    task.align_batch(config.worker.slot_count)
-    player_controller = None
-    if play_controller != "task":
-        from ..tasks.controllers import PlayerVelocityController, create_play_controller
+    trace_recorder = None
+    train_config = build_rsl_rl_train_config(config)
+    if trace_path is not None:
+        if config.worker.slot_count != 1:
+            raise ValueError("policy step tracing currently supports exactly one Slot")
+        from .policy_trace import TaskPolicyTraceRecorder
 
-        replacement = create_play_controller(play_controller, task, config.worker.slot_count)
-        if replacement is not None:
-            task.use_command_source(replacement)
-            if isinstance(replacement, PlayerVelocityController):
-                player_controller = replacement
-    curriculum_manager = registry.create_curriculum(
-        config.task_id,
-        config.task,
-        num_envs=config.worker.slot_count,
-        device=ENVIRONMENT_DEVICE,
-        run_seed=config.worker.run_seed,
-    )
-    if terrain_level is None:
-        curriculum_manager = _attach_terrain_curriculum(
-            config,
-            task,
-            curriculum_manager,
+        actor_observation_groups = tuple(train_config["obs_groups"]["actor"])
+        trace_recorder = TaskPolicyTraceRecorder(
+            trace_path,
+            source={
+                "task_id": config.task_id,
+                "robot_id": config.worker.robot_id,
+                "run_directory": config.logging.run_directory,
+                "checkpoint": checkpoint,
+                "map_package": config.session.map_path,
+                "seed": config.worker.run_seed,
+                "controller": play_controller,
+                "observation_normalization": bool(
+                    config.runner.parameters.get("obs_normalization", False)
+                ),
+            },
+            clock={
+                "physics_dt_s": config.worker.physics_dt,
+                "decimation_range": list(config.worker.decimation),
+            },
+            actor_observation_groups=actor_observation_groups,
         )
-    else:
-        # A requested playback tier is fixed for this evaluation.  A training
-        # checkpoint may also contain adaptive command/terrain state; restoring
-        # it into the fixed-tier manager would either change the requested tier
-        # or fail when the terrain term is intentionally absent.
-        restore_curriculum = False
-    raw_session = UERLSession.open(config, process_controller=WorkerProcessController())
+
+    raw_session: UERLSession | None = None
     direct_env: UERLDirectEnv | None = None
     vec_env: UERLVecEnvWrapper | None = None
+    evaluation_complete = False
     try:
+        registry = create_default_registry()
+        task = registry.create_task(config.task_id, config.task)
+        task.align_batch(config.worker.slot_count)
+        player_controller = None
+        if play_controller != "task":
+            from ..tasks.controllers import PlayerVelocityController, create_play_controller
+
+            replacement = create_play_controller(
+                play_controller,
+                task,
+                config.worker.slot_count,
+                fixed_velocity=fixed_velocity,
+            )
+            if replacement is not None:
+                task.use_command_source(replacement)
+                if isinstance(replacement, PlayerVelocityController):
+                    player_controller = replacement
+        curriculum_manager = registry.create_curriculum(
+            config.task_id,
+            config.task,
+            num_envs=config.worker.slot_count,
+            device=ENVIRONMENT_DEVICE,
+            run_seed=config.worker.run_seed,
+        )
+        if terrain_level is None:
+            curriculum_manager = _attach_terrain_curriculum(
+                config,
+                task,
+                curriculum_manager,
+            )
+        else:
+            # A requested playback tier is fixed for this evaluation.  A training
+            # checkpoint may also contain adaptive command/terrain state; restoring
+            # it into the fixed-tier manager would either change the requested tier
+            # or fail when the terrain term is intentionally absent.
+            restore_curriculum = False
+        raw_session = UERLSession.open(config, process_controller=WorkerProcessController())
         direct_env = UERLDirectEnv(
             UERLSessionAdapter(raw_session, device=ENVIRONMENT_DEVICE),
             task,
@@ -448,11 +488,12 @@ def run_evaluation(
             device=ENVIRONMENT_DEVICE,
             curriculum_manager=curriculum_manager,
             initial_terrain_level=terrain_level,
+            step_trace_callback=None if trace_recorder is None else trace_recorder.record_step,
         )
         vec_env = UERLVecEnvWrapper(direct_env, cfg=config)
         runner = UERLOnPolicyRunner(
             vec_env,
-            build_rsl_rl_train_config(config),
+            train_config,
             log_dir=None,
             device=config.runner.device,
         )
@@ -463,6 +504,10 @@ def run_evaluation(
                 str(checkpoint),
                 map_location=config.runner.device,
                 restore_curriculum=False,
+            )
+        if trace_recorder is not None:
+            trace_recorder.set_policy_fingerprint(
+                _export_policy_onnx_sha1(task=task, runner=runner, config=config)
             )
         policy = runner.get_inference_policy(device=config.runner.device)
         observations = vec_env.get_observations().to(config.runner.device)
@@ -497,13 +542,21 @@ def run_evaluation(
                 completed_episodes += int(dones.sum().item())
                 reward_sum += float(rewards.mean().item())
                 episode_length_sum += int(extras["terminal_episode_length"][dones].sum().item())
+        evaluation_complete = True
     finally:
-        if vec_env is not None:
-            vec_env.close("evaluation_complete")
-        elif direct_env is not None:
-            direct_env.close("evaluation_setup_failed")
-        else:
-            raw_session.close("evaluation_setup_failed")
+        try:
+            if vec_env is not None:
+                vec_env.close("evaluation_complete")
+            elif direct_env is not None:
+                direct_env.close("evaluation_setup_failed")
+            elif raw_session is not None:
+                raw_session.close("evaluation_setup_failed")
+        except BaseException:
+            evaluation_complete = False
+            raise
+        finally:
+            if trace_recorder is not None:
+                trace_recorder.finish(complete=evaluation_complete)
 
     summary = EvaluationSummary(
         task_id=config.task_id,
@@ -514,6 +567,42 @@ def run_evaluation(
         mean_reward=reward_sum / steps,
     )
     return evaluator.finish(summary) if evaluator is not None else summary
+
+
+def _export_policy_onnx_sha1(
+    *,
+    task: DirectTask,
+    runner: UERLOnPolicyRunner,
+    config: ResolvedRunConfig,
+) -> str:
+    """Fingerprint the exact ONNX payload that the UE artifact must contain."""
+
+    import hashlib
+    import tempfile
+
+    from ..core.config.manifest import capture_git_identity
+    from ..policy.artifact import ArtifactMetadata, ArtifactTiming
+    from .export import export_policy, robot_runtime_from_config
+
+    with tempfile.TemporaryDirectory(prefix="uerl-trace-artifact-") as temporary_directory:
+        artifact = export_policy(
+            task=task,
+            runner=runner,
+            output=Path(temporary_directory) / "trace-policy.uerlpol2",
+            metadata=ArtifactMetadata(
+                run_hash=config.normalized_hash,
+                git_identity=dict(capture_git_identity()),
+            ),
+            robot_runtime=robot_runtime_from_config(config),
+            timing=ArtifactTiming(
+                config.worker.physics_dt,
+                config.worker.decimation[0],
+                config.worker.decimation[1],
+            ),
+            task_id=config.task_id,
+            robot_id=config.worker.robot_id,
+        )
+    return hashlib.sha1(artifact.onnx).hexdigest()
 
 
 def _task_name(task_id: str) -> str:

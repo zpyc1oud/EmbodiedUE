@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import sys
-from collections.abc import Callable, Mapping, Set
+from collections.abc import Callable, Mapping, Sequence, Set
 
 import torch
 
@@ -22,9 +23,9 @@ _KEY_E = 0x45
 
 
 def register_play_controller(name: str, factory: ControllerFactory) -> None:
-    """Register a named play controller. ``task`` and ``player`` are built in."""
+    """Register a named play controller beside the built-in publishers."""
 
-    if not name or name in {"task", "player"}:
+    if not name or name in {"task", "player", "fixed"}:
         raise ConfigError(
             f"play controller name {name!r} is reserved",
             code="CONFIG_OUT_OF_RANGE",
@@ -40,10 +41,16 @@ def register_play_controller(name: str, factory: ControllerFactory) -> None:
 
 
 def known_play_controllers() -> tuple[str, ...]:
-    return ("task", "player", *tuple(_FACTORIES))
+    return ("task", "player", "fixed", *tuple(_FACTORIES))
 
 
-def create_play_controller(name: str, task: DirectTask, batch_size: int) -> CommandSource | None:
+def create_play_controller(
+    name: str,
+    task: DirectTask,
+    batch_size: int,
+    *,
+    fixed_velocity: Sequence[float] | None = None,
+) -> CommandSource | None:
     """Return a replacement command source, or None to keep the task's own."""
 
     if name == "task":
@@ -68,6 +75,26 @@ def create_play_controller(name: str, task: DirectTask, batch_size: int) -> Comm
             max_yaw_rate=float(config.max_yaw_rate),
             batch_size=batch_size,
         )
+    if name == "fixed":
+        if task.command_channels().get("velocity") != 3:
+            raise ConfigError(
+                "fixed playback requires a velocity command channel of width 3",
+                code="CONFIG_OUT_OF_RANGE",
+                path="controller",
+            )
+        if fixed_velocity is None or len(fixed_velocity) != 3:
+            raise ConfigError(
+                "fixed playback requires exactly three --fixed-velocity values",
+                code="CONFIG_MISSING_FIELD",
+                path="fixed_velocity",
+            )
+        if not all(math.isfinite(float(value)) for value in fixed_velocity):
+            raise ConfigError(
+                "fixed velocity values must be finite",
+                code="CONFIG_OUT_OF_RANGE",
+                path="fixed_velocity",
+            )
+        return FixedVelocityController(values=fixed_velocity, batch_size=batch_size)
     factory = _FACTORIES.get(name)
     if factory is None:
         raise ConfigError(
@@ -161,3 +188,27 @@ class PlayerVelocityController:
 
         idle = self._velocity.eq(0).all(dim=1).to(device=actions.device)
         return actions.masked_fill(idle.unsqueeze(1), 0.0)
+
+
+class FixedVelocityController:
+    """Publish one explicit velocity command for every step and reset."""
+
+    def __init__(self, *, values: Sequence[float], batch_size: int) -> None:
+        self._velocity = (
+            torch.tensor(tuple(float(value) for value in values), dtype=torch.float32)
+            .reshape(1, 3)
+            .expand(batch_size, 3)
+            .clone()
+        )
+
+    def channels(self) -> Mapping[str, int]:
+        return {"velocity": 3}
+
+    def update(self, raw_state: Mapping[str, torch.Tensor]) -> None:
+        del raw_state
+
+    def reset(self, reset_mask: torch.Tensor, post_reset_state: Mapping[str, torch.Tensor]) -> None:
+        del reset_mask, post_reset_state
+
+    def current(self) -> Mapping[str, torch.Tensor]:
+        return {"velocity": self._velocity}

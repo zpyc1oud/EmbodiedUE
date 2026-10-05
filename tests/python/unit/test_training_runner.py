@@ -549,6 +549,67 @@ def test_run_evaluation_loads_checkpoint_and_aggregates_completed_episodes(
     vec_env.close.assert_called_once_with("evaluation_complete")
 
 
+def test_run_evaluation_marks_task_trace_incomplete_if_session_open_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Persist an incomplete trace when evaluation cannot acquire its Worker Session."""
+
+    import yaml
+
+    import uerl.training.runner as runner_module
+
+    checkpoint = tmp_path / "model.pt"
+    checkpoint.write_bytes(b"checkpoint")
+    trace_path = tmp_path / "run" / "traces" / "task.yaml"
+    registry = Mock()
+    registry.create_task.return_value = Mock()
+    monkeypatch.setattr(runner_module, "create_default_registry", lambda: registry)
+    monkeypatch.setattr(
+        cast(Any, runner_module).UERLSession,
+        "open",
+        Mock(side_effect=RuntimeError("Worker unavailable")),
+    )
+
+    config = _config(tmp_path / "run")
+    config = replace(config, worker=replace(config.worker, slot_count=1))
+    with pytest.raises(RuntimeError, match="Worker unavailable"):
+        run_evaluation(config, checkpoint=checkpoint, steps=1, trace_path=trace_path)
+
+    payload = yaml.safe_load(trace_path.read_text(encoding="utf-8"))
+    assert payload["status"] == "incomplete"
+    assert payload["records"] == []
+
+
+def test_run_evaluation_marks_task_trace_incomplete_if_task_setup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Persist an incomplete trace when Task setup fails before opening UE."""
+
+    import yaml
+
+    import uerl.training.runner as runner_module
+
+    checkpoint = tmp_path / "model.pt"
+    checkpoint.write_bytes(b"checkpoint")
+    trace_path = tmp_path / "run" / "traces" / "task.yaml"
+    monkeypatch.setattr(
+        runner_module,
+        "create_default_registry",
+        Mock(side_effect=RuntimeError("Task registry unavailable")),
+    )
+    config = _config(tmp_path / "run")
+    config = replace(config, worker=replace(config.worker, slot_count=1))
+
+    with pytest.raises(RuntimeError, match="Task registry unavailable"):
+        run_evaluation(config, checkpoint=checkpoint, steps=1, trace_path=trace_path)
+
+    payload = yaml.safe_load(trace_path.read_text(encoding="utf-8"))
+    assert payload["status"] == "incomplete"
+    assert payload["records"] == []
+
+
 def test_dominant_frequency_ignores_constant_signal_and_finds_peak() -> None:
     """Keep gait frequency instrumentation tied to sampled physical time."""
 

@@ -649,6 +649,72 @@ def test_vc003_step_keeps_terminal_transition_and_sparse_reset() -> None:
     print("[VERIFY] VC-005: terminal_source=transition next_obs_source=post_reset")
 
 
+def test_policy_trace_distinguishes_input_transition_and_post_reset_state() -> None:
+    """A trace row keeps the action input, pre-reset result, and reset state distinct."""
+
+    session = _FakeDirectSession(
+        _state([1.5]),
+        _post_reset([0.1], episode_index=[1]),
+        initial_post_reset=_post_reset([0.4], episode_index=[0]),
+    )
+    config = _resolved_config(7, physics_dt=0.005, decimation=(2, 2))
+    config = replace(config, worker=replace(config.worker, slot_count=1))
+    captured: list[Mapping[str, object]] = []
+    env = UERLDirectEnv(
+        session,
+        _LifecycleTask(),
+        resolved_config=config,
+        step_trace_callback=captured.append,
+    )
+
+    observations, rewards, terminated, truncated, _info = env.step(torch.tensor([[0.7]]))
+
+    assert rewards.tolist() == [-2.0]
+    assert terminated.tolist() == [True]
+    assert truncated.tolist() == [False]
+    assert observations["policy"][0, 0].item() == pytest.approx(0.1)
+    assert len(captured) == 1
+    row = captured[0]
+    assert row["phase"] == "post_reset_input"
+    assert row["episode_index"] == 0
+    assert row["episode_step"] == 0
+    assert row["clocks"] == {
+        "physics_dt_s": 0.005,
+        "input_observation_dt_s": pytest.approx(0.01),
+        "step_decimation": 2,
+        "transition_dt_s": pytest.approx(0.01),
+        "input_episode_elapsed_s": 0.0,
+        "transition_episode_elapsed_s": pytest.approx(0.01),
+    }
+    input_row = row["input"]
+    assert isinstance(input_row, Mapping)
+    assert input_row["raw_state"]["state.value"] == pytest.approx([0.4])
+    assert input_row["state_valid"] is True
+    assert input_row["fault_code"] == 0
+    assert input_row["observation_groups"]["policy"] == pytest.approx([0.4])
+    assert input_row["previous_action"] == [0.0]
+    assert input_row["commands"] == {}
+    action_row = row["action"]
+    assert isinstance(action_row, Mapping)
+    assert action_row["policy_action"] == pytest.approx([0.7])
+    assert action_row["physical_commands"]["cmd.force"] == pytest.approx([0.7])
+    transition_row = row["transition"]
+    assert isinstance(transition_row, Mapping)
+    transition_state = transition_row["raw_state"]
+    assert isinstance(transition_state, Mapping)
+    transition_observations = transition_row["observation_groups"]
+    assert isinstance(transition_observations, Mapping)
+    assert transition_state["state.value"] == pytest.approx([1.5])
+    assert transition_observations["policy"] == pytest.approx([1.5])
+    assert transition_row["terminated"] is True
+    reset_row = row["reset"]
+    assert isinstance(reset_row, Mapping)
+    assert reset_row["raw_state"]["state.value"] == pytest.approx([0.1])
+    assert reset_row["observation_groups"]["policy"] == pytest.approx([0.1])
+    assert reset_row["episode_index"] == 1
+    env.close()
+
+
 def test_curriculum_manager_transforms_task_state_and_updates_before_sparse_reset() -> None:
     session = _FakeDirectSession(_state([0.6, 0.2]), _post_reset([0.1, 0.3]))
     term = _OffsetCurriculum()
