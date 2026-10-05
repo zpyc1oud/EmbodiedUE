@@ -86,6 +86,29 @@ namespace
 	{
 		return SpawnWorldStaticBox(World, FVector(0.0, 0.0, -50.0), FVector(10.0, 10.0, 0.5));
 	}
+
+	AActor* SpawnDynamicProbe(UWorld& World, const FVector& Location)
+	{
+		UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+		if (!Cube)
+		{
+			return nullptr;
+		}
+		AStaticMeshActor* Probe = World.SpawnActor<AStaticMeshActor>(
+			AStaticMeshActor::StaticClass(), Location, FRotator::ZeroRotator);
+		if (!Probe)
+		{
+			return nullptr;
+		}
+		UStaticMeshComponent* Component = Probe->GetStaticMeshComponent();
+		Component->SetStaticMesh(Cube);
+		Component->SetMobility(EComponentMobility::Movable);
+		Component->SetCollisionObjectType(ECC_PhysicsBody);
+		Component->SetCollisionResponseToAllChannels(ECR_Block);
+		Component->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Component->SetSimulatePhysics(true);
+		return Probe;
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -1364,6 +1387,91 @@ bool FUERLPolicyComponentClaimReleaseTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the restored actor can be claimed again"), Rig.Component->StartPolicy());
 	Rig.Component->StopPolicy();
 	AddInfo(TEXT("[VERIFY] AC_UE_REVIEW_032: release restores attachment, drive state and transform so the authored actor stays reusable"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLPolicyComponentHostFaultFallbackRecoveryTest,
+	"UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_016.HostFaultFallbackStopsOwnedRobotAndRestarts",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPolicyComponentHostFaultFallbackRecoveryTest::RunTest(const FString& Parameters)
+{
+	UUERLPolicyArtifactAsset* Asset = RequirePhantomXAsset(*this);
+	if (!Asset)
+	{
+		return false;
+	}
+	FComponentTestRig Rig;
+	if (!Rig.Build(*this, Asset))
+	{
+		return false;
+	}
+	FDeployPhysicsSettingsGuard Guard(0.005f, 10);
+	if (!StartWithZeroCommand(*this, Rig.Component))
+	{
+		return false;
+	}
+
+	AActor* PhysicsProbe = SpawnDynamicProbe(*Rig.World(), FVector(500.0, 0.0, 1000.0));
+	TestNotNull(TEXT("unrelated Chaos probe was created"), PhysicsProbe);
+	if (!PhysicsProbe)
+	{
+		Rig.Component->StopPolicy();
+		return false;
+	}
+	UStaticMeshComponent* PhysicsProbeMesh = PhysicsProbe->FindComponentByClass<UStaticMeshComponent>();
+	TestNotNull(TEXT("unrelated Chaos probe simulates"), PhysicsProbeMesh);
+	if (!PhysicsProbeMesh || !PhysicsProbeMesh->IsSimulatingPhysics())
+	{
+		Rig.Component->StopPolicy();
+		return false;
+	}
+
+	UUERLPolicyComponentTestEventRecorder* Recorder = NewObject<UUERLPolicyComponentTestEventRecorder>();
+	Recorder->FaultFallbackComponent = Rig.Component;
+	BindRecorderEvent(
+		Rig.Component->OnPolicyFault,
+		Recorder,
+		GET_FUNCTION_NAME_CHECKED(UUERLPolicyComponentTestEventRecorder, OnFaultStopPolicy));
+	TickPolicyWorld(Rig.World(), 0.010f);
+	const double ProbeZBeforeFallback = PhysicsProbe->GetActorLocation().Z;
+
+	// An authored host can choose to tear down a runtime-owned robot on fault.
+	Rig.Ground->Destroy();
+	TestFalse(TEXT("missing reset ground raises a policy fault"), Rig.Component->ResetToReferencePose());
+	TestEqual(TEXT("host fallback observes exactly one policy fault"), Recorder->FaultCount, 1);
+	TestTrue(TEXT("fault reason identifies the missing ground"), Recorder->LastFaultReason.Contains(TEXT("ground")));
+	TestFalse(TEXT("host fallback stops inference"), Rig.Component->IsRunning());
+	FTransform RemovedRobot;
+	TestFalse(TEXT("StopPolicy releases the spawned robot owned by this component"),
+		Rig.Component->GetRobotTransform(RemovedRobot));
+	TestFalse(TEXT("host fallback does not pause the game world"), Rig.World()->IsPaused());
+
+	TickPolicyWorld(Rig.World(), 0.020f);
+	TestTrue(TEXT("unrelated Chaos simulation continues after the fallback"),
+		PhysicsProbeMesh->IsSimulatingPhysics()
+		&& PhysicsProbe->GetActorLocation().Z < ProbeZBeforeFallback - 0.05);
+
+	Rig.Ground = SpawnGround(*Rig.World());
+	TestNotNull(TEXT("host restored the missing static ground"), Rig.Ground);
+	if (!Rig.Ground)
+	{
+		return false;
+	}
+	TestTrue(TEXT("host restart succeeds after restoring the cause and re-latching commands"),
+		StartWithZeroCommand(*this, Rig.Component));
+	FTransform RestartedRobot;
+	TestTrue(TEXT("restart creates a live robot at the target ground"),
+		Rig.Component->GetRobotTransform(RestartedRobot));
+	TickPolicyWorld(Rig.World(), 0.010f);
+	TestTrue(TEXT("restart consumes a fresh bootstrap control window"),
+		Rig.Component->GetLastControlTiming().ObservationDtSeconds > 0.0);
+
+	Rig.Component->StopPolicy();
+	AddInfo(TEXT(
+		"[VERIFY] AC_UE_INT_COMPONENT_016: an OnPolicyFault host fallback tears down its owned Robot, "
+		"leaves unrelated Chaos simulation live, and restarts after ground/commands recover"));
 	return true;
 }
 

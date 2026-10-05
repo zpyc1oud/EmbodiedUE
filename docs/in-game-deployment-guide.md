@@ -134,7 +134,7 @@ Alternatively, `bAutoStart=true` starts on the component's first tick; set comma
 
 ## Commands, diagnostics, and reset
 
-`SetCommand` copies and latches each channel. Query names and widths with `GetRequiredCommandChannels`. `CommandStalenessSeconds` controls stale-command diagnostics; zero disables that diagnostic. Staleness is not a control tick and does not automatically change the action.
+`SetCommand` copies and latches each channel. Query names and widths with `GetRequiredCommandChannels`. The component checks width and finite values; it does not know task-specific units or ranges. For the documented PhantomX task, `velocity` is body-frame forward/lateral speed in m/s followed by yaw rate in rad/s. Use the saved Task's command distribution when deploying its policy; the default sampler uses 0.4–0.5 m/s linear speed, clamps yaw rate to ±1 rad/s, and includes zero-speed standing episodes. `CommandStalenessSeconds` controls stale-command diagnostics; zero disables that diagnostic. Staleness is not a control tick and does not automatically change the action.
 
 Connect these events to logs, HUD, or gameplay state:
 
@@ -148,14 +148,16 @@ Connect these events to logs, HUD, or gameplay state:
 Check reset return values and `GetLastError`:
 
 ```text
-StopPolicy()                  // Stops inference; Chaos keeps simulating.
+StopPolicy()                  // Releases this controller's Robot resources; does not pause the World.
 SoftReset() -> bResetOK       // Clears history, contact/terrain caches, and solver accumulation.
 ResetToReferencePose() -> bPoseOK
                               // Restores the live robot pose without destroying its Actor.
 StartPolicy()                 // Explicitly restart after reset.
 ```
 
-No old control step continues after `StopPolicy`. Floating-base pose reset uses current ground and the Owner mounting transform; a fixed base retains its mounting transform. Re-spawning an Actor should not conceal a reset failure.
+No old control step continues after `StopPolicy`. The runtime destroys a Robot Actor it spawned; for a claimed mesh it restores the attachment and physics settings captured at claim time. `OnPolicyFault` disables inference/ticks but leaves the host to choose a fallback. A claimed mesh may keep simulating its prior drive; restoring an originally non-simulating mesh stops that mesh. `StopPolicy` does not globally pause Chaos or provide a universal emergency stop. Resolve the fault, set every required command channel again, and call `StartPolicy` explicitly to restart. Floating-base pose reset uses current ground and the Owner mounting transform; a fixed base retains its mounting transform.
+
+For the phase-separated numerical, fixed-action, target-scene, and fault-recovery procedure, see [static-ground deployment validation](how-to/policy-deployment-validation.md).
 
 ## Multiple instances and timing
 

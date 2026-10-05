@@ -39,11 +39,25 @@ public:
 	}
 
 	int32 FaultCount = 0;
+	FString LastFaultReason;
 
 	UFUNCTION()
 	void OnFault(const FString& Reason)
 	{
 		++FaultCount;
+		LastFaultReason = Reason;
+	}
+
+	TWeakObjectPtr<UUERLPolicyComponent> FaultFallbackComponent;
+
+	UFUNCTION()
+	void OnFaultStopPolicy(const FString& Reason)
+	{
+		OnFault(Reason);
+		if (UUERLPolicyComponent* Component = FaultFallbackComponent.Get())
+		{
+			Component->StopPolicy();
+		}
 	}
 
 	int32 MismatchCount = 0;
