@@ -268,6 +268,7 @@ def run_training(
 
     registry = create_default_registry()
     task = registry.create_task(config.task_id, config.task)
+    task.capabilities.require("train", allow_unknown=True)
     enable_noise = getattr(task, "enable_observation_corruption", None)
     if callable(enable_noise):
         noise_generator = torch.Generator()
@@ -343,6 +344,9 @@ def run_training(
             event_manager_factory=event_manager_factory,
             initial_terrain_level=terrain_level,
         )
+        capabilities = task.capabilities
+        capabilities.require("train")
+        print(f"[CAPABILITY] {capabilities.format()}")
         train_config = build_rsl_rl_train_config(config)
         vec_env = UERLVecEnvWrapper(direct_env, cfg=config)
         runner = UERLOnPolicyRunner(
@@ -407,6 +411,7 @@ def run_evaluation(
 
     registry = create_default_registry()
     task = registry.create_task(config.task_id, config.task)
+    task.capabilities.require("evaluate", allow_unknown=True)
     task.align_batch(config.worker.slot_count)
     player_controller = None
     if play_controller != "task":
@@ -448,6 +453,9 @@ def run_evaluation(
             curriculum_manager=curriculum_manager,
             initial_terrain_level=terrain_level,
         )
+        capabilities = task.capabilities
+        capabilities.require("evaluate")
+        print(f"[CAPABILITY] {capabilities.format()}")
         vec_env = UERLVecEnvWrapper(direct_env, cfg=config)
         runner = UERLOnPolicyRunner(
             vec_env,

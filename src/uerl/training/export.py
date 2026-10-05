@@ -97,6 +97,9 @@ def export_policy(
     the artifact segment — never hand-roll weight serialization.
     """
 
+    capabilities = task.capabilities
+    capabilities.require("export", allow_unknown=True)
+    print(f"[CAPABILITY] {capabilities.format()}")
     observation_plan = task.observation_plan
     action_plan = task.action_plan
 

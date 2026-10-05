@@ -16,6 +16,7 @@ from tensordict import TensorDict
 
 from uerl.core.direct.task import DirectTask
 from uerl.core.mdp.plan import PLAN_VERSION, ActionPlan, ObservationPlan, PlanOp
+from uerl.errors import ConfigError
 from uerl.policy.artifact import (
     ARTIFACT_FORMAT_VERSION,
     ArtifactMetadata,
@@ -506,3 +507,28 @@ def test_ac_py_unit_export_005_temp_files_cleaned_on_success_and_failure(
         assert not path.exists(), f"temp export dir left behind: {path}"
     assert success_out.is_file()
     assert not fail_out.exists()
+
+
+def test_export_capability_rejects_python_only_task_before_onnx_export(tmp_path: Path) -> None:
+    """Unsupported Python task math must fail before the expensive exporter runs."""
+
+    task = DirectTask()
+    runner = _FakeOnnxRunner(b"not reached")
+
+    with pytest.raises(ConfigError) as raised:
+        export_policy(
+            task=task,
+            runner=runner,
+            output=tmp_path / "unsupported.uerlpol2",
+            metadata=_metadata(),
+            robot_runtime=_robot_runtime(actuator_count=1),
+            timing=_timing(),
+            task_id="python.only",
+            robot_id="test.robot",
+        )
+
+    assert raised.value.code == "TASK_CAPABILITY_UNSUPPORTED"
+    assert raised.value.path == "task.capabilities.export"
+    assert "Manager-generated" in str(raised.value)
+    assert runner.export_calls == 0
+    assert not (tmp_path / "unsupported.uerlpol2").exists()

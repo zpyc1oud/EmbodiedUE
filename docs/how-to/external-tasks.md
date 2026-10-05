@@ -69,6 +69,31 @@ existing `DirectTask` subclasses or composed Tasks; both use `DirectEnv`, Sessio
 reset, and valid-Slot handling. This example uses the existing composed CartPole
 factory and introduces no new simulation loop.
 
+## Simple and Manager Task implementations
+
+An external factory can return either a small `DirectTask` subclass that
+implements action, observation, termination, and reward hooks, or a `DirectTask`
+assembled from action, observation, termination, and reward Managers. Both are
+driven by the same `DirectEnv` step/reset path. Task code does not own Session
+calls, sparse reset, or invalid-Slot compaction.
+
+Inspect a constructed Task with `task.capabilities`. Training and evaluation are
+supported when the required DirectTask methods or Manager declarations exist.
+Manager Tasks report `unknown` until a Worker RobotSpec has been bound and their
+plans have been assembled. A Python-only Task can train and evaluate, but its
+Python observation/action math has no exported plan and reports export as
+`unsupported` with the reason. The export service stops such a Task before
+calling the ONNX exporter.
+
+Training and evaluation print the resolved capability report after Worker
+schema binding and before their long loop; export prints it before ONNX
+conversion. If a Task adds Python action or observation behavior around Manager
+plans, export reports `unknown`: the framework does not infer mathematical
+equivalence from registration metadata. `unknown` is not a deployment
+compatibility claim; verify that Task's supported plan path and complete the
+separate artifact, UE, and target-scene checks for the behavior you intend to
+ship.
+
 ## Built-in resources
 
 Built-in training and terrain YAML files now live under `src/uerl/configs/` and

@@ -11,6 +11,8 @@ from unittest.mock import Mock
 import pytest
 
 from uerl import (
+    ConfigError,
+    DirectTask,
     DirectTaskConfig,
     LaunchMode,
     LoggingConfig,
@@ -197,6 +199,7 @@ def test_rsl_rl_config_derives_generic_names_and_ignores_dynamic_iterations(tmp_
 def test_run_training_uses_config_iterations_and_closes_wrapper(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Drive the generic lifecycle with seams and verify one iteration source."""
 
@@ -210,6 +213,14 @@ def test_run_training_uses_config_iterations_and_closes_wrapper(
     vec_env = Mock()
     calls: dict[str, object] = {"order": []}
     order = cast(list[str], calls["order"])
+    capabilities = Mock()
+    capabilities.format.return_value = (
+        "train=supported evaluate=supported export=supported"
+    )
+    capabilities.require.side_effect = lambda operation, **_kwargs: order.append(
+        f"capability:{operation}"
+    )
+    task.capabilities = capabilities
     checkpoint = tmp_path / "run" / "custom.pt"
     checkpoint.parent.mkdir(parents=True)
     checkpoint.write_bytes(b"existing checkpoint")
@@ -260,12 +271,67 @@ def test_run_training_uses_config_iterations_and_closes_wrapper(
     assert calls["restore_curriculum"] is True
     assert calls["skip_curriculum_terms"] == ()
     # Resume resets every Slot inside load; learn then staggers the timeouts.
-    assert calls["order"] == ["load", "learn", "save"]
+    assert calls["order"] == [
+        "capability:train",
+        "capability:train",
+        "load",
+        "learn",
+        "save",
+    ]
     assert calls["init_at_random_ep_len"] is True
     assert result.iterations == 7
     assert result.checkpoint.is_file()
     vec_env.close.assert_called_once_with("training_complete")
+    assert "[CAPABILITY] train=supported evaluate=supported export=supported" in capsys.readouterr().out
     print("[VERIFY] VC-004: max_iterations=7 source=runner.max_iterations")
+
+
+def test_run_training_preflights_missing_task_methods_before_opening_session(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A Task without action/observation/reward paths fails before UE startup."""
+
+    import uerl.training.runner as runner_module
+
+    registry = Mock()
+    registry.create_task.return_value = DirectTask()
+    open_session = Mock(side_effect=AssertionError("capability check must precede UE startup"))
+    monkeypatch.setattr(runner_module, "create_default_registry", lambda: registry)
+    monkeypatch.setattr(cast(Any, runner_module).UERLSession, "open", open_session)
+    config = _config(tmp_path / "run")
+    config = replace(config, runner=replace(config.runner, checkpoint=None))
+
+    with pytest.raises(ConfigError) as raised:
+        run_training(config)
+
+    assert raised.value.code == "TASK_CAPABILITY_UNSUPPORTED"
+    assert raised.value.path == "task.capabilities.train"
+    open_session.assert_not_called()
+
+
+def test_run_evaluation_preflights_missing_task_methods_before_opening_session(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Evaluation uses the same DirectTask contract and rejects it before UE."""
+
+    import uerl.training.runner as runner_module
+
+    checkpoint = tmp_path / "checkpoint.pt"
+    checkpoint.write_bytes(b"checkpoint")
+    registry = Mock()
+    registry.create_task.return_value = DirectTask()
+    open_session = Mock(side_effect=AssertionError("capability check must precede UE startup"))
+    monkeypatch.setattr(runner_module, "create_default_registry", lambda: registry)
+    monkeypatch.setattr(cast(Any, runner_module).UERLSession, "open", open_session)
+
+    with pytest.raises(ConfigError) as raised:
+        run_evaluation(_config(tmp_path / "run"), checkpoint=checkpoint, steps=1)
+
+    assert raised.value.code == "TASK_CAPABILITY_UNSUPPORTED"
+    assert raised.value.path == "task.capabilities.evaluate"
+    open_session.assert_not_called()
 
 
 def test_run_training_keeps_environment_cpu_when_runner_uses_cuda(
