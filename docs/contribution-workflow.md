@@ -127,17 +127,21 @@ parity does not establish whole-scene behavior.
 
 ### Current test-gate work
 
-[Issue #13](https://github.com/zpyc1oud/EmbodiedUE/issues/13) tracks accountable suite
-selection/completion, terrain-effect assertions, trajectory repeatability, and the
-separation of core and licensed-content validation. Until that work lands, inspect
-the current runner's coverage and completion evidence rather than assuming a
-successful aggregate command proves every required case ran.
+[Issue #13](https://github.com/zpyc1oud/EmbodiedUE/issues/13) is closed with reason
+`not_planned`; its proposed suite-selection and completion work is not the active
+test-gate plan. The current layered audit and follow-up verification are tracked in
+[Issue #19](https://github.com/zpyc1oud/EmbodiedUE/issues/19). Inspect the selected
+runner's coverage and completion evidence rather than assuming an aggregate
+success proves every required case ran.
 
-The existing integration of PRs #9–#12 retains its agreed gates, including the
-thirteen omitted native cases and real Pursuit. Issue #13's new infrastructure is
-not an additional prerequisite for finishing that integration. Existing conditional
-authorization remains bounded by its original action and conditions; this workflow
-neither expands that authorization nor adds unrelated acceptance work.
+PRs #9–#12 are historical, merged integration work; their integration-specific
+gates are no longer pending work. This does not establish acceptance for current
+changes: report core behavior and authorized-content evidence separately. If the
+selected full or release scope requires Pursuit and its actual content or authored
+integration is absent, that scope remains blocked as described below. Existing
+conditional authorization remains bounded by its original action and conditions;
+this workflow neither expands that authorization nor adds unrelated acceptance
+work.
 
 ## 5. Handle content and host constraints explicitly
 
