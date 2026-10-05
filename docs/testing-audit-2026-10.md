@@ -56,9 +56,8 @@ states that mocks do not verify Chaos or other engine behavior.
    proofs.** `run_all_tests.py` checks successful log completion and minimum
    counts for each filter. The filters are currently explicit, but threshold
    counts alone would not prove that every expected case ran if a filter or
-   test name drifted. The contribution workflow already tracks suite selection
-   and completion accountability in Issue #13, so this audit records the risk
-   without duplicating that runner work.
+   test name drifted. Issue #13 is closed with reason `not_planned`; this remains
+   an audit finding only and does not reopen or reactivate that canceled scope.
 
 ## Isaac Lab comparison
 
