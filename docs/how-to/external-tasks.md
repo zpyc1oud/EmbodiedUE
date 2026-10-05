@@ -90,11 +90,13 @@ factory and introduces no new simulation loop.
 
 ## Simple and Manager Task implementations
 
-An external factory can return either a small `DirectTask` subclass that
-implements action, observation, termination, and reward hooks, or a `DirectTask`
-assembled from action, observation, termination, and reward Managers. Both are
-driven by the same `DirectEnv` step/reset path. Task code does not own Session
-calls, sparse reset, or invalid-Slot compaction.
+An external factory can return either a `DirectTask` subclass that implements
+`preprocess_actions`, `build_observations`, `compute_terminations` (or
+`termination_terms`), and `compute_rewards`, or a `DirectTask` assembled from
+action, observation, termination, and reward Managers. `DirectTask`,
+`DirectTaskCfg`, `UERLDirectEnv`, and the capability report types are public
+Python APIs. Both Task styles use the same `DirectEnv` step/reset path; Task code
+does not own Session calls, sparse reset, or invalid-Slot compaction.
 
 Inspect a constructed Task with `task.capabilities`. Training and evaluation are
 supported when the required DirectTask methods or Manager declarations exist.
@@ -105,14 +107,15 @@ Python observation/action math has no exported plan and reports export as
 calling the ONNX exporter.
 
 Training and evaluation print the resolved capability report after Worker
-schema binding and before their long loop; export prints it before ONNX
-conversion. Export proceeds only when the resolved report says `supported`;
-both `unsupported` and `unknown` stop before ONNX conversion. If a Task adds
-Python action or observation behavior around Manager plans, export reports
-`unknown`: the framework does not infer mathematical equivalence from
-registration metadata. Resolve the implementation into a supported plan path
-before export, then complete the separate artifact, UE, and target-scene checks
-for the behavior you intend to ship.
+schema binding and before their long loop; an unsupported run raises a typed
+preflight error with its reason. Export prints the report before ONNX conversion
+and proceeds only when the resolved report says `supported`; both
+`unsupported` and `unknown` stop first. If a Task adds Python action or
+observation behavior around Manager plans, export reports `unknown`: the
+framework does not infer mathematical equivalence from registration metadata.
+Resolve the implementation into a supported plan path before export, then
+complete the separate artifact, UE, and target-scene checks for the behavior you
+intend to ship.
 
 ## Built-in resources
 
@@ -130,7 +133,10 @@ zipped wheel is not supported by the path-based loaders.
 The packaging test builds and installs the framework, checked-in example, and
 newly generated package wheels into an isolated target, changes to an unrelated
 directory, and checks discovery, all built-in defaults, both YAML resources,
-Task construction, and CLI preflight. This does not validate UE execution,
-training quality, or export. A generated minimal Task interface,
-minimal/composed equivalence, and early export capability reporting remain work
-tracked by [Issue #6](https://github.com/zpyc1oud/EmbodiedUE/issues/6).
+Task construction, and CLI preflight. The generator creates a Manager-based
+CartPole package; it is not a generator for arbitrary Python-hook Tasks. The
+minimal-versus-Manager behavior test uses test-only external entry points and a
+scripted Session to check the public hooks through the shared Python runtime.
+It does not install a user-authored minimal Task package or validate UE
+execution, Chaos behavior, training quality, or game deployment. Those remain
+part of the broader Issue #6 acceptance.
