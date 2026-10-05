@@ -170,14 +170,15 @@ documented order and validate the resulting combined revision where behavior can
 interact. Record the resulting commit and its evidence. Retire the completed branch
 when it is no longer needed, and close only the Issues whose acceptance is met.
 
-This document defines contributor practice. GitHub enforcement depends on the
-repository's actual configuration. At the 2026-10-05 baseline (`44967ea`), the tree
-has local hooks but no checked-in `.github` workflows/templates, and the visible
-`Default` ruleset is disabled. That is not a claim about every possible external
-check or branch setting. Do not claim CI or required reviews are enforced without
-verifying them. Enabling CI, rulesets, templates, or other repository controls is
-a separate maintainer change. Templates can later collect the same information
-without creating a second policy.
+This document defines contributor practice. At the 2026-10-05 baseline
+(`44967ea`), the tree had local hooks but no checked-in `.github`
+workflows/templates, and the visible `Default` ruleset was disabled. Since then,
+`.github/workflows/static-checks.yml` has been added. It runs Ruff and Mypy
+on pull requests to `main` and pushes to `main`. It does not validate
+documentation links or configuration files, or run Python tests, Unreal Engine,
+Chaos, or GPU checks. A green result is static-check evidence only, not a runtime
+guarantee. Required status checks and other repository controls remain separate
+maintainer decisions.
 
 AI assistants follow this workflow within the user's authorized task. Requests to
 prepare, review, or implement work do not by themselves authorize merging,
