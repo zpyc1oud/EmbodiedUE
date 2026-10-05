@@ -160,8 +160,12 @@ def test_real_ue_negotiates_all_terrain_tiers_and_resets_each_slot(tmp_path: Pat
         assert effective_config["environment"]["terrain"] == terrain
         assert result.response["effective_worker_config_hash"] == sha256_json(effective_config)
         manifest_path = config.logging.run_directory / "manifest.yaml"
-        manifest = load_unique_yaml(manifest_path.read_text(encoding="utf-8"))
-        assert manifest["resolved_config"]["normalized_hash"] == config.normalized_hash
+        manifest_value = load_unique_yaml(manifest_path.read_text(encoding="utf-8"))
+        assert isinstance(manifest_value, dict)
+        manifest: dict[str, Any] = manifest_value
+        resolved_config = manifest.get("resolved_config")
+        assert isinstance(resolved_config, dict)
+        assert resolved_config["normalized_hash"] == config.normalized_hash
         assert manifest["effective_worker_config"] == effective_config
         assert manifest["layout_hashes"]["reset_request"] == reset_layout.layout_hash
         identity = dict(manifest)

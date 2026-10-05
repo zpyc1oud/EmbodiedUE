@@ -89,7 +89,11 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path) 
         resolved_config=config,
     )
     try:
-        manifest = load_unique_yaml((config.logging.run_directory / "manifest.yaml").read_text(encoding="utf-8"))
+        manifest_value = load_unique_yaml((config.logging.run_directory / "manifest.yaml").read_text(encoding="utf-8"))
+        assert isinstance(manifest_value, dict)
+        manifest: dict[str, object] = manifest_value
+        resolved_config = manifest.get("resolved_config")
+        assert isinstance(resolved_config, dict)
         state_names = tuple(field["name"] for field in task.schema.state_requirements)
         action_names = tuple(field["name"] for field in task.schema.action_schema)
         assert raw_session.state is SessionState.READY
@@ -103,15 +107,13 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path) 
             "robot.joint.cart.joint_velocity",
         )
         assert action_names == ("robot.actuator.target",)
-        assert manifest["resolved_config"]["normalized_hash"] == config.normalized_hash
+        assert resolved_config["normalized_hash"] == config.normalized_hash
         assert manifest["run_seed"] == config.worker.run_seed
         assert manifest["layout_hashes"]
         initial_policy = env.get_observations()["policy"].clone()
         first_actions = torch.zeros(SLOT_COUNT, 1)
         first_actions[1, 0] = 0.5
-        first_obs, first_reward, first_terminated, first_truncated, _first_info = env.step(
-            first_actions
-        )
+        first_obs, first_reward, first_terminated, first_truncated, _first_info = env.step(first_actions)
         first_episode_length_buf = env.episode_length_buf.clone()
         second_obs, second_reward, second_terminated, second_truncated, second_info = env.step(
             torch.zeros(SLOT_COUNT, 1)
