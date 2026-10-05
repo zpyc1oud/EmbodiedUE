@@ -163,6 +163,106 @@ def test_missing_run_config_fails_before_session_with_recovery_guidance(
 
 
 @pytest.mark.parametrize("command", ["play", "export"])
+def test_missing_saved_session_protocol_fails_before_session(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "model_final.pt").write_bytes(b"checkpoint")
+    payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
+    del payload["session"]["protocol"]
+    snapshot = run / "resolved_config.json"
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    before = snapshot.read_bytes()
+
+    def unexpected_session_open(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
+        raise AssertionError("missing protocol must fail before Session.open")
+
+    monkeypatch.setattr(UERLSession, "open", unexpected_session_open)
+
+    result = (play.main if command == "play" else export.main)(
+        ["--run", str(run), "--session.mode", "attach"]
+    )
+
+    assert result == 1
+    assert "--session.protocol" in capsys.readouterr().out
+    assert snapshot.read_bytes() == before
+
+
+@pytest.mark.parametrize("command", ["play", "export"])
+def test_latest_requires_task_before_file_resolution_or_session_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    from uerl import training
+
+    monkeypatch.chdir(tmp_path)
+
+    def unexpected_file_resolution(*args: object, **kwargs: object) -> NoReturn:
+        raise AssertionError("latest without a Task must fail before Run lookup")
+
+    def unexpected_session_open(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
+        raise AssertionError("latest without a Task must fail before Session.open")
+
+    monkeypatch.setattr(training, "resolve_run_directory", unexpected_file_resolution)
+    monkeypatch.setattr(training, "resolve_resume_checkpoint", unexpected_file_resolution)
+    monkeypatch.setattr(UERLSession, "open", unexpected_session_open)
+
+    with pytest.raises(SystemExit) as error:
+        (play.main if command == "play" else export.main)(["--run", "latest"])
+
+    assert error.value.code == 2
+    assert "--task is required with --run latest" in capsys.readouterr().err
+    assert not (tmp_path / "runs").exists()
+
+
+@pytest.mark.parametrize("command", ["play", "export"])
+def test_checkpoint_rejects_task_from_unrelated_ancestor_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    run = tmp_path / "unrelated-run"
+    checkpoint = run / "rsl_rl" / "model_10.pt"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_bytes(b"checkpoint")
+    checkpoint_before = checkpoint.read_bytes()
+    payload = to_jsonable(build_run_config(CARTPOLE_TASK_ID))
+    snapshot = run / "resolved_config.json"
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    snapshot_before = snapshot.read_bytes()
+
+    def unexpected_session_open(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
+        raise AssertionError("an explicit Task conflict must fail before Session.open")
+
+    monkeypatch.setattr(UERLSession, "open", unexpected_session_open)
+
+    result = (play.main if command == "play" else export.main)(
+        [
+            "--task",
+            "UERL-PhantomX-Walk-v0",
+            "--checkpoint",
+            str(checkpoint),
+            "--session.mode",
+            "attach",
+        ]
+    )
+
+    assert result == 1
+    output = capsys.readouterr().out
+    assert "Run was trained for 'UERL-CartPole-Direct-v0'" in output
+    assert "not 'UERL-PhantomX-Walk-v0'" in output
+    assert snapshot.read_bytes() == snapshot_before
+    assert checkpoint.read_bytes() == checkpoint_before
+
+
+@pytest.mark.parametrize("command", ["play", "export"])
 def test_semantic_override_cannot_change_a_saved_run(
     tmp_path: Path,
     command: str,
