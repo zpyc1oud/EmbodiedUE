@@ -25,6 +25,31 @@ package name, entry-point name, and Task ID, then install that directory. Use
 environment. Edit `src/example_cartpole/reward.yaml` to change
 `pole_position_weight`. Reinstall after editing a non-editable installation.
 
+## Create a DirectTask Python-hooks package
+
+The [Direct CartPole example](../../examples/external-direct-cartpole/) owns its
+action, observation, reward, and termination functions in a `DirectTask` subclass.
+It still uses the framework's `DirectEnv`, Session, reset, and valid-Slot path.
+Its package-owned reward override is YAML, as are Task and Run configurations.
+
+To generate another package from the CLI:
+
+```powershell
+uv run uerl new direct-cartpole direct-balance-demo --output-dir ..\direct-balance-demo
+Set-Location ..\direct-balance-demo
+uv pip install -e . --no-deps
+$env:UERL_TASK_PLUGINS = 'direct-balance-demo'
+uerl tasks --filter UERL-DirectBalanceDemo-v0
+uerl check task UERL-DirectBalanceDemo-v0 --json
+```
+
+`check task --json` writes a machine-readable preflight report to stdout; it is
+not a configuration file or a configuration input. The report shows whether
+train, evaluate, and export are supported, unsupported, or unknown, with reasons.
+For a Python-hooks Task, train/evaluate are supported and export is unsupported
+because Python action/observation methods have no Manager-generated plans. Do
+not infer mathematical or cross-language exportability from Task metadata.
+
 To create a new package from the CLI instead, generate a ready-to-install
 project outside the repository:
 
@@ -106,11 +131,14 @@ Python observation/action math has no exported plan and reports export as
 `unsupported` with the reason. The export service stops such a Task before
 calling the ONNX exporter.
 
-Training and evaluation print the resolved capability report after Worker
-schema binding and before their long loop; an unsupported run raises a typed
-preflight error with its reason. Export prints the report before ONNX conversion
-and proceeds only when the resolved report says `supported`; both
-`unsupported` and `unknown` stop first. If a Task adds Python action or
+Training and evaluation report capabilities after Worker schema binding and
+before their long loop. A known unsupported capability fails before Worker
+startup; Manager `unknown` is allowed to reach RobotSpec binding and then must
+resolve before the loop starts. Export rejects known unsupported work before
+Worker startup, then checks strictly after DirectEnv initialization and its
+initial reset, before vector-runner construction or checkpoint loading. It
+proceeds only when the resolved report says `supported`; both `unsupported` and
+`unknown` stop first. If a Task adds Python action or
 observation behavior around Manager plans, export reports `unknown`: the
 framework does not infer mathematical equivalence from registration metadata.
 Resolve the implementation into a supported plan path before export, then
@@ -130,13 +158,12 @@ zipped wheel is not supported by the path-based loaders.
 
 ## Validation boundary
 
-The packaging test builds and installs the framework, checked-in example, and
-newly generated package wheels into an isolated target, changes to an unrelated
-directory, and checks discovery, all built-in defaults, both YAML resources,
-Task construction, and CLI preflight. The generator creates a Manager-based
-CartPole package; it is not a generator for arbitrary Python-hook Tasks. The
-minimal-versus-Manager behavior test uses test-only external entry points and a
-scripted Session to check the public hooks through the shared Python runtime.
-It does not install a user-authored minimal Task package or validate UE
-execution, Chaos behavior, training quality, or game deployment. Those remain
-part of the broader Issue #6 acceptance.
+The packaging test builds and installs the framework, checked-in examples, and
+generated Manager and Direct package wheels into an isolated target. It checks
+entry-point discovery, YAML resource loading, Task construction, and CLI
+capability reports outside the checkout. The Direct/Manager behavior test uses
+the checked-in Direct Task implementation, a Manager registration, a scripted
+Session, and independent numeric expectations for actions, observations,
+rewards, termination, reset masks, and invalid Slots. This remains Python
+evidence; it does not validate UE execution, Chaos behavior, training quality,
+or game deployment. Those remain separate Issue #6 acceptance gates.

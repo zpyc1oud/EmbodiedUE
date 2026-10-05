@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from uerl.cli import new
 from uerl.core.config.yaml_loader import load_unique_yaml
 
@@ -142,3 +144,67 @@ def test_external_cartpole_generator_refuses_existing_project_files(tmp_path: Pa
     assert existing.read_text(encoding="utf-8") == "keep"
     assert not (project / "pyproject.toml").exists()
     assert "refusing to overwrite" in capsys.readouterr().out
+
+
+def test_direct_cartpole_generator_writes_yaml_package_with_known_capability_boundary(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "direct-balance-demo"
+
+    assert new.main(["direct-cartpole", "direct-balance-demo", "--output-dir", str(project), "--json"]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["kind"] == "direct-cartpole"
+    assert result["task_id"] == "UERL-DirectBalanceDemo-v0"
+    assert result["entry_point"] == "direct-balance-demo"
+    assert len(result["files"]) == 5
+
+    metadata = (project / "pyproject.toml").read_text(encoding="utf-8")
+    package_dir = project / "src" / "direct_balance_demo"
+    package = package_dir / "__init__.py"
+    tests = project / "tests" / "test_registration.py"
+    generated = package.read_text(encoding="utf-8")
+    assert 'name = "uerl-direct-balance-demo-direct"' in metadata
+    assert 'direct-balance-demo = "direct_balance_demo:create_registration"' in metadata
+    assert "class DirectCartPoleTask(DirectTask)" in generated
+    assert "def compute_rewards(" in generated
+    assert "def compute_terminations(" in generated
+    assert "UERLDirectEnv" not in generated
+    assert "Manager-generated" in tests.read_text(encoding="utf-8")
+    assert load_unique_yaml((package_dir / "reward.yaml").read_text(encoding="utf-8")) == {
+        "pole_position_weight": -2.0
+    }
+    compile(generated, str(package), "exec")
+
+
+def test_checked_in_direct_example_matches_generator_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "example-direct-cartpole"
+    assert (
+        new.main(
+            [
+                "direct-cartpole",
+                "example-direct-cartpole",
+                "--output-dir",
+                str(project),
+                "--task-id",
+                "UERL-DirectCartPole-v0",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    sample = Path(__file__).resolve().parents[3] / "examples" / "external-direct-cartpole"
+    generated_files = (
+        Path("pyproject.toml"),
+        Path("README.md"),
+        Path("src/example_direct_cartpole/__init__.py"),
+        Path("src/example_direct_cartpole/reward.yaml"),
+        Path("tests/test_registration.py"),
+    )
+    for relative_path in generated_files:
+        assert (project / relative_path).read_bytes() == (sample / relative_path).read_bytes()

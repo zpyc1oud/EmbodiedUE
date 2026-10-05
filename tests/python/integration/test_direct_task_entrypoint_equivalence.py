@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import importlib
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from importlib.metadata import EntryPoint, EntryPoints
+from pathlib import Path
 from typing import Any, TypeVar, cast
 
 import pytest
@@ -17,8 +20,6 @@ from uerl import (
     PhysicalCommandBatch,
     PostResetState,
     SessionSchema,
-    StepContext,
-    TerminationResult,
     TransitionState,
     UERLDirectEnv,
     robot_actuator_action_schema,
@@ -32,7 +33,6 @@ from uerl.core.direct.task import DirectTask
 from uerl.core.direct.types import StateBatch
 from uerl.core.mdp.lib.events import EventEffect
 from uerl.tasks.cartpole import (
-    CARTPOLE_CONTROL_DT,
     create_cartpole_registration,
 )
 from uerl.tasks.registry import TaskRegistration, create_default_registry
@@ -52,84 +52,6 @@ _SLOT_COUNT = 4
 _StateBatchT = TypeVar("_StateBatchT", bound=StateBatch)
 
 
-class _MinimalCartPoleTask(DirectTask):
-    """External-style Task that defines math directly without Manager assembly."""
-
-    def __init__(self, config: CartPoleTaskConfig) -> None:
-        self.params = config
-        spec = _robot_spec()
-        state_names = tuple(
-            str(item["name"]) for item in robot_observation_schema(spec, CARTPOLE_SHAPES)
-        )
-        action_names = tuple(str(item["name"]) for item in robot_actuator_action_schema(spec))
-        super().__init__(
-            replace(config, state_requirements=state_names, action_schema=action_names),
-            control_dt=CARTPOLE_CONTROL_DT,
-            batch_size=_SLOT_COUNT,
-            device="cpu",
-        )
-
-    def preprocess_actions(
-        self,
-        policy_actions: torch.Tensor,
-        raw_state: Mapping[str, torch.Tensor],
-    ) -> PhysicalCommandBatch:
-        del raw_state
-        assert self.robot_spec is not None
-        scale = self.robot_spec.actuators[0].action_scale
-        bounded = policy_actions.clamp(-self.params.action_clip, self.params.action_clip)
-        return PhysicalCommandBatch({_ACTION_FIELD: bounded * scale})
-
-    def build_observations(
-        self,
-        raw_state: Mapping[str, torch.Tensor],
-        state_valid: torch.Tensor,
-        previous_policy_actions: torch.Tensor,
-        control_frame_dt: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor]:
-        del state_valid, previous_policy_actions, control_frame_dt
-        return {"policy": torch.cat([raw_state[name] for name in _OBSERVATION_FIELDS], dim=1)}
-
-    def compute_terminations(self, context: StepContext) -> TerminationResult:
-        cart_out = (
-            context.transition_state[_OBSERVATION_FIELDS[2]].abs().amax(dim=1)
-            > self.params.max_cart_position
-        )
-        pole_fell = (
-            context.transition_state[_OBSERVATION_FIELDS[0]].abs().amax(dim=1)
-            > self.params.pole_angle_limit
-        )
-        terminated = cart_out | pole_fell
-        timed_out = (
-            context.episode_steps >= self.params.max_episode_steps - 1
-            if self.params.max_episode_steps > 0
-            else torch.zeros_like(terminated)
-        )
-        return TerminationResult(
-            terminated,
-            timed_out,
-            {"cart_out_of_bounds": cart_out, "pole_fell": pole_fell, "time_out": timed_out},
-        )
-
-    def compute_rewards(
-        self,
-        context: StepContext,
-        terminations: TerminationResult,
-    ) -> torch.Tensor:
-        state = context.transition_state
-        pole_pos = state[_OBSERVATION_FIELDS[0]].reshape(-1)
-        pole_vel = state[_OBSERVATION_FIELDS[1]].abs().reshape(-1)
-        cart_vel = state[_OBSERVATION_FIELDS[3]].abs().reshape(-1)
-        ended = terminations.terminated.to(dtype=torch.float32)
-        return (
-            self.params.rew_scale_alive * (1.0 - ended)
-            + self.params.rew_scale_terminated * ended
-            + self.params.rew_scale_pole_pos * pole_pos.square()
-            + self.params.rew_scale_cart_vel * cart_vel
-            + self.params.rew_scale_pole_vel * pole_vel
-        )
-
-
 def _external_config() -> CartPoleTaskConfig:
     """Represent a user reward-only edit without depending on the generator."""
 
@@ -141,8 +63,20 @@ def _create_external_minimal_task(
     *,
     robot_spec: RobotSpec | None = None,
 ) -> DirectTask:
-    del robot_spec
-    return _MinimalCartPoleTask(CartPoleTaskConfig.from_direct(config))
+    package_source = Path(__file__).resolve().parents[3] / "examples" / "external-direct-cartpole" / "src"
+    package_source_text = str(package_source)
+    inserted = package_source_text not in sys.path
+    if inserted:
+        sys.path.insert(0, package_source_text)
+    sys.modules.pop("example_direct_cartpole", None)
+    try:
+        direct_example = importlib.import_module("example_direct_cartpole")
+        task = direct_example.create_task(CartPoleTaskConfig.from_direct(config), robot_spec=robot_spec)
+        return cast(DirectTask, task)
+    finally:
+        sys.modules.pop("example_direct_cartpole", None)
+        if inserted:
+            sys.path.remove(package_source_text)
 
 
 def create_external_minimal_registration() -> TaskRegistration:
@@ -483,7 +417,8 @@ def test_external_minimal_and_manager_entrypoints_match_behavior_and_reward_edit
     manager_task = registry.create_task(EXTERNAL_MANAGER_TASK_ID, manager_config)
     baseline_task = registry.create_task(EXTERNAL_MANAGER_TASK_ID, baseline_config)
 
-    assert isinstance(external_task, _MinimalCartPoleTask)
+    assert type(external_task).__module__ == "example_direct_cartpole"
+    assert type(external_task).__name__ == "DirectCartPoleTask"
     assert type(manager_task) is DirectTask
     assert external_task.capabilities.train.status is CapabilityStatus.SUPPORTED
     assert external_task.capabilities.evaluate.status is CapabilityStatus.SUPPORTED

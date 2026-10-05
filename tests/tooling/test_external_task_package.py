@@ -28,6 +28,12 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
     example = tmp_path / "example"
     shutil.copytree(REPO / "examples" / "external-cartpole", example,
                     ignore=shutil.ignore_patterns("__pycache__", "*.egg-info", "build"))
+    direct_example = tmp_path / "direct-example"
+    shutil.copytree(
+        REPO / "examples" / "external-direct-cartpole",
+        direct_example,
+        ignore=shutil.ignore_patterns("__pycache__", "*.egg-info", "build"),
+    )
     generated = tmp_path / "balance-demo"
     assert new.main(["external-cartpole", "balance-demo", "--output-dir", str(generated)]) == 0
     generated_test_env = os.environ.copy()
@@ -35,6 +41,13 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
         (str(generated / "src"), str(REPO / "src"), generated_test_env.get("PYTHONPATH", ""))
     )
     _run([sys.executable, "-m", "pytest", "-q", "tests"], generated, env=generated_test_env)
+    generated_direct = tmp_path / "direct-balance-demo"
+    assert new.main(["direct-cartpole", "direct-balance-demo", "--output-dir", str(generated_direct)]) == 0
+    generated_direct_test_env = os.environ.copy()
+    generated_direct_test_env["PYTHONPATH"] = os.pathsep.join(
+        (str(generated_direct / "src"), str(REPO / "src"), generated_direct_test_env.get("PYTHONPATH", ""))
+    )
+    _run([sys.executable, "-m", "pytest", "-q", "tests"], generated_direct, env=generated_direct_test_env)
     wheels = tmp_path / "wheels"
     wheels.mkdir()
     # Build from an sdist too, so both release formats must carry the YAML resources.
@@ -43,7 +56,7 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
     unpacked = tmp_path / "unpacked"
     shutil.unpack_archive(source, unpacked)
     source_root = next(unpacked.iterdir())
-    for root in (source_root, example, generated):
+    for root in (source_root, example, generated, direct_example, generated_direct):
         _run([sys.executable, "-c",
               f"from setuptools.build_meta import build_wheel; build_wheel({str(wheels)!r})"], root)
     installed = tmp_path / "installed"
@@ -54,9 +67,14 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
     shutil.rmtree(project)
     shutil.rmtree(example)
     shutil.rmtree(generated)
+    shutil.rmtree(direct_example)
+    shutil.rmtree(generated_direct)
     shutil.rmtree(unpacked)
     probe = tmp_path / "probe.py"
     probe.write_text('''
+import contextlib
+import io
+import json
 import os
 import sys
 from pathlib import Path
@@ -68,27 +86,56 @@ from uerl.core.config.paths import repository_config_root
 from uerl.cli.main import main
 from uerl.training import build_run_config
 from uerl.core.direct.task import DirectTask
+from uerl.core.direct.capabilities import CapabilityStatus
 assert repository_config_root().is_relative_to(Path(sys.argv[1]))
 registry = create_default_registry(external_tasks=())
 assert len(registry.list()) == 5
 for entry in registry.list():
     build_run_config(entry.task_id)
-os.environ['UERL_TASK_PLUGINS'] = 'example-cartpole,balance-demo'
+os.environ['UERL_TASK_PLUGINS'] = 'example-cartpole,balance-demo,example-direct-cartpole,direct-balance-demo'
 registry = create_default_registry()
-assert len(registry.list()) == 7
+assert len(registry.list()) == 9
 example_config = registry.create_task_config('Example-CartPole-v0')
 generated_config = registry.create_task_config('UERL-BalanceDemo-v0')
+direct_config = registry.create_task_config('UERL-DirectCartPole-v0')
+generated_direct_config = registry.create_task_config('UERL-DirectBalanceDemo-v0')
 assert example_config.rew_scale_pole_pos == -2.0
 assert generated_config.rew_scale_pole_pos == -2.0
+assert direct_config.rew_scale_pole_pos == -2.0
+assert generated_direct_config.rew_scale_pole_pos == -2.0
 assert registry.create_task_config('UERL-CartPole-Direct-v0').rew_scale_pole_pos == -1.0
 assert isinstance(registry.create_task('Example-CartPole-v0', example_config), DirectTask)
 assert isinstance(registry.create_task('UERL-BalanceDemo-v0', generated_config), DirectTask)
+direct_task = registry.create_task('UERL-DirectCartPole-v0', direct_config)
+generated_direct_task = registry.create_task('UERL-DirectBalanceDemo-v0', generated_direct_config)
+assert isinstance(direct_task, DirectTask)
+assert isinstance(generated_direct_task, DirectTask)
+for task in (direct_task, generated_direct_task):
+    assert task.capabilities.train.status is CapabilityStatus.SUPPORTED
+    assert task.capabilities.evaluate.status is CapabilityStatus.SUPPORTED
+    assert task.capabilities.export.status is CapabilityStatus.UNSUPPORTED
 assert main(['check', 'task', 'Example-CartPole-v0']) == 0
 assert main(['check', 'task', 'UERL-BalanceDemo-v0']) == 0
+direct_report = io.StringIO()
+with contextlib.redirect_stdout(direct_report):
+    assert main(['check', 'task', 'UERL-DirectCartPole-v0', '--json']) == 0
+direct_capabilities = json.loads(direct_report.getvalue())['capabilities']
+assert direct_capabilities['train']['status'] == 'supported'
+assert direct_capabilities['evaluate']['status'] == 'supported'
+assert direct_capabilities['export']['status'] == 'unsupported'
+assert 'Manager-generated' in direct_capabilities['export']['reason']
+manager_report = io.StringIO()
+with contextlib.redirect_stdout(manager_report):
+    assert main(['check', 'task', 'Example-CartPole-v0', '--json']) == 0
+assert json.loads(manager_report.getvalue())['capabilities']['export']['status'] == 'unknown'
 assert main(['config', '--task', 'Example-CartPole-v0', '--json']) == 0
 assert main(['config', '--task', 'UERL-BalanceDemo-v0', '--json']) == 0
+assert main(['config', '--task', 'UERL-DirectCartPole-v0', '--json']) == 0
+assert main(['config', '--task', 'UERL-DirectBalanceDemo-v0', '--json']) == 0
 assert main(['tasks', '--filter', 'Example-CartPole-v0']) == 0
 assert main(['tasks', '--filter', 'UERL-BalanceDemo-v0']) == 0
+assert main(['tasks', '--filter', 'UERL-DirectCartPole-v0']) == 0
+assert main(['tasks', '--filter', 'UERL-DirectBalanceDemo-v0']) == 0
 # Package-owned resource changes feed the next fresh config without affecting built-ins.
 example_resource = Path(sys.argv[1]) / 'example_cartpole' / 'reward.yaml'
 example_resource.write_text('pole_position_weight: -3.0\\n', encoding='utf-8')
@@ -96,6 +143,12 @@ assert registry.create_task_config('Example-CartPole-v0').rew_scale_pole_pos == 
 generated_resource = Path(sys.argv[1]) / 'balance_demo' / 'reward.yaml'
 generated_resource.write_text('pole_position_weight: -4.0\\n', encoding='utf-8')
 assert registry.create_task_config('UERL-BalanceDemo-v0').rew_scale_pole_pos == -4.0
+direct_resource = Path(sys.argv[1]) / 'example_direct_cartpole' / 'reward.yaml'
+direct_resource.write_text('pole_position_weight: -5.0\\n', encoding='utf-8')
+assert registry.create_task_config('UERL-DirectCartPole-v0').rew_scale_pole_pos == -5.0
+generated_direct_resource = Path(sys.argv[1]) / 'direct_balance_demo' / 'reward.yaml'
+generated_direct_resource.write_text('pole_position_weight: -6.0\\n', encoding='utf-8')
+assert registry.create_task_config('UERL-DirectBalanceDemo-v0').rew_scale_pole_pos == -6.0
 assert registry.create_task_config('UERL-CartPole-Direct-v0').rew_scale_pole_pos == -1.0
 os.environ['UERL_TASK_PLUGINS'] = 'example-cartpole,example-cartpole'
 assert main(['check', 'task', 'Example-CartPole-v0']) == 1

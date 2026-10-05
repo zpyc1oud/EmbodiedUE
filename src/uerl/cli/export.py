@@ -165,6 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     registry = create_default_registry()
     registration = registry.resolve(config.task_id)
     task = registry.create_task(config.task_id, config.task)
+    task.capabilities.require("export", allow_unknown=True)
     metadata = ArtifactMetadata(
         run_hash=resolved.run_hash,
         git_identity=dict(capture_git_identity()),
@@ -188,6 +189,12 @@ def main(argv: list[str] | None = None) -> int:
             device=ENVIRONMENT_DEVICE,
             curriculum_manager=curriculum_manager,
         )
+        # DirectEnv has bound RobotSpec and completed the initial reset here.
+        # Reject unresolved Manager and unsupported Python-hook exports before
+        # constructing the vector runner or loading a checkpoint.
+        capabilities = task.capabilities
+        print(f"[CAPABILITY] {capabilities.format()}")
+        capabilities.require("export")
         vec_env = UERLVecEnvWrapper(direct_env, cfg=config)
         runner = UERLOnPolicyRunner(
             vec_env,
