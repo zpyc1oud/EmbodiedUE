@@ -6,6 +6,7 @@ import argparse
 import json
 
 from ..tasks.registry import create_default_registry
+from .boundary import guard
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -54,6 +55,7 @@ def _task_rows(filter_text: str | None = None) -> list[dict[str, object]]:
     return rows
 
 
+@guard
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     rows = _task_rows(args.filter)

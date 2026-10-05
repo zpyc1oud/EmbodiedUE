@@ -4,7 +4,7 @@ This guide describes the current objective for `UERL-PhantomX-ContinuousTerrain-
 
 ## Terrain configuration and parallel Slots
 
-[continuous.yaml](../../configs/environments/terrains/phantomx/continuous.yaml) defines eight difficulty levels and their generation parameters. The task factory expands the patch dimensions to cover episode travel and scan reach. `resolved_config.json` records both the terrain definition and `worker.slot_count`; 64 Slots does not mean 64 independently maintained terrain configurations.
+[continuous.yaml](../../src/uerl/configs/environments/terrains/phantomx/continuous.yaml) defines eight difficulty levels and their generation parameters. The task factory expands the patch dimensions to cover episode travel and scan reach. `resolved_config.json` records both the terrain definition and `worker.slot_count`; 64 Slots does not mean 64 independently maintained terrain configurations.
 
 Continuous terrain defaults to Slot-isolated geometry and an 8×8 placement grid for 64 Slots. Each Slot has terrain geometry, a level, and episode state. Changing `--num-envs` changes parallelism; review collision isolation, placement, and terrain coverage before increasing it. Discrete terrain instead defaults to a shared terrain atlas. These are task-factory choices, not universal PhantomX defaults.
 

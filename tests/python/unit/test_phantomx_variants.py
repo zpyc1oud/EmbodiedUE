@@ -30,7 +30,7 @@ from uerl.tasks.phantomx.task import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-TRAINING_PATH = ROOT / "configs" / "tasks" / "phantomx" / "training.yaml"
+TRAINING_PATH = ROOT / "src" / "uerl" / "configs" / "tasks" / "phantomx" / "training.yaml"
 PARITY_DIR = ROOT / "tests" / "parity" / "cases" / "phantomx_variants"
 CONTROL_DT = 0.005 * 4
 SHAPES = generic_robot_observation_shapes()
