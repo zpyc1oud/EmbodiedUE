@@ -87,12 +87,13 @@ calling the ONNX exporter.
 
 Training and evaluation print the resolved capability report after Worker
 schema binding and before their long loop; export prints it before ONNX
-conversion. If a Task adds Python action or observation behavior around Manager
-plans, export reports `unknown`: the framework does not infer mathematical
-equivalence from registration metadata. `unknown` is not a deployment
-compatibility claim; verify that Task's supported plan path and complete the
-separate artifact, UE, and target-scene checks for the behavior you intend to
-ship.
+conversion. Export proceeds only when the resolved report says `supported`;
+both `unsupported` and `unknown` stop before ONNX conversion. If a Task adds
+Python action or observation behavior around Manager plans, export reports
+`unknown`: the framework does not infer mathematical equivalence from
+registration metadata. Resolve the implementation into a supported plan path
+before export, then complete the separate artifact, UE, and target-scene checks
+for the behavior you intend to ship.
 
 ## Built-in resources
 

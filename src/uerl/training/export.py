@@ -16,6 +16,7 @@ from typing import Protocol
 
 from uerl.core.config.models import ResolvedRunConfig
 from uerl.core.direct.task import DirectTask
+from uerl.core.mdp.plan import ActionPlan, ObservationPlan
 from uerl.errors import ConfigError
 from uerl.policy.artifact import (
     ARTIFACT_FORMAT_VERSION,
@@ -98,10 +99,42 @@ def export_policy(
     """
 
     capabilities = task.capabilities
-    capabilities.require("export", allow_unknown=True)
     print(f"[CAPABILITY] {capabilities.format()}")
+    capabilities.require("export")
     observation_plan = task.observation_plan
     action_plan = task.action_plan
+
+    return _export_policy_artifact(
+        observation_plan=observation_plan,
+        action_plan=action_plan,
+        runner=runner,
+        output=output,
+        metadata=metadata,
+        robot_runtime=robot_runtime,
+        timing=timing,
+        task_id=task_id,
+        robot_id=robot_id,
+    )
+
+
+def _export_policy_artifact(
+    *,
+    observation_plan: ObservationPlan,
+    action_plan: ActionPlan,
+    runner: _OnnxExporter,
+    output: Path,
+    metadata: ArtifactMetadata,
+    robot_runtime: RobotRuntime,
+    timing: ArtifactTiming,
+    task_id: str,
+    robot_id: str,
+) -> PolicyArtifact:
+    """Package already-approved plans and runner output into an artifact.
+
+    The public export service checks Task capability before calling this helper.
+    Keeping packaging separate also lets focused tests exercise the artifact
+    format without pretending a test plan is a mathematically supported Task.
+    """
 
     with tempfile.TemporaryDirectory(prefix="uerl-export-") as temporary_dir:
         temporary_root = Path(temporary_dir)

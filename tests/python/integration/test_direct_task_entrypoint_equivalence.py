@@ -33,13 +33,14 @@ from uerl.core.direct.types import StateBatch
 from uerl.core.mdp.lib.events import EventEffect
 from uerl.tasks.cartpole import (
     CARTPOLE_CONTROL_DT,
-    CARTPOLE_TASK_ID,
     create_cartpole_registration,
 )
 from uerl.tasks.registry import TaskRegistration, create_default_registry
 
 EXTERNAL_TASK_ID = "Test-CartPole-Minimal-v0"
 EXTERNAL_ENTRY_POINT = "test-minimal-cartpole"
+EXTERNAL_MANAGER_TASK_ID = "Test-CartPole-Manager-v0"
+EXTERNAL_MANAGER_ENTRY_POINT = "test-manager-cartpole"
 _OBSERVATION_FIELDS = (
     "robot.joint.pole.joint_position",
     "robot.joint.pole.joint_velocity",
@@ -152,6 +153,17 @@ def create_external_minimal_registration() -> TaskRegistration:
         task_id=EXTERNAL_TASK_ID,
         task_version="0.1.0",
         task_factory=_create_external_minimal_task,
+        task_config_factory=_external_config,
+    )
+
+
+def create_external_manager_registration() -> TaskRegistration:
+    """Expose the composed Manager path through a second external entry point."""
+
+    return replace(
+        create_cartpole_registration(),
+        task_id=EXTERNAL_MANAGER_TASK_ID,
+        task_version="0.1.0",
         task_config_factory=_external_config,
     )
 
@@ -313,7 +325,7 @@ def _make_batch(
     )
 
 
-def _run(task: DirectTask) -> _Trajectory:
+def _run_scripted_trajectory(task: DirectTask) -> _Trajectory:
     session = _ScriptedCartPoleSession()
     env = UERLDirectEnv(session, task)
     try:
@@ -435,37 +447,51 @@ def _assert_same_trajectory(left: _Trajectory, right: _Trajectory) -> None:
 def test_external_minimal_and_manager_entrypoints_match_behavior_and_reward_edit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    point = EntryPoint(
-        name=EXTERNAL_ENTRY_POINT,
-        value=(
-            "tests.python.integration.test_direct_task_entrypoint_equivalence:"
-            "create_external_minimal_registration"
-        ),
-        group="uerl.tasks",
+    points = EntryPoints(
+        [
+            EntryPoint(
+                name=EXTERNAL_ENTRY_POINT,
+                value=(
+                    "tests.python.integration.test_direct_task_entrypoint_equivalence:"
+                    "create_external_minimal_registration"
+                ),
+                group="uerl.tasks",
+            ),
+            EntryPoint(
+                name=EXTERNAL_MANAGER_ENTRY_POINT,
+                value=(
+                    "tests.python.integration.test_direct_task_entrypoint_equivalence:"
+                    "create_external_manager_registration"
+                ),
+                group="uerl.tasks",
+            ),
+        ]
     )
-    monkeypatch.setattr("importlib.metadata.entry_points", lambda **kwargs: EntryPoints([point]))
-    registry = create_default_registry(external_tasks=(EXTERNAL_ENTRY_POINT,))
+    monkeypatch.setattr("importlib.metadata.entry_points", lambda **kwargs: points)
+    registry = create_default_registry(
+        external_tasks=(EXTERNAL_ENTRY_POINT, EXTERNAL_MANAGER_ENTRY_POINT)
+    )
 
     external_config = registry.create_task_config(EXTERNAL_TASK_ID)
-    manager_defaults = cast(CartPoleTaskConfig, registry.create_task_config(CARTPOLE_TASK_ID))
-    manager_config = replace(
-        manager_defaults,
-        rew_scale_pole_pos=-2.0,
-        max_episode_steps=3,
+    manager_defaults = cast(
+        CartPoleTaskConfig,
+        registry.create_task_config(EXTERNAL_MANAGER_TASK_ID),
     )
+    manager_config = replace(manager_defaults, rew_scale_pole_pos=-2.0, max_episode_steps=3)
     baseline_config = replace(manager_config, rew_scale_pole_pos=-1.0)
     external_task = registry.create_task(EXTERNAL_TASK_ID, external_config)
-    manager_task = registry.create_task(CARTPOLE_TASK_ID, manager_config)
-    baseline_task = registry.create_task(CARTPOLE_TASK_ID, baseline_config)
+    manager_task = registry.create_task(EXTERNAL_MANAGER_TASK_ID, manager_config)
+    baseline_task = registry.create_task(EXTERNAL_MANAGER_TASK_ID, baseline_config)
 
     assert isinstance(external_task, _MinimalCartPoleTask)
+    assert type(manager_task) is DirectTask
     assert external_task.capabilities.train.status is CapabilityStatus.SUPPORTED
     assert external_task.capabilities.evaluate.status is CapabilityStatus.SUPPORTED
     assert external_task.capabilities.export.status is CapabilityStatus.UNSUPPORTED
     assert manager_task.capabilities.train.status.value == "unknown"
-    external_result = _run(external_task)
-    manager_result = _run(manager_task)
-    baseline_result = _run(baseline_task)
+    external_result = _run_scripted_trajectory(external_task)
+    manager_result = _run_scripted_trajectory(manager_task)
+    baseline_result = _run_scripted_trajectory(baseline_task)
     assert manager_task.capabilities.train.status.value == "supported"
     assert manager_task.capabilities.evaluate.status is CapabilityStatus.SUPPORTED
     assert manager_task.capabilities.export.status is CapabilityStatus.SUPPORTED
