@@ -64,8 +64,8 @@ states that mocks do not verify Chaos or other engine behavior.
 
 The comparison uses the official Isaac Lab `v2.3.2` release
 (`37ddf626871758333d6ed89cf64ad702aef127d0`), which is listed as compatible
-with Isaac Sim 4.5/5.0/5.1. That release is closer to the current Isaac Sim 5.x
-testing model than its moving `main`, which now targets Isaac Sim 6.1.
+with Isaac Sim 4.5/5.0/5.1. The comparison and release-source links below pin
+their upstream revisions.
 
 The official contribution guide calls for pytest coverage of normal and edge
 behavior and provides full-suite, file, and individual-test commands. Its
