@@ -43,7 +43,7 @@ struct UERLPOLICY_API FUERLPolicyControllerConfig
 	FVector GroundOrigin = FVector::ZeroVector;
 	FVector GroundNormal = FVector::UpVector;
 	TArray<TWeakObjectPtr<AActor>> TerrainQueryActors;
-	/** Host actor excluded from deployment start-clearance and pose-reset probes. */
+	/** Host actor excluded from deployment pose-reset probes. */
 	TWeakObjectPtr<AActor> GroundQueryIgnoreActor;
 	double InitialRootHeightMeters = 0.0;
 	/** When true, claim an authored SkeletalMesh on the owner. */
@@ -120,6 +120,12 @@ public:
 
 	/** State field layout matching ``CollectState`` (same order as observation plan requirements). */
 	const TArray<FUERLFieldDescriptor>& GetSelectedStateFields() const { return SelectedStateFields; }
+	const TArray<float>& LastRawState() const { return RawState; }
+	const TArray<float>& LastObservation() const { return Observation; }
+	const TArray<float>& LastPreviousAction() const { return LastPreviousActionInput; }
+	const TArray<float>& LastAction() const { return Action; }
+	const TArray<float>& LastActuatorTargets() const { return Targets; }
+	const TMap<FName, TArray<float>>& LastCommands() const { return LastStepCommands; }
 
 	bool IsInitialized() const { return bInitialized; }
 
@@ -144,4 +150,6 @@ private:
 	TArray<float> Action;
 	TArray<float> Targets;
 	TArray<float> PreviousAction;
+	TArray<float> LastPreviousActionInput;
+	TMap<FName, TArray<float>> LastStepCommands;
 };

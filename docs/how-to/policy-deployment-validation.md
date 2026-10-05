@@ -22,6 +22,7 @@ uv sync --locked
 
 $ueRoot = $env:UE_ROOT
 if (-not $ueRoot) { throw 'Set UE_ROOT to the UE 5.8 installation root.' }
+$ueCmd = "$ueRoot\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $project = (Resolve-Path 'engine/UERLHost.uproject').Path
 $runDir = (Resolve-Path 'runs/UERL-PhantomX-ContinuousTerrain-v0/<run-directory>').Path
 $map = '/Game/Maps/UERLPolicyDemo'
@@ -64,7 +65,6 @@ acceptance.
 On the UE 5.8 host, run the corresponding C++ expected-value tests:
 
 ```powershell
-$ueCmd = "$ueRoot\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 & $ueCmd $project '/Engine/Maps/Entry' `
   '-ExecCmds=Automation RunTests UERL.Unit.Policy.DeployParity+UERL.Unit.Policy.DeployVariableDtParity;Quit' `
   -unattended -nullrhi -nosound -NoSplash
@@ -107,7 +107,7 @@ Use the same saved Run, seed, spawn transform, and command sequence on every
 repeat. First collect the Task-side evaluation on the target map:
 
 ```powershell
-uv run uerl play --run $runDir --map $map --seed 0 --steps 4000 --presentation none
+uv run uerl play --project $project --ue-executable $ueCmd --run $runDir --map $map --seed 0 --steps 4000 --presentation none
 ```
 
 Then open that exact map in the Editor, place the imported policy actor on the
