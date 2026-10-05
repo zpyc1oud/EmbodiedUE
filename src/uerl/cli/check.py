@@ -9,6 +9,7 @@ from ..errors import ConfigError, RegistryError, UERLError
 from ..tasks.registry import create_default_registry
 from ..training import build_run_config, robot_runtime_from_config
 from .boundary import describe
+from .host_check import add_host_arguments, run_host_check
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -17,6 +18,8 @@ def _parser() -> argparse.ArgumentParser:
     task_parser = subparsers.add_parser("task", help="check one registered Task")
     task_parser.add_argument("task_id", help="Registered Task ID.")
     task_parser.add_argument("--json", action="store_true", help="Print stable JSON output.")
+    host_parser = subparsers.add_parser("host", help="check the bundled CartPole host files and profile")
+    add_host_arguments(host_parser)
     return parser
 
 
@@ -44,6 +47,8 @@ def _task_report(task_id: str) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.kind == "host":
+        return run_host_check(args)
     if args.kind != "task":
         return 2
     try:
