@@ -157,6 +157,17 @@ assert main(['check', 'task', 'Example-CartPole-v0']) == 1
     # dependencies are reused; the installed target must own all product imports.
     env = os.environ.copy()
     env.pop("UERL_TASK_PLUGINS", None)
+    direct_task_probe = REPO / "tests" / "tooling" / "support" / "installed_direct_task_probe.py"
+    direct_task_result = subprocess.run(
+        [sys.executable, "-I", str(direct_task_probe), str(installed)],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert direct_task_result.returncode == 0, direct_task_result.stdout + direct_task_result.stderr
+    assert "installed Direct Tasks stepped through DirectEnv" in direct_task_result.stdout
     completed = subprocess.run([sys.executable, "-I", str(probe), str(installed)], cwd=tmp_path,
                                env=env, text=True, capture_output=True, check=False)
     assert completed.returncode == 0, completed.stdout + completed.stderr

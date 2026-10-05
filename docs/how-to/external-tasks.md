@@ -161,9 +161,11 @@ zipped wheel is not supported by the path-based loaders.
 The packaging test builds and installs the framework, checked-in examples, and
 generated Manager and Direct package wheels into an isolated target. It checks
 entry-point discovery, YAML resource loading, Task construction, and CLI
-capability reports outside the checkout. The Direct/Manager behavior test uses
-the checked-in Direct Task implementation, a Manager registration, a scripted
-Session, and independent numeric expectations for actions, observations,
-rewards, termination, reset masks, and invalid Slots. This remains Python
-evidence; it does not validate UE execution, Chaos behavior, training quality,
-or game deployment. Those remain separate Issue #6 acceptance gates.
+capability reports outside the checkout, then executes one scripted DirectEnv
+step for each installed Direct package outside the checkout. The Direct/Manager
+behavior test uses the checked-in Direct Task implementation, a Manager
+registration, a scripted Session, and independent numeric expectations for
+actions, observations, rewards, termination, reset masks, and invalid Slots.
+These are Python checks; they do not validate UE execution, Chaos behavior,
+training quality, or game deployment. Those remain separate Issue #6 acceptance
+gates.
