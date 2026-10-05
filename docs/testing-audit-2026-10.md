@@ -39,18 +39,19 @@ states that mocks do not verify Chaos or other engine behavior.
    `.github/workflows/static-checks.yml` runs Ruff and Mypy. The user had
    previously selected that basic CI scope, so the absence of pytest in CI is a
    recorded boundary, not a defect or authorization to broaden the workflow.
-   This task runs the requested full default Python suite locally and reports it
-   separately from CI and UE evidence.
-3. **The native UE suite needs a Windows/UE host.** The current environment is
-   Linux and does not provide the project's UE 5.8 installation, so UE
-   Automation, Chaos, and real Worker E2E remain unverified here. Keep that
-   status separate from Python and static-check results.
+   Local changes still follow the contributor workflow's Python validation; that
+   requirement does not imply adding pytest to CI.
+3. **The native UE suite needs a Windows/UE host.** This audit does not
+   establish UE Automation, Chaos, or real Worker E2E results. Run those checks
+   on the required Windows/UE 5.8 host and keep their evidence separate from
+   Python and static-check results.
 4. **The external Direct package path is narrower than the public hooks.** The
    existing Direct/Manager equivalence coverage exercises an external-entry
    point fixture, while `uerl new external-cartpole` produces a Manager package.
-   An installed generated Direct package should be covered through package
-   discovery and the public CLI/configuration path; matching response lengths
-   or reading generated source alone is insufficient.
+   The public Direct hooks do not yet have a generated, installed package path
+   covered through discovery and CLI/configuration behavior. Add that coverage
+   with independent numeric assertions; matching response lengths or reading
+   generated source alone is insufficient.
 5. **UE Automation completion thresholds are smoke checks, not case identity
    proofs.** `run_all_tests.py` checks successful log completion and minimum
    counts for each filter. The filters are currently explicit, but threshold
