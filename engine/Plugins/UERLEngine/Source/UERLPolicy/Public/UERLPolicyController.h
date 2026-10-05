@@ -85,11 +85,12 @@ public:
 		const FUERLPolicyControllerConfig& Config,
 		FString& OutError);
 
-	/** One control step. Missing command channels error (no silent zero-fill). */
+	/** One control step. Missing command channels error; optionally retain snapshot-only inputs. */
 	bool Step(
 		const FUERLPolicyCommands& Commands,
 		const FUERLControlTiming& Timing,
-		FString& OutError);
+		FString& OutError,
+		bool bCaptureDiagnostics = false);
 
 	/** Clear previous-action / working buffers; robot pose is left to the host. */
 	void Reset();
@@ -122,9 +123,11 @@ public:
 	const TArray<FUERLFieldDescriptor>& GetSelectedStateFields() const { return SelectedStateFields; }
 	const TArray<float>& LastRawState() const { return RawState; }
 	const TArray<float>& LastObservation() const { return Observation; }
+	/** Empty after steps that did not request diagnostic capture. */
 	const TArray<float>& LastPreviousAction() const { return LastPreviousActionInput; }
 	const TArray<float>& LastAction() const { return Action; }
 	const TArray<float>& LastActuatorTargets() const { return Targets; }
+	/** Empty after steps that did not request diagnostic capture. */
 	const TMap<FName, TArray<float>>& LastCommands() const { return LastStepCommands; }
 
 	bool IsInitialized() const { return bInitialized; }

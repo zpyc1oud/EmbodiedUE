@@ -121,19 +121,32 @@ component checks channel width and finite values, not task-specific units or
 limits. The Egypt chase example uses `[0.45, 0, yaw_rate]`.
 
 Bind `OnControlStepCompleted` to the host's run recorder. Each event carries a
-single post-physics frame with solver frame/time, elapsed game/physics time,
-observation dt, last solver-step dt, named raw-state fields and widths, exact
-network observation, previous action input, raw policy action, actuator
-targets, and named command values with ages. Append these frames to the same
-run log as Task-side results so comparisons share a sequence number and solver
-boundary; this is opt-in and only copies diagnostic arrays when a listener is
-bound.
+single post-physics frame with a component-local sequence number, solver
+frame/time, elapsed game/physics time, observation dt, last solver-step dt,
+named raw-state fields and widths, exact network observation, previous action
+input, raw policy action, actuator targets, and named command values with ages.
+The event is opt-in: the component builds and copies the snapshot arrays only
+while a listener is bound. The component does not persist these events, and
+`uerl play` does not emit a corresponding per-step snapshot log. A host recorder
+must persist the UE sequence itself; compare it with Task-side playback using
+the same artifact, map, seed, start, and command schedule. Exact per-step
+Task/UE pairing requires an external recorder that captures both sides.
 
 Run the snapshot alignment regression on the UE host:
+
+AC_019 replays the artifact observation plan from each captured frame's raw
+state, command values, previous action, and control dt, then re-evaluates the
+artifact network from that observation and compares the results with the
+recorded observation and action. AC_020 calls `StopPolicy` and `SoftReset`
+inside the public frame callback and checks the restart/bootstrap boundary.
 
 ```powershell
 & $ueCmd $project '/Engine/Maps/Entry' `
   '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_019;Quit' `
+  -unattended -nullrhi -nosound -NoSplash
+
+& $ueCmd $project '/Engine/Maps/Entry' `
+  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_020;Quit' `
   -unattended -nullrhi -nosound -NoSplash
 ```
 

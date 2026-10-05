@@ -236,8 +236,9 @@ void UUERLPolicyComponent::BroadcastControlFrameSnapshot(
 
 	for (const FUERLFieldDescriptor& Field : Controller.GetSelectedStateFields())
 	{
-		Snapshot.RawStateFields.Add(Field.Name);
-		Snapshot.RawStateFieldWidths.Add(Field.Width);
+		FUERLPolicyStateFieldSample& StateField = Snapshot.RawStateFields.AddDefaulted_GetRef();
+		StateField.Name = Field.Name;
+		StateField.Width = Field.Width;
 	}
 	for (const FUERLPolicyCommandChannel& Channel : Controller.RequiredCommands())
 	{
@@ -602,7 +603,7 @@ void UUERLPolicyComponent::TickComponent(
 	ControlTiming.ObservationDtSeconds = ObservationSeconds;
 	ControlTiming.LastSolverStepSeconds = Clock.LastDt;
 	const uint64 StepGeneration = LifecycleGeneration;
-	if (!Controller.Step(Commands, ControlTiming, Error))
+	if (!Controller.Step(Commands, ControlTiming, Error, OnControlStepCompleted.IsBound()))
 	{
 		Fault(Error);
 		return;

@@ -37,6 +37,19 @@ struct UERLPOLICY_API FUERLPolicyCommandSample
 	double AgeSeconds = 0.0;
 };
 
+/** Name and scalar width for one packed Robot raw-state segment. */
+USTRUCT(BlueprintType)
+struct UERLPOLICY_API FUERLPolicyStateFieldSample
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	FName Name;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	int32 Width = 0;
+};
+
 /** Inputs, outputs, and clocks aligned to one completed policy control frame. */
 USTRUCT(BlueprintType)
 struct UERLPOLICY_API FUERLPolicyControlFrameSnapshot
@@ -65,10 +78,7 @@ struct UERLPOLICY_API FUERLPolicyControlFrameSnapshot
 	double LastSolverStepSeconds = 0.0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Policy")
-	TArray<FName> RawStateFields;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Policy")
-	TArray<int32> RawStateFieldWidths;
+	TArray<FUERLPolicyStateFieldSample> RawStateFields;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Policy")
 	TArray<float> RawState;

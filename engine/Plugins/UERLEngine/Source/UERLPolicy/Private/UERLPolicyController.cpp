@@ -373,7 +373,8 @@ bool FUERLPolicyController::InitializeFromBytes(
 bool FUERLPolicyController::Step(
 	const FUERLPolicyCommands& Commands,
 	const FUERLControlTiming& Timing,
-	FString& OutError)
+	FString& OutError,
+	bool bCaptureDiagnostics)
 {
 	OutError.Reset();
 	if (!bInitialized)
@@ -415,8 +416,7 @@ bool FUERLPolicyController::Step(
 
 	FUERLPlanInputs ObsInputs;
 	ObsInputs.RawState = RawState;
-	TArray<float> PreviousActionInput = PreviousAction;
-	ObsInputs.PreviousAction = PreviousActionInput;
+	ObsInputs.PreviousAction = PreviousAction;
 	ObsInputs.ControlFrameDtSeconds = static_cast<float>(Timing.ObservationDtSeconds);
 	TMap<FName, TArray<float>> StepCommands;
 	for (const FUERLPolicyCommandChannel& Channel : RequiredCommandChannels)
@@ -439,7 +439,10 @@ bool FUERLPolicyController::Step(
 					Channel.Width));
 		}
 		ObsInputs.Commands.Add(Channel.Name, *Values);
-		StepCommands.Add(Channel.Name, *Values);
+		if (bCaptureDiagnostics)
+		{
+			StepCommands.Add(Channel.Name, *Values);
+		}
 	}
 
 	if (!ObservationRuntime.Execute(ObsInputs, Observation, OutError))
@@ -458,7 +461,7 @@ bool FUERLPolicyController::Step(
 
 	FUERLPlanInputs ActionInputs;
 	ActionInputs.PolicyAction = Action;
-	ActionInputs.PreviousAction = PreviousActionInput;
+	ActionInputs.PreviousAction = PreviousAction;
 	if (!ActionRuntime.Execute(ActionInputs, Targets, OutError))
 	{
 		return false;
@@ -472,8 +475,16 @@ bool FUERLPolicyController::Step(
 		return false;
 	}
 
-	LastPreviousActionInput = MoveTemp(PreviousActionInput);
-	LastStepCommands = MoveTemp(StepCommands);
+	if (bCaptureDiagnostics)
+	{
+		LastPreviousActionInput = PreviousAction;
+		LastStepCommands = MoveTemp(StepCommands);
+	}
+	else
+	{
+		LastPreviousActionInput.Reset();
+		LastStepCommands.Reset();
+	}
 	PreviousAction = Action;
 	LastTiming = Timing;
 	OutError.Reset();

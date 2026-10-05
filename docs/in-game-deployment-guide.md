@@ -181,4 +181,4 @@ The host defaults to the empty `/Engine/Maps/Entry`. For the optional Egypt Play
 
 ## Limitations
 
-Runtime and packaging instructions target the repository's UE 5.8 Windows setup. They have not been rerun during this documentation-only update. Window-end contact sampling cannot recover force peaks that ended earlier in the window. The demo uses static ground and cached terrain queries; moving ground, dynamic obstacles, or new command channels require task/artifact design and validation. Demo assets and third-party maps need a redistribution review before release.
+Runtime and packaging instructions target the repository's UE 5.8 Windows setup. Build the target Editor and run the applicable Automation checks in that environment before deployment; Python parity does not establish Chaos behavior. Window-end contact sampling cannot recover force peaks that ended earlier in the window. The demo uses static ground and cached terrain queries; moving ground, dynamic obstacles, or new command channels require task/artifact design and validation. Demo assets and third-party maps need a redistribution review before release.

@@ -5,6 +5,13 @@
 #include "UERLPolicyComponent.h"
 #include "UERLPolicyComponentTestEvents.generated.h"
 
+enum class EUERLPolicyTestFrameCallbackMode : uint8
+{
+	Stop,
+	SoftReset,
+	RecordOnly,
+};
+
 /** Records dynamic component events for the policy component integration tests. */
 UCLASS()
 class UUERLPolicyComponentTestEventRecorder : public UObject
@@ -14,12 +21,29 @@ class UUERLPolicyComponentTestEventRecorder : public UObject
 public:
 	int32 ControlFrameCount = 0;
 	FUERLPolicyControlFrameSnapshot LastControlFrame;
+	TArray<FUERLPolicyControlFrameSnapshot> ControlFrames;
+	EUERLPolicyTestFrameCallbackMode ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::RecordOnly;
+	TWeakObjectPtr<UUERLPolicyComponent> ControlFrameCallbackComponent;
+	bool bControlFrameCallbackSucceeded = false;
 
 	UFUNCTION()
 	void OnControlFrameCompleted(const FUERLPolicyControlFrameSnapshot& Frame)
 	{
 		++ControlFrameCount;
 		LastControlFrame = Frame;
+		ControlFrames.Add(Frame);
+		if (UUERLPolicyComponent* Component = ControlFrameCallbackComponent.Get())
+		{
+			if (ControlFrameCallbackMode == EUERLPolicyTestFrameCallbackMode::Stop)
+			{
+				Component->StopPolicy();
+				bControlFrameCallbackSucceeded = !Component->IsRunning();
+			}
+			else if (ControlFrameCallbackMode == EUERLPolicyTestFrameCallbackMode::SoftReset)
+			{
+				bControlFrameCallbackSucceeded = Component->SoftReset();
+			}
+		}
 	}
 
 	int32 OverrunCount = 0;
