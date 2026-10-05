@@ -151,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         robot_runtime = robot_runtime_from_config(config)
     else:
         if not args.robot_runtime.is_file():
-            parser.error("--robot-runtime must point to an existing YAML or JSON file")
+            parser.error("--robot-runtime must point to an existing YAML file")
         try:
             runtime_payload = load_unique_yaml(args.robot_runtime.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, yaml.YAMLError, TypeError, ValueError) as exc:
