@@ -12,6 +12,7 @@ Start with the [repository README](../README.md) for prerequisites and the first
 | In-game inference and packaging | [Deployment](in-game-deployment-guide.md) |
 | Common setup and runtime failures | [Troubleshooting](troubleshooting.md) |
 | Test layers and commands | [Tests](../tests/README.md) |
+| Testing audit and Isaac Lab comparison | [Testing audit](testing-audit-2026-10.md) |
 | Adding plan operators | [Operator admission](../engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md) |
 | Contributions and change review | [Contributing](../CONTRIBUTING.md) |
 | Proposal, PR, validation, merge, and release process | [Contribution workflow](contribution-workflow.md) |
