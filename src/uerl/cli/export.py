@@ -6,10 +6,10 @@ import argparse
 import json
 from pathlib import Path
 
+from uerl.application.run_config import RESOLVED_CONFIG_FILENAME, resolve_run_config
 from uerl.cli.boundary import guard, parse_overrides
 from uerl.cli.flags import EXPORT_FLAGS, add_common_flags, apply_common_flags
 from uerl.cli.host_flags import add_host_flags, resolve_host_flags
-from uerl.cli.run_config import RESOLVED_CONFIG_FILENAME, recorded_map_path, resolve_run_config
 from uerl.training.export import export_policy
 
 
@@ -43,7 +43,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--map",
         dest="map_name",
-        help="UE World long package name; defaults to the registered Task map.",
+        help="UE World long package name; defaults to the recorded Run map, then the registered Task map.",
     )
     parser.add_argument(
         "--presentation",
@@ -69,7 +69,6 @@ def main(argv: list[str] | None = None) -> int:
     from uerl.training import (
         build_launch_overrides,
         build_rsl_rl_train_config,
-        build_run_config,
         resolve_resume_checkpoint,
         resolve_run_directory,
         robot_runtime_from_config,
@@ -102,12 +101,10 @@ def main(argv: list[str] | None = None) -> int:
     direct_overrides = apply_common_flags(parser, args, parse_overrides(parser, remaining), EXPORT_FLAGS)
     # The artifact does not depend on the Slot count; one Robot is enough to build the policy graph.
     direct_overrides.setdefault("worker.slot_count", "1")
-    map_name = (
-        args.map_name
-        or direct_overrides.get("session.map_path")
-        or recorded_map_path(run_directory)
-        or build_run_config(args.task).session.map_path
-    )
+    if args.map_name:
+        direct_overrides["session.map_path"] = args.map_name
+    base_config = resolve_run_config(args.task, run_directory, direct_overrides).config
+    map_name = base_config.session.map_path
     launch_overrides: dict[str, str] = {}
     if direct_overrides.get("session.mode") != "attach":
         host = resolve_host_flags(args)

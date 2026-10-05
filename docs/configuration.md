@@ -16,9 +16,9 @@ These commands do not start UE. A successful task check validates declarations, 
 |---|---|
 | UE Skeletal Mesh / Skeleton / PhysicsAsset | Bodies, joints, hierarchy, mass, inertia, geometry, and limits |
 | `src/uerl/assets/robots/*.py` | Asset references, actuator semantics, gains, reference poses, observation selection, and reset distributions |
-| `configs/tasks/*/training.yaml` | Base task, Worker, and runner settings |
+| `src/uerl/configs/tasks/*/training.yaml` | Base task, Worker, and runner settings |
 | `src/uerl/tasks/*/registration.py` | Task-specific factories and defaults |
-| `configs/environments/terrains/phantomx/*.yaml` | Terrain tiers and generation parameters |
+| `src/uerl/configs/environments/terrains/phantomx/*.yaml` | Terrain tiers and generation parameters |
 | Run `resolved_config.json` and manifest | The configuration and identities recorded for an actual run |
 
 Robot declarations support derivation and regular-expression joint selection. Runtime Worker projections are generated from those declarations and reflected topology; they are not a second configuration to edit.
@@ -43,6 +43,37 @@ uv run uerl config --task UERL-PhantomX-ContinuousTerrain-v0 --runner.max_iterat
 Unknown or non-configurable paths are rejected. Do not combine an everyday flag with a dotted override for the same field. `--run-dir` conflicts with `--logging.run_directory`, and `--resume` conflicts with `--runner.checkpoint`.
 
 Changing dimensions, timing, robot semantics, or the training objective can make an existing checkpoint incompatible. `play --run` and `export --run` load recorded settings from the Run. Prefer Run directories over detached weight files when reproducing results.
+
+## Saved-run configuration
+
+`play --run` and `export --run` use the shared application resolver in
+[`application/run_config.py`](../src/uerl/application/run_config.py). It restores
+Worker, Task, and runner settings from `resolved_config.json`, retains the saved
+training hash, and validates explicit overrides through the typed configuration
+resolver. Session endpoints and logging start from the current registration.
+The saved file is not edited.
+
+Map selection is `--map`, then `--session.map_path`, then the recorded map, then
+the registered Task map. The selected map is used both in Worker launch arguments
+and the Session configuration. Existing CLI commands and flags are unchanged.
+Python callers of the former `uerl.cli.run_config` module should import
+`resolve_run_config` from `uerl.application.run_config` instead; map restoration
+is included in the returned configuration.
+
+### Current limitations
+
+A missing snapshot still uses current Task defaults. Missing dataclass fields in
+an existing snapshot still use the current template; unknown fields, invalid
+field types, and a different Task identity are rejected. These legacy fallback
+rules do not establish faithful continuation for incomplete runs.
+
+`train --resume` still selects a checkpoint while building configuration from
+current Task defaults and explicit overrides, through the same application
+resolver's defaults path. It does **not** restore the source run snapshot.
+Objective checks and checkpoint curriculum/random-state restoration remain in
+the training runner. Strict continuation metadata requirements, allowed semantic
+overrides, warm-start intent, and configuration differences remain tracked in
+[Issue #7](https://github.com/zpyc1oud/EmbodiedUE/issues/7).
 
 ## Timing and parallelism
 

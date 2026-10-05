@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import cast
 
+from ..application.run_config import RESOLVED_CONFIG_FILENAME, resolve_run_config
 from ..core.config.canonical import canonical_json
 from ..core.config.manifest import capture_git_identity
 from ..host.profile import DEFAULT_UE_EXECUTABLE
@@ -14,7 +15,6 @@ from ..presentation import InternalViewportRecorder
 from .boundary import guard, parse_overrides
 from .flags import PLAY_FLAGS, add_common_flags, apply_common_flags
 from .host_flags import add_host_flags, resolve_host_flags
-from .run_config import RESOLVED_CONFIG_FILENAME, recorded_map_path, resolve_run_config
 
 __all__ = ["DEFAULT_UE_EXECUTABLE", "InternalViewportRecorder", "_parser", "main"]
 
@@ -68,7 +68,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--map",
         dest="map_name",
-        help="UE World long package name; defaults to the registered Task map.",
+        help="UE World long package name; defaults to the recorded Run map, then the registered Task map.",
     )
     parser.add_argument(
         "--presentation",
@@ -103,7 +103,6 @@ def main(argv: list[str] | None = None) -> int:
     from ..tasks.registry import create_default_registry
     from ..training import (
         build_launch_overrides,
-        build_run_config,
         resolve_resume_checkpoint,
         resolve_run_directory,
         run_evaluation,
@@ -135,12 +134,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.controller not in known_play_controllers():
         parser.error(f"unknown play controller {args.controller!r}")
-    map_name = (
-        args.map_name
-        or direct_overrides.get("session.map_path")
-        or recorded_map_path(run_directory)
-        or build_run_config(args.task).session.map_path
-    )
+    if args.map_name:
+        direct_overrides["session.map_path"] = args.map_name
+    base_config = resolve_run_config(args.task, run_directory, direct_overrides).config
+    map_name = base_config.session.map_path
     recorder = None
     if args.record is not None:
         if args.presentation != "viewport":

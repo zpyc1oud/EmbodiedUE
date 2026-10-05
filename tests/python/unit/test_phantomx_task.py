@@ -30,7 +30,7 @@ from uerl.tasks.phantomx.pursuit import PHANTOMX_PURSUIT_TARGET_FIELD
 from uerl.tasks.phantomx.task import PhantomXTask, create_phantomx_pursuit_direct_task
 
 ROOT = Path(__file__).resolve().parents[3]
-TRAINING_PATH = ROOT / "configs" / "tasks" / "phantomx" / "training.yaml"
+TRAINING_PATH = ROOT / "src" / "uerl" / "configs" / "tasks" / "phantomx" / "training.yaml"
 SHAPES = generic_robot_observation_shapes()
 TERRAIN_SHAPE = SHAPES.shape_for(ObsType.TERRAIN_HEIGHT)
 

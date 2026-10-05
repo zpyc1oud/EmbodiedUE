@@ -14,6 +14,7 @@ Start with the [repository README](../README.md) for prerequisites and the first
 | Test layers and commands | [Tests](../tests/README.md) |
 | Adding plan operators | [Operator admission](../engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md) |
 | Contributions and change review | [Contributing](../CONTRIBUTING.md) |
+| Proposal, PR, validation, merge, and release process | [Contribution workflow](contribution-workflow.md) |
 | Trust boundaries and vulnerability reports | [Security](../SECURITY.md) |
 | Third-party code and content | [Notices and inventory](../THIRD_PARTY_NOTICES.md) |
 | Fab asset removal planning | [Asset publication plan](asset-publication-plan.md) |
