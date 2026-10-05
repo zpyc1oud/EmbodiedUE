@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from uerl.cli import new
+from uerl.core.config.yaml_loader import load_unique_yaml
 
 
 def test_robot_scaffold_writes_declaration_and_checklist(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
@@ -121,8 +122,11 @@ def test_external_cartpole_generator_writes_an_installable_package(tmp_path: Pat
     assert "DirectTask" in test_source
     assert "UERL-BalanceDemo-v0" in readme
     assert "UERL_TASK_PLUGINS" in readme
+    assert 'balance_demo = ["reward.yaml"]' in metadata
+    assert "reward.yaml" in registration
+    assert not (package / "reward.json").exists()
 
-    reward = json.loads((package / "reward.json").read_text(encoding="utf-8"))
+    reward = load_unique_yaml((package / "reward.yaml").read_text(encoding="utf-8"))
     assert reward == {"pole_position_weight": -2.0}
     compile(registration, str(package / "__init__.py"), "exec")
 

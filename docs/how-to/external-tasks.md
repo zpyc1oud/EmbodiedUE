@@ -33,7 +33,7 @@ uerl config --task UERL-BalanceDemo-v0 --json
 
 The generated project includes entry-point metadata, its own reward resource,
 registration tests, and usage instructions. It reuses the framework CartPole
-Task and changes only `pole_position_weight` in `src/balance_demo/reward.json`.
+Task and changes only `pole_position_weight` in `src/balance_demo/reward.yaml`.
 Run its tests with `python -m pytest`. The generated package can be installed and
 checked from any current directory; `check task` does not start UE. For editable
 development, use `uv pip install -e <directory> --no-deps` in the prepared

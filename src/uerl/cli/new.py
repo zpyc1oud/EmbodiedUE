@@ -430,7 +430,7 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
         where = ["src"]
 
         [tool.setuptools.package-data]
-        {slug} = ["reward.json"]
+        {slug} = ["reward.yaml"]
         '''
     )
     package = dedent(
@@ -439,10 +439,10 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
 
         from __future__ import annotations
 
-        import json
         from dataclasses import replace
         from importlib.resources import files
 
+        from uerl.core.config.yaml_loader import load_unique_yaml
         from uerl.tasks.cartpole import CartPoleTaskConfig
         from uerl.tasks.cartpole.registration import create_cartpole_registration, create_cartpole_task_config
         from uerl.tasks.registry import TaskRegistration
@@ -453,10 +453,13 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
         def create_task_config() -> CartPoleTaskConfig:
             """Change the configured pole-position reward and preserve CartPole semantics."""
 
-            reward = json.loads(files(__package__).joinpath("reward.json").read_text(encoding="utf-8"))
+            reward = load_unique_yaml(files(__package__).joinpath("reward.yaml").read_text(encoding="utf-8"))
+            weight = reward.get("pole_position_weight") if isinstance(reward, dict) else None
+            if not isinstance(weight, (int, float)) or isinstance(weight, bool):
+                raise ValueError("reward.yaml must define a numeric pole_position_weight")
             return replace(
                 create_cartpole_task_config(),
-                rew_scale_pole_pos=float(reward["pole_position_weight"]),
+                rew_scale_pole_pos=float(weight),
             )
 
 
@@ -481,7 +484,7 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
         This installable package registers `{task_id}` through the `uerl.tasks`
         entry-point group. It reuses EmbodiedUE's CartPole Task, Robot declaration,
         Worker and runner configurations, and runtime. Its only Task change is the
-        pole-position reward weight in `src/{slug}/reward.json`.
+        pole-position reward weight in `src/{slug}/reward.yaml`.
 
         ## Requirements
 
@@ -514,7 +517,7 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
 
         ## Change the reward
 
-        Edit `pole_position_weight` in `src/{slug}/reward.json` (initially `-2.0`).
+        Edit `pole_position_weight` in `src/{slug}/reward.yaml` (initially `-2.0`).
         The package reads this resource for each fresh Task configuration. A
         non-editable installation must be reinstalled after the file changes.
         The generated tests in `tests/test_registration.py` check the registration,
@@ -550,7 +553,7 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
         root / "pyproject.toml": metadata,
         root / "README.md": readme,
         root / "src" / slug / "__init__.py": package,
-        root / "src" / slug / "reward.json": '{"pole_position_weight": -2.0}\n',
+        root / "src" / slug / "reward.yaml": "pole_position_weight: -2.0\n",
         root / "tests" / "test_registration.py": tests,
     }
 
