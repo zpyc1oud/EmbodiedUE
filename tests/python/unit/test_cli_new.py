@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from uerl.cli import new
+from uerl.core.config.yaml_loader import load_unique_yaml
 
 
 def test_robot_scaffold_writes_declaration_and_checklist(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
@@ -91,4 +92,53 @@ def test_scaffold_refuses_conflicts_before_writing_other_files(tmp_path: Path, c
 
     assert declaration.read_text() == "existing"
     assert not declaration.with_suffix(".md").exists()
+    assert "refusing to overwrite" in capsys.readouterr().out
+
+
+def test_external_cartpole_generator_writes_an_installable_package(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    project = tmp_path / "balance-demo"
+
+    assert new.main(["external-cartpole", "balance-demo", "--output-dir", str(project), "--json"]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["kind"] == "external-cartpole"
+    assert result["task_id"] == "UERL-BalanceDemo-v0"
+    assert result["entry_point"] == "balance-demo"
+    assert len(result["files"]) == 5
+
+    metadata = (project / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'name = "uerl-balance-demo"' in metadata
+    assert 'balance-demo = "balance_demo:create_registration"' in metadata
+
+    package = project / "src" / "balance_demo"
+    registration = (package / "__init__.py").read_text(encoding="utf-8")
+    test_source = (project / "tests" / "test_registration.py").read_text(encoding="utf-8")
+    readme = (project / "README.md").read_text(encoding="utf-8")
+    assert 'TASK_ID = "UERL-BalanceDemo-v0"' in registration
+    assert "create_cartpole_registration" in registration
+    assert "importlib.resources" in registration
+    assert "NotImplementedError" not in registration
+    assert "TODO" not in registration
+    assert "DirectTask" in test_source
+    assert "UERL-BalanceDemo-v0" in readme
+    assert "UERL_TASK_PLUGINS" in readme
+    assert 'balance_demo = ["reward.yaml"]' in metadata
+    assert "reward.yaml" in registration
+    assert not (package / "reward.json").exists()
+
+    reward = load_unique_yaml((package / "reward.yaml").read_text(encoding="utf-8"))
+    assert reward == {"pole_position_weight": -2.0}
+    compile(registration, str(package / "__init__.py"), "exec")
+
+
+def test_external_cartpole_generator_refuses_existing_project_files(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    project = tmp_path / "balance-demo"
+    project.mkdir()
+    existing = project / "README.md"
+    existing.write_text("keep", encoding="utf-8")
+
+    assert new.main(["external-cartpole", "balance-demo", "--output-dir", str(project)]) == 1
+
+    assert existing.read_text(encoding="utf-8") == "keep"
+    assert not (project / "pyproject.toml").exists()
     assert "refusing to overwrite" in capsys.readouterr().out
