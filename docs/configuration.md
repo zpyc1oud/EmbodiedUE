@@ -216,18 +216,23 @@ runtime options:
   a missing unused sampler state is reported and accepted.
 
 Neither source files nor checkpoints are rewritten. Recover missing configuration
-from original experiment evidence before retrying; there is no automatic migration
-or warm-start mode. The strict contract applies to the training CLI. Programmatic
+from original experiment evidence before retrying; there is no automatic migration.
+The strict contract applies to the training CLI. Programmatic
 callers can use `Continuation` and `inspect_resume_checkpoint` before passing the
 resolved configuration and recovered options to `run_training`.
 
-### Evaluation and export limitations
+### Continuation, evaluation, export, and deployment boundary
 
-`play` and `export` require a complete current-schema saved configuration. They
+`train --resume` is strict continuation from a compatible saved Run, restoring
+its saved configuration and compatible training state. The CLI has no warm-start
+mode that initializes a new experiment from selected prior weights.
+`play` and `export` require a complete current-schema saved configuration; they
 reject missing fields, unsupported schema versions, and a Task identity or
 version mismatch before Session startup. Current defaults never fill missing
-saved settings. Broader run intent, warm start and deployment validation remain
-tracked in [Issue #7](https://github.com/zpyc1oud/EmbodiedUE/issues/7).
+saved settings. These restoration rules do not establish learning quality or
+deployment compatibility across target scenes. Full target-map and in-game
+deployment validation remains tracked in
+[Issue #8](https://github.com/zpyc1oud/EmbodiedUE/issues/8).
 
 ## Timing and parallelism
 

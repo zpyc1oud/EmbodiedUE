@@ -87,7 +87,7 @@ The resolver accepts a run intent, Task/run source, machine settings, and explic
 |---|---|---|
 | New training | Task defaults, experiment preset, explicit overrides | Save the effective configuration |
 | Continuation | Original run snapshot | Allow defined machine/output/budget changes; reject silent Task changes |
-| Warm start | New experiment plus selected prior weights | State which optimizer, normalization, and curriculum state is restored |
+| Warm start | Out of scope | No warm-start mode; start fresh training or continue a compatible saved Run |
 | Evaluation | Saved policy semantics plus explicit evaluation conditions | Preserve the original training configuration |
 | Export | Saved trained configuration and actual plans | Validate sufficient metadata; use online initialization when necessary |
 
