@@ -43,3 +43,6 @@ jobs:
 
       - name: Run Mypy
         run: uv run --no-sync mypy src tests
+
+      - name: Run Python tests
+        run: uv run --no-sync pytest -q

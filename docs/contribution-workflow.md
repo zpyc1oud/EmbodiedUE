@@ -174,11 +174,12 @@ This document defines contributor practice. At the 2026-10-05 baseline
 (`44967ea`), the tree had local hooks but no checked-in `.github`
 workflows/templates, and the visible `Default` ruleset was disabled. Since then,
 `.github/workflows/static-checks.yml` has been added. It runs Ruff and Mypy
-on pull requests to `main` and pushes to `main`. It does not validate
-documentation links or configuration files, or run Python tests, Unreal Engine,
-Chaos, or GPU checks. A green result is static-check evidence only, not a runtime
-guarantee. Required status checks and other repository controls remain separate
-maintainer decisions.
+and the default Python pytest suite on pull requests to `main` and pushes to
+`main`. The pytest paths include Python, protocol, tooling, and parity tests but
+exclude real UE E2E. The workflow does not validate documentation links or
+configuration files, or run Unreal Engine, Chaos, or GPU checks. A green result
+does not establish UE runtime behavior. Required status checks and other
+repository controls remain separate maintainer decisions.
 
 AI assistants follow this workflow within the user's authorized task. Requests to
 prepare, review, or implement work do not by themselves authorize merging,
