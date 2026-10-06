@@ -1,6 +1,7 @@
 # UE unit tests
 
-Native UE Automation tests compile with their UBT modules. Their sources are located in:
+Native UE Automation tests compile in their UBT modules.
+The C++ source directories are:
 
 - `engine/Plugins/UERLEngine/Source/UERLInterface/Private/Tests/Unit/`
 - `engine/Plugins/UERLEngine/Source/UERLTransport/Private/Tests/Unit/`
@@ -9,6 +10,12 @@ Native UE Automation tests compile with their UBT modules. Their sources are loc
 - `engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/`
 - `engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/`
 
-`UERLRobot` cases cover topology reflection, observation plans, kinematics, contact, provider registration/configuration rejection, and real CartPole content smoke tests. The content smoke requires the repository Skeletal Mesh and PhysicsAsset and must not silently skip missing assets.
+`UERLRobot` cases cover topology reflection, observation plans, kinematics, contact, and provider registration.
+They also cover rejected configurations and real CartPole content smoke tests.
+The content smoke requires the repository Skeletal Mesh and PhysicsAsset.
+Report missing assets as a failure or blocker, not a silent skip.
 
-This directory indexes the tests; it does not duplicate C++ sources outside their compilable modules. See [the test guide](../../README.md) for commands.
+This directory is an index.
+Keep each C++ source in its compilable module.
+Use the [test guide](../../README.md) for commands.
+Use [Write tests](../../../docs/how-to/write-tests.md) for test implementation and review.

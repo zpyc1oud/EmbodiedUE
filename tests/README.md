@@ -1,6 +1,8 @@
 # Tests
 
-This directory contains tests, mocks, fixtures, and E2E orchestration. Product interfaces and Tasks belong in `src/uerl`.
+This directory contains tests, mocks, fixtures, and E2E orchestration.
+Product interfaces and Tasks belong in `src/uerl`.
+Use [Write tests](../docs/how-to/write-tests.md) for examples, fixture rules, independent assertions, and review steps.
 
 ## Test layers
 
@@ -16,11 +18,13 @@ This directory contains tests, mocks, fixtures, and E2E orchestration. Product i
 | `tooling/` | Installation, packaging, dependency boundaries, and profiling |
 | `ue/unit/` | Index of native UE Automation tests |
 
-Native C++ tests must compile inside UBT modules. Their sources live in each module's `Private/Tests/Unit/`; see the [UE test index](ue/unit/README.md).
+Native C++ tests must compile inside UBT modules.
+Their sources are in each module's `Private/Tests/Unit/` directory.
+See the [UE test index](ue/unit/README.md).
 
 ## Python checks
 
-After installing dependencies:
+After dependency installation, run the applicable commands:
 
 ```powershell
 uv run pytest -q
@@ -28,25 +32,32 @@ uv run pytest tests/python/unit tests/protocol/unit tests/tooling -q
 uv run pytest tests/python/integration tests/protocol/integration -q
 ```
 
-Default pytest collection excludes real UE E2E. Python coverage includes task math, RobotConfig/RobotSpec, schema/indexing, Session boundaries, manifests, registries, DirectEnv, artifact containers, and export. Protocol tests cover the 48-byte header, strict JSON, safe integers, layout hashes, padding, flags, and TCP fragmentation.
+Default pytest collection excludes real UE E2E.
+Python coverage includes Task mathematics, RobotConfig/RobotSpec, schemas, indexing, Session boundaries, manifests, registries, DirectEnv, artifacts, and export.
+Protocol tests cover the 48-byte header, strict JSON, safe integers, layout hashes, padding, flags, and TCP fragmentation.
 
-Parity cases compare both implementations against reviewed expected values. Deployment cases compare Python reference execution and UE plan/NNE/action execution with their specified tolerances, including `atol=rtol=2e-5` for deployment inference cases.
+Parity cases compare both implementations with reviewed expected values.
+Deployment cases compare Python reference execution with UE plan, NNE, and action execution.
+Use the specified tolerances, including `atol=rtol=2e-5` for deployment inference cases.
 
-Saved-run configuration tests exercise the application resolver and the play/export
-CLI through the Session-open boundary (`python/integration/test_saved_run_cli_config.py`).
-They check recorded settings, map precedence, launch arguments, and snapshot preservation
-without starting a Worker. Play/export cases also check Task inference from Run identity,
-explicit identity conflicts, strict rejection of incomplete snapshots, semantic override
-rejection, and external Task registry resolution. Continuation cases additionally cover strict metadata,
-allowed changes, source preservation and both training configuration builds.
-`python/integration/test_resume_checkpoint.py` exercises real small CPU RSL
-models, normalization, non-empty optimizer state, iteration and Python curriculum/
-decimation state through the existing checkpoint loader. These checks do not
-validate physical behavior or the real UE training workflow.
+Saved-run tests use the application resolver and the play/export CLI through the Session-open boundary.
+See `python/integration/test_saved_run_cli_config.py`.
+These cases do not start a Worker.
+They cover saved settings, map precedence, launch arguments, and snapshot preservation.
+
+Play/export cases cover Task inference, identity conflicts, incomplete snapshots, rejected semantic overrides, and external Task registration.
+Continuation cases cover strict metadata, permitted changes, source preservation, and both training configuration builds.
+
+`python/integration/test_resume_checkpoint.py` uses real small CPU RSL models.
+It covers normalization, populated optimizer state, iteration, Python curriculum state, and decimation state through the existing checkpoint loader.
+These cases do not establish physical behavior or the real UE training procedure.
 
 ## Windows and UE checks
 
-These commands require the UE 5.8 Windows host and a built `UERLHostEditor`. They have not been rerun in the Linux documentation-editing environment. The E2E support runner currently uses the default Epic `UE_5.8` executable path in `tests/e2e/support/worker_runner.py`; custom installations need that test setup reviewed separately from product CLI overrides.
+These commands require a UE 5.8 Windows host and a built `UERLHostEditor`.
+This documentation update adds no new Windows/UE execution evidence.
+The E2E Worker runner selects `UE_ROOT`, then `UE_58_ROOT`, then the default Epic `UE_5.8` installation.
+This selection is separate from the product CLI host profile.
 
 ```powershell
 # Python, UE Automation, and real UE E2E.
@@ -80,7 +91,10 @@ uv run python scripts/run_e2e.py --suite ue -k "u5_007 or u5_008 or u5_009 or u5
 
 For a custom UE installation, set `$env:UE_ROOT` (or `$env:UE_58_ROOT`) before running the full suite or E2E scripts. These runners use the repository host project.
 
-To invoke UE Automation directly, run the complete core and extended filters. The groups use separate editor processes; the terrain group starts fresh to avoid order-dependent preview-scene physics. `PIEAttach` runs in `scripts/run_e2e.py --suite all`, which supplies its required port and Python client.
+For direct UE Automation, run the complete core and extended filters.
+Use a separate Editor process for each group.
+A fresh terrain process prevents order-dependent preview-scene physics.
+The command `scripts/run_e2e.py --suite all` includes `PIEAttach` and supplies its port and Python client.
 
 ```powershell
 $automationGroups = @(
@@ -97,24 +111,47 @@ foreach ($group in $automationGroups) {
 ```
 ## Engine behavior covered
 
-Automation/E2E cases exercise transport layouts, seed and safety behavior, binding, physics gates, variable-decimation Step contracts, topology reflection, kinematics, window-end contact, 35-point terrain observations, asset import/reimport, policy plans/NNE, and live component control. Integration cases cover deployment contact/ground queries, cached hits and errors, completed solver clocks and pause, command latching, Start/Stop, and collision isolation.
+Automation and E2E cases cover transport layouts, seeds, safety behavior, binding, physics gates, and variable-decimation Step contracts.
+They also cover topology reflection, kinematics, final-step contact, 35-point terrain observations, asset import, reimport, policy plans, NNE, and live control.
 
-Lifecycle cases cover request-driven fixed steps, schema/layout negotiation, Ready gates, header-before-payload validation, binary batches, stable errors, timeout cancellation, disconnect handling, sparse reset, headless/viewport trajectory comparisons, process/attached ownership, fatal cleanup, and Editor/PIE attach/reattach. Passing a Python mock test does not validate these engine behaviors.
+Integration cases cover deployment contact and ground queries, cached hits, errors, completed solver clocks, pause, commands, start, stop, and collision isolation.
+Lifecycle cases cover fixed steps, schema negotiation, Ready, binary batches, errors, timeouts, disconnects, sparse reset, and trajectory comparisons.
+They also cover process ownership, fatal cleanup, and Editor/PIE attachment and reattachment.
+Python mock results do not establish these engine behaviors.
 
-Active-Step cancellation tests use a post-physics delay available only in `WITH_DEV_AUTOMATION_TESTS` builds. It is test instrumentation, not a product setting or wire configuration.
+Active-Step cancellation cases use a post-physics delay available only in `WITH_DEV_AUTOMATION_TESTS` builds.
+The delay is test instrumentation, not a product setting or wire configuration.
 
 ## Test conventions
 
-1. Test implemented behavior through executable entry points. Do not reserve acceptance/performance gates for hypothetical features.
-2. Include the acceptance-case identifier and behavior in test names where the suite uses that convention; organize tests as Arrange / Act / Assert.
-3. `[VERIFY]` output records observations and does not replace assertions.
-4. Unit tests avoid external processes. Integration tests use test-only mocks; E2E tests launch UE.
-5. Mock external dependencies rather than the logic under test. Each case should independently decide pass/fail.
+1. Exercise implemented behavior through executable entry points.
+   Do not define acceptance or performance requirements for hypothetical features.
+2. Use the existing acceptance-case identifier convention and a behavior-based test name.
+   Organize the case as Arrange, Act, and Assert.
+3. Use assertions to determine the result.
+   Use `[VERIFY]` output only for supplementary observations.
+4. Keep unit tests free of external processes.
+   Use controlled dependencies for integration cases and actual UE for E2E cases.
+5. Replace external dependencies instead of the logic under examination.
+   Each case must determine its own pass or fail result.
 
-Manager tests use fixed inputs and independent expected constants. DirectEnv boundary tests check the order of termination, reward, curriculum, reset, commands, interval events, and next observation. Sparse reset assertions use stable Slot IDs. Event terms use distinct fixed intervals to expose timer interference. Reset events generate Session reset payloads; interval events run after reset. Only UE Automation/E2E verifies Chaos numerics.
+Manager cases use fixed inputs and independent expected constants.
+DirectEnv cases cover termination, reward, curriculum, reset, commands, interval events, and the next observation in their required order.
+Sparse reset assertions use stable Slot IDs.
+Event cases use distinct fixed intervals to expose timer interference.
+Reset events create Session reset payloads.
+Interval events run after reset.
 
-Variable-decimation tests cover 5/35 ms reward integration, discrete failure costs, 20-second termination, randomized initial timeout phases, sparse clock reset, transition discounts and timeout bootstrap, actual-time vibration evaluation, command-direction progress under turns/overspeed/stalling, highest-tier resampling, checkpoint continuation, and fixed-level resume. Old-objective resume is rejected before Worker startup; CartPole retains the fixed-step path.
+Only UE Automation or real E2E can establish Chaos numerical behavior.
+Variable-decimation cases cover 5/35 ms reward integration, discrete failure costs, and 20-second termination.
+They also cover initial timeout phases, sparse clock reset, discounts, timeout bootstrap, vibration evaluation, and command-direction progress.
+Progress cases include turns, excessive speed, and no motion.
+Other cases cover highest-tier resampling, checkpoint continuation, and fixed-level resume.
+Old-objective resume fails before Worker startup, while CartPole retains fixed-step behavior.
 
 ## Import boundary
 
-Product code is imported from `src/uerl` using the pytest paths in `pyproject.toml`. `tests/protocol/support/` is an independent test-only oracle; product code must not import it. It is not a training entry point.
+Pytest imports product code from `src/uerl` through the paths in `pyproject.toml`.
+The directory `tests/protocol/support/` contains an independent test-only oracle.
+Product code must not import it.
+It is not a training entry point.

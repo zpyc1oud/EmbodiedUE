@@ -1,13 +1,13 @@
 # Install an external Task
 
-An installed Python package can provide a Task without changing framework
-registration. The [CartPole example](../../examples/external-cartpole/) is a
-complete packaging example that changes one reward weight and reuses the existing
-CartPole Task factory, Robot declaration, observations, actions, and runtime.
+An installed Python package can supply a Task without changes to framework registration.
+The [CartPole example](../../examples/external-cartpole/) changes one reward weight.
+It uses the existing CartPole Task factory, Robot declaration, observations, actions, and runtime.
 
 ## Install and enable the example
 
-With the repository's Python dependencies already installed, run in PowerShell:
+First install the repository's Python dependencies.
+Then run these PowerShell commands:
 
 ```powershell
 uv pip install ./examples/external-cartpole --no-deps
@@ -17,16 +17,20 @@ uerl check task Example-CartPole-v0
 uerl config --task Example-CartPole-v0 --json
 ```
 
-These commands work from outside the checkout. `check task` validates Python
-configuration and Task construction without starting UE. To develop your own
-package, copy `examples/external-cartpole` outside the repository, change its
-package name, entry-point name, and Task ID, then install that directory. Use
-`uv pip install -e <directory> --no-deps` for editable development in the prepared
-environment. Edit `src/example_cartpole/reward.yaml` to change
-`pole_position_weight`. Reinstall after editing a non-editable installation.
+After installation, the inspection commands work outside the checkout.
+The command `check task` validates Python configuration and Task construction without UE startup.
 
-To create a new package from the CLI instead, generate a ready-to-install
-project outside the repository:
+For your own package:
+
+1. Copy `examples/external-cartpole` outside the repository.
+2. Change the package name, entry-point name, and Task ID.
+3. Install that directory into the prepared environment.
+
+For editable development, use `uv pip install -e <directory> --no-deps`.
+To change `pole_position_weight`, edit `src/example_cartpole/reward.yaml`.
+For a non-editable installation, reinstall after a source change.
+
+Alternatively, create a package with the CLI:
 
 ```powershell
 uv run uerl new external-cartpole balance-demo --output-dir ..\balance-demo
@@ -38,73 +42,74 @@ uerl check task UERL-BalanceDemo-v0
 uerl config --task UERL-BalanceDemo-v0 --json
 ```
 
-The generated project includes entry-point metadata, its own reward resource,
-registration tests, and usage instructions. It reuses the framework CartPole
-Task and changes only `pole_position_weight` in
-`src/balance_demo/reward.yaml`. Run its tests with `python -m pytest`; edit the
-YAML resource and reinstall after changing a non-editable installation.
+The generated project contains entry-point metadata, a reward resource, registration tests, and usage instructions.
+It uses the framework CartPole Task.
+Its only Task change is `pole_position_weight` in `src/balance_demo/reward.yaml`.
+Run its tests with `python -m pytest`.
+After a non-editable source change, reinstall the package.
 
-On an already configured Windows/UE host, the same registration is used by:
+On a configured Windows/UE host, use the same registration for training:
 
 ```powershell
 uerl train --task Example-CartPole-v0 --num-envs 2 --max-iterations 1 --device cpu
 ```
 
-Supply host paths as described in [Getting started](../../README.md#getting-started).
+Supply host paths as specified in [Getting started](../../README.md#getting-started).
 The Python wheel does not contain UE assets, the host project, or UE binaries.
 
 ## Registration contract
 
-Declare a named entry point in your package's `pyproject.toml`:
+Declare a named entry point in the package's `pyproject.toml`:
 
 ```toml
 [project.entry-points."uerl.tasks"]
 my-task = "my_package:create_registration"
 ```
 
-The target is a zero-argument callable returning one
-`uerl.tasks.registry.TaskRegistration`. Its factories supply fresh Task, Worker,
-and runner configurations and a `DirectTask`. Existing optional curriculum,
-event, and evaluation factories remain available. A Task owns its Python
-resources and loads them with `importlib.resources`; do not use the current
-working directory to locate them.
+The target must be a zero-argument callable that returns one `uerl.tasks.registry.TaskRegistration`.
+Its factories supply fresh Task, Worker, and runner configurations and a `DirectTask`.
+Optional curriculum, event, and evaluation factories remain available.
 
-Enable entry-point names with the comma-separated `UERL_TASK_PLUGINS` environment
-variable. Installation alone does not enable a package. All CLI commands use
-this selection. Python callers can use
-`create_default_registry(external_tasks=("my-task",))`; passing `()` selects only
-built-ins and overrides the environment. Loading enabled packages executes their
-Python code, so enable packages you trust.
+Each Task owns its Python resources.
+Use `importlib.resources` to load them.
+Do not locate them through the current directory.
 
-Task IDs must be unique across built-ins and enabled packages, even across
-versions. Entry-point names must be unique among installed packages. Missing
-names, import failures, non-callable targets, invalid registration objects, and
-invalid factories produce `RegistryError` with the entry-point source. Failed
-registry construction does not return a partially populated registry. Keep the
-same package and selection available when restoring a run.
+Enable entry-point names with the comma-separated `UERL_TASK_PLUGINS` environment variable.
+Installation alone does not enable a package.
+All CLI commands use this selection.
+Python callers can use `create_default_registry(external_tasks=("my-task",))`.
+An explicit `()` selects built-in Tasks only and overrides the environment variable.
+Only enable trusted packages, because package loading executes their Python code.
 
-Registration does not require Manager composition. External factories can return
-existing `DirectTask` subclasses or composed Tasks; both use `DirectEnv`, Session,
-reset, and valid-Slot handling. This example uses the existing composed CartPole
-factory and introduces no new simulation loop.
+Task IDs must be unique across built-in Tasks and enabled packages, including different versions.
+Entry-point names must be unique among installed packages.
+Missing names, import failures, invalid callables, invalid registration objects, and invalid factories cause `RegistryError`.
+The error identifies the entry-point source.
+A failed construction does not return a partial registry.
+Keep the same package and selection available for saved Runs.
+
+Registration does not require Manager composition.
+An external factory can return a `DirectTask` subclass or a composed Task.
+Both use DirectEnv, Session, reset, and valid-Slot behavior.
+This example uses the existing composed CartPole factory without a new simulation loop.
 
 ## Built-in resources
 
-Built-in training and terrain YAML files now live under `src/uerl/configs/` and
-ship in wheels and source distributions. Existing loaders read that installed
-location. Logical resource identifiers such as
-`environments/terrains/cartpole/flat.yaml` stay unchanged. Code using the previous
-checkout path `configs/tasks/...` should use the Task loaders instead. The
-historically named `repository_config_root()` now returns the package resource
-root for standard wheel and editable installations; importing directly from a
-zipped wheel is not supported by the path-based loaders.
+Built-in training and terrain YAML files are under `src/uerl/configs/`.
+Wheels and source distributions include these files.
+The existing loaders read this installed location.
+Logical resource IDs, such as `environments/terrains/cartpole/flat.yaml`, remain unchanged.
+
+Use Task loaders instead of the old checkout path `configs/tasks/...`.
+The function `repository_config_root()` now returns the package resource root for standard wheel and editable installations.
+Path-based loaders do not support direct import from a zipped wheel.
 
 ## Validation boundary
 
-The packaging test builds and installs the framework, checked-in example, and
-newly generated package wheels into an isolated target, changes to an unrelated
-directory, and checks discovery, all built-in defaults, both YAML resources,
-Task construction, and CLI preflight. This does not validate UE execution,
-training quality, or export. A generated minimal Task interface,
-minimal/composed equivalence, and early export capability reporting remain work
-tracked by [Issue #6](https://github.com/zpyc1oud/EmbodiedUE/issues/6).
+The package test builds framework, example, and generated-package wheels.
+It installs them into an isolated target and uses an unrelated current directory.
+It examines discovery, built-in defaults, both YAML resources, Task construction, and CLI preflight.
+See [Write tests](write-tests.md#write-package-and-generator-tests) for the test procedure.
+
+These results do not establish UE execution, training quality, or correct export.
+[Issue #6](https://github.com/zpyc1oud/EmbodiedUE/issues/6) tracks the generated minimal Task interface, minimal/composed equivalence, and early export capability reporting.
