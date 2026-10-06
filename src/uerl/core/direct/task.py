@@ -20,6 +20,7 @@ from uerl.errors import ConfigError
 
 from ..config import DirectTaskConfig
 from ..config.robot import RobotSpec
+from .capabilities import CapabilityStatus, TaskCapabilities, TaskCapability
 from .curriculum import CurriculumManager
 from .robot_action import ROBOT_ACTUATOR_TARGET_FIELD, robot_actuator_action_schema
 from .robot_observation import ObservationShapeTable
@@ -474,6 +475,102 @@ class DirectTask:
         if velocity is None:
             return None
         return cast(torch.Tensor, torch.linalg.vector_norm(velocity[:, :2], dim=1))
+
+    @property
+    def capabilities(self) -> TaskCapabilities:
+        """Report known train/evaluate support and plan-backed export support.
+
+        Training and evaluation use the same DirectEnv contract. A Manager
+        configuration remains unknown until it is assembled against the
+        Worker-provided RobotSpec. Python-only Tasks can be trainable and
+        evaluable, but they have no export representation unless they expose
+        Manager-generated plans. A custom execution override beside Manager
+        plans is reported as unknown because this check does not prove that its
+        mathematics matches the serialized plan.
+        """
+
+        manager_requested = self._cfg is not None or self._cfg_factory is not None
+        manager_ready = (
+            self._actions is not None
+            and self._observations is not None
+            and self._terminations is not None
+            and self._rewards is not None
+        )
+        custom_action = type(self).preprocess_actions is not DirectTask.preprocess_actions
+        custom_observation = type(self).build_observations is not DirectTask.build_observations
+        custom_reward = type(self).compute_rewards is not DirectTask.compute_rewards
+        custom_termination = (
+            type(self).compute_terminations is not DirectTask.compute_terminations
+            or type(self).termination_terms is not DirectTask.termination_terms
+        )
+
+        if manager_requested and not manager_ready:
+            runtime_capability = TaskCapability(
+                CapabilityStatus.UNKNOWN,
+                "Manager declarations require binding to the Worker RobotSpec before they can be checked",
+            )
+        else:
+            missing = []
+            if self._actions is None and not custom_action:
+                missing.append("preprocess_actions")
+            if self._observations is None and not custom_observation:
+                missing.append("build_observations")
+            if self._rewards is None and not custom_reward:
+                missing.append("compute_rewards")
+            if self._terminations is None and not custom_termination:
+                missing.append("compute_terminations or termination_terms")
+            if missing:
+                runtime_capability = TaskCapability(
+                    CapabilityStatus.UNSUPPORTED,
+                    "Task must provide " + ", ".join(missing) + " through DirectTask methods or Managers",
+                )
+            else:
+                runtime_capability = TaskCapability(CapabilityStatus.SUPPORTED)
+
+        custom_execution = tuple(
+            name
+            for name, overridden in (
+                ("preprocess_actions", custom_action),
+                ("build_observations", custom_observation),
+            )
+            if overridden
+        )
+        custom_plan = (
+            type(self).observation_plan is not DirectTask.observation_plan
+            or type(self).action_plan is not DirectTask.action_plan
+        )
+        if custom_execution and manager_ready:
+            plan_capability = TaskCapability(
+                CapabilityStatus.UNKNOWN,
+                "Python execution override(s) "
+                + ", ".join(custom_execution)
+                + " may differ from Manager plans; plan equivalence is not established",
+            )
+        elif manager_requested and not manager_ready:
+            plan_capability = TaskCapability(
+                CapabilityStatus.UNKNOWN,
+                "observation/action plans are checked after binding the Worker RobotSpec",
+            )
+        elif manager_ready and not custom_plan:
+            plan_capability = TaskCapability(CapabilityStatus.SUPPORTED)
+        elif custom_plan:
+            plan_capability = TaskCapability(
+                CapabilityStatus.UNKNOWN,
+                "custom plan properties are present, but their execution equivalence is not established",
+            )
+        else:
+            plan_capability = TaskCapability(
+                CapabilityStatus.UNSUPPORTED,
+                "Python Task action/observation methods have no Manager-generated "
+                "observation_plan/action_plan; "
+                "use Manager action and observation declarations for export",
+            )
+
+        return TaskCapabilities(
+            train=runtime_capability,
+            evaluate=runtime_capability,
+            export=plan_capability,
+        )
 
     def context_with_command(self, context: StepContext) -> StepContext:
         """Attach the published velocity so reward terms read one channel."""

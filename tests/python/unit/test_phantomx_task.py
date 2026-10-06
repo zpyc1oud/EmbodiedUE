@@ -11,9 +11,11 @@ import torch
 
 from tests.python.unit.robot_shape_fixtures import generic_robot_observation_shapes
 from uerl.core.config.robot import ObsType, RobotSpec, RobotTopology, merge_robot_spec
+from uerl.core.direct.capabilities import CapabilityStatus
 from uerl.core.direct.robot_action import ROBOT_ACTUATOR_TARGET_FIELD
 from uerl.core.direct.robot_observation import robot_observation_schema
 from uerl.core.direct.types import PhysicalCommandBatch, StepContext, TerminationResult
+from uerl.core.mdp.executor import PlanExecutor, PlanInputs
 from uerl.errors import ConfigError
 from uerl.tasks.phantomx.commands import PhantomXVelocityCommandSource
 from uerl.tasks.phantomx.config import (
@@ -625,3 +627,26 @@ def test_training_noise_spares_the_command_and_keeps_the_critic_clean() -> None:
     assert torch.equal(noisy["policy"][:, 9:12], clean["policy"][:, 9:12])
     assert torch.equal(noisy["critic"][:, :109], clean["policy"])
     assert torch.equal(noisy["critic"][:, 109:], clean["critic"][:, 109:])
+
+
+def test_clean_phantomx_actor_matches_export_plan_and_noise_keeps_export_unknown() -> None:
+    assert PhantomXTask().capabilities.export.status is CapabilityStatus.UNKNOWN
+    task = _task()
+    state = _state(task, num_envs=2, linear_velocity=torch.tensor([[0.3, 0.0, 0.0], [0.3, 0.0, 0.0]]))
+    previous_action = torch.zeros(2, 18)
+    dt = torch.full((2,), 0.005)
+    clean = task.build_observations(state, torch.ones(2, dtype=torch.bool), previous_action, dt)
+    planned = PlanExecutor(task.observation_plan, command_channels=task.command_source.channels()).execute(
+        PlanInputs(
+            raw_state=state,
+            commands=task.command_source.current(),
+            previous_action=previous_action,
+            control_frame_dt=dt.reshape(-1, 1),
+        )
+    )
+    torch.testing.assert_close(clean["policy"], planned["policy"], atol=0, rtol=0)
+    clean_report = task.capabilities
+    assert clean_report.export.status is CapabilityStatus.SUPPORTED
+    task.enable_observation_corruption(torch.Generator().manual_seed(1))
+    noisy_report = task.capabilities
+    assert noisy_report.export.status is CapabilityStatus.UNKNOWN

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from typing import Any, cast
 
 import torch
 
 from uerl.core.config.models import DirectTaskConfig
 from uerl.core.config.robot import RobotSpec
+from uerl.core.direct.capabilities import CapabilityStatus, TaskCapabilities, TaskCapability
 from uerl.core.direct.robot_observation import ObservationShapeTable, robot_observation_schema
 from uerl.core.direct.task import CommandSource, DirectTask, DirectTaskCfg
 from uerl.core.direct.types import SessionSchema, StepContext, TerminationResult
@@ -87,6 +89,18 @@ class PhantomXTask(DirectTask):
             task_config=params,
             observation_shapes=observation_shapes,
         )
+
+    @property
+    def capabilities(self) -> TaskCapabilities:
+        """The clean product actor uses the Manager plan; extra state is critic-only."""
+        report = super().capabilities
+        if (
+            type(self) is PhantomXTask
+            and report.train.status is CapabilityStatus.SUPPORTED
+            and self._noise_generator is None
+        ):
+            return replace(report, export=TaskCapability(CapabilityStatus.SUPPORTED))
+        return report
 
     @property
     def command_source(self) -> CommandSource:

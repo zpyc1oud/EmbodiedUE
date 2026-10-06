@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
+from ..core.direct.capabilities import TaskCapabilities
 from ..errors import ConfigError, RegistryError, UERLError
 from ..tasks.registry import create_default_registry
 from ..training import build_run_config, robot_runtime_from_config
@@ -17,17 +18,22 @@ def _parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="kind", required=True)
     task_parser = subparsers.add_parser("task", help="check one registered Task")
     task_parser.add_argument("task_id", help="Registered Task ID.")
-    task_parser.add_argument("--json", action="store_true", help="Print stable JSON output.")
+    task_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the preflight report as JSON; it is not a Task configuration file.",
+    )
     host_parser = subparsers.add_parser("host", help="check the bundled CartPole host files and profile")
     add_host_arguments(host_parser)
     return parser
 
 
-def _task_report(task_id: str) -> dict[str, object]:
+def _task_report(task_id: str) -> tuple[dict[str, object], TaskCapabilities]:
     registry = create_default_registry()
     registration = registry.resolve(task_id)
     config = build_run_config(task_id)
-    registry.create_task(task_id, config.task)
+    task = registry.create_task(task_id, config.task)
+    capabilities = task.capabilities
     runtime = robot_runtime_from_config(config)
     return {
         "task_id": config.task_id,
@@ -42,7 +48,8 @@ def _task_report(task_id: str) -> dict[str, object]:
         "state_requirements": list(config.task.state_requirements),
         "action_schema": list(config.task.action_schema),
         "config_hash": config.normalized_hash,
-    }
+        "capabilities": capabilities.to_dict(),
+    }, capabilities
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.kind != "task":
         return 2
     try:
-        report = _task_report(args.task_id)
+        report, capabilities = _task_report(args.task_id)
     except RegistryError as exc:
         for line in describe(exc):
             print(line)
@@ -72,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
             f"max_iterations={report['max_iterations']} actuators={report['actuator_count']} "
             f"config_hash={report['config_hash']}"
         )
+        print(f"capabilities {capabilities.format()}")
     return 0
 
 
