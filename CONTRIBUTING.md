@@ -40,6 +40,9 @@ Then complete the applicable checks in [tests/README.md](tests/README.md).
 Python tests do not establish correct Chaos behavior.
 For UE changes, build the Editor and run the applicable Automation and E2E cases on Windows.
 Record each unavailable check.
+For several reviewed features, use [batch validation](docs/how-to/batch-validation.md).
+Keep basic checks in feature development and share expensive UE checks on a frozen integration candidate.
+Keep the validation worktree and compatible build caches between batches.
 
 The repository has pre-commit and pre-push hooks for Ruff, Mypy, and tests.
 Full pre-push checks can require UE.

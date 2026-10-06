@@ -4,6 +4,10 @@ This directory contains tests, mocks, fixtures, and E2E orchestration.
 Product interfaces and Tasks belong in `src/uerl`.
 Use [Write tests](../docs/how-to/write-tests.md) for examples, fixture rules, independent assertions, and review steps.
 
+For several reviewed features, follow [batch validation](../docs/how-to/batch-validation.md).
+Run early checks per feature and shared UE checks on the frozen integration candidate.
+Record the exact combined revision; a different subset does not inherit its acceptance automatically.
+
 ## Test layers
 
 | Directory | Scope |
