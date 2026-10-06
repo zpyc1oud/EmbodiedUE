@@ -192,16 +192,16 @@ def _robot_files(root: Path, slug: str, asset_path: str) -> dict[Path, str]:
         UE asset path: `{asset_path}`
         Python declaration ref: `{asset_ref}`
 
-        This file is intentionally not registered yet. Before adding it to
-        `src/uerl/assets/robots/__init__.py`:
+        The generated declaration is not registered yet.
+        Before registration in `src/uerl/assets/robots/__init__.py`, complete these steps:
 
         1. Replace `TODO_*` joint/body selectors with names from UE topology.
         2. Set actuator gains, effort limits, action scales, observations, and reset streams.
         3. Add `{class_name.upper()}_ASSET_REF` / `{class_name.upper()}_CFG` to `ROBOT_ASSETS`.
         4. Add a Task that consumes the declaration and run `uerl check task <TaskID>`.
 
-        The declaration is a reviewable starting point; it does not claim that
-        the placeholder topology matches the Skeletal Mesh.
+        The declaration is a starting point for review.
+        Make sure that its topology matches the Skeletal Mesh before use.
         '''
     )
     return {
@@ -383,8 +383,9 @@ def _task_files(
         - Environment: `{environment_id}`
         - Robot ID: `{robot_id}`
 
-        Generated files are deliberately unregistered until the contract is
-        implemented. Complete these steps in order:
+        The generated files are not registered.
+        Implement the contract before registration.
+        Complete these steps in order:
 
         1. Replace `TODO_*` State/Action fields and parameters in `config.py`.
         2. Implement the DirectTask builder and composed terms in `registration.py`.
@@ -481,17 +482,16 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
         f'''\
         # {class_name}: external CartPole Task
 
-        This installable package registers `{task_id}` through the `uerl.tasks`
-        entry-point group. It reuses EmbodiedUE's CartPole Task, Robot declaration,
-        Worker and runner configurations, and runtime. Its only Task change is the
-        pole-position reward weight in `src/{slug}/reward.yaml`.
+        This package registers `{task_id}` through the `uerl.tasks` entry-point group.
+        It uses the existing CartPole Task and Robot declaration.
+        It also uses existing Worker and runner configurations and the runtime.
+        Its only Task change is the pole-position reward weight in `src/{slug}/reward.yaml`.
 
         ## Requirements
 
-        Use Python 3.11 in an environment with EmbodiedUE `ue-rl-engine==1.0.0`
-        and its runtime dependencies installed. Training also requires a configured
-        Windows/UE 5.8 host; package installation and the inspection commands below
-        do not start UE.
+        Use Python 3.11 with EmbodiedUE `ue-rl-engine==1.0.0` and its runtime dependencies installed.
+        Training also requires a configured Windows/UE 5.8 host.
+        Package installation and the inspection commands below do not start UE.
 
         ## Install and inspect
 
@@ -505,9 +505,9 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
         uerl config --task {task_id} --json
         ```
 
-        In Bash, use `export UERL_TASK_PLUGINS={entry_point}`. After installation,
-        these `uerl` commands work from any current directory. `check task` validates
-        the Python registration, resolved configuration, and Task construction.
+        In Bash, use `export UERL_TASK_PLUGINS={entry_point}`.
+        After installation, these `uerl` commands work from any directory.
+        The command `check task` validates registration, resolved configuration, and Task construction.
 
         Train it on a configured Windows/UE host with:
 
@@ -517,12 +517,12 @@ def _external_cartpole_files(root: Path, slug: str, task_id: str) -> dict[Path, 
 
         ## Change the reward
 
-        Edit `pole_position_weight` in `src/{slug}/reward.yaml` (initially `-2.0`).
-        The package reads this resource for each fresh Task configuration. A
-        non-editable installation must be reinstalled after the file changes.
-        The generated tests in `tests/test_registration.py` check the registration,
-        Task construction, and reward-only customization. Run them with
-        `python -m pytest tests` in the prepared framework environment.
+        Edit `pole_position_weight` in `src/{slug}/reward.yaml`.
+        Its initial value is `-2.0`.
+        The package reads the resource for each new Task configuration.
+        After a source change, reinstall a non-editable package.
+        The generated `tests/test_registration.py` covers registration, Task construction, and the reward-only change.
+        Run `python -m pytest tests` in the prepared framework environment.
         '''
     )
     tests = dedent(

@@ -5,16 +5,15 @@ That grant does not relicense third-party software or content. Unreal Engine,
 Fab/Epic assets, robot assets, policy artifacts, and media are outside that grant
 unless an explicit project licensing statement covers the specific item.
 
-This is a preliminary inventory, not exhaustive license clearance or a substitute
-for required upstream license texts when redistributing dependencies. Entries below
-separate verified observations from permissions still requiring evidence.
+This is a preliminary inventory.
+It is not complete license clearance or a replacement for required upstream license texts.
+The entries separate verified observations from permissions that still require evidence.
 
 ## Python dependencies
 
-The project declares dependencies in [pyproject.toml](pyproject.toml) and resolves
-versions in [uv.lock](uv.lock). The following license identifiers were checked against
-installed distribution metadata/license files on 2026-10-03; they do not establish
-all licenses contained in every platform's wheel or transitive dependency.
+The project declares dependencies in [pyproject.toml](pyproject.toml) and resolves versions in [uv.lock](uv.lock).
+The review on 2026-10-03 compared these license identifiers with installed distribution metadata and license files.
+It did not establish every license in each platform wheel or transitive dependency.
 
 | Dependency / inspected version | Verified license information |
 |---|---|
@@ -27,9 +26,9 @@ all licenses contained in every platform's wheel or transitive dependency.
 | Pillow 12.3.0 | MIT-CMU |
 | ONNX Runtime 1.29.0 (development dependency) | MIT metadata |
 
-No conventional vendored library tree or native dependency binaries were found in
-the inspected tracked main tree. Local environments and ignored `references/` are
-not part of that tree. Dependencies remain separately licensed. For any binary,
+The inspected main tree had no conventional vendored library tree or native dependency binaries.
+Development environments and ignored `references/` were not part of that tree.
+Dependencies retain their separate licenses. For any binary,
 wheel, container, or installer release, include the upstream license/notice files
 required by the actual components distributed, including CUDA and other bundled
 libraries where applicable. FFmpeg licensing depends on its build configuration;
@@ -52,7 +51,8 @@ be established. Some content may instead carry another license. Likewise, Epic's
 [content agreement](https://www.unrealengine.com/eula/content) and the UE agreement's
 Examples provisions are distinct; directory names alone do not determine rights.
 
-The Fab collection and its text map export have been removed from the current tree;
-no third-party rights were reclassified. Original integration code remains. See the
+The current tree excludes the Fab collection and its text map export.
+The removal did not change third-party rights.
+Original integration code remains. See the
 [asset exclusion and history plan](docs/asset-publication-plan.md) and
 [remaining release decisions](docs/release-readiness.md).

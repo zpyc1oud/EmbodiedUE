@@ -2,12 +2,14 @@
 
 ## Scope and method
 
-This audit describes the repository at `b6f2f75b8be9bcc1251e5aa9d4aaf885d206b88d`.
-Counts are source inventory counts, not expanded pytest parameter-case totals:
-Python cases count test functions, and UE cases count
-`IMPLEMENT_SIMPLE_AUTOMATION_TEST` declarations. The inventory was generated
-from the checked-in test paths and compared with the runners, pytest
-configuration, and contribution documentation.
+This audit describes revision `b6f2f75b8be9bcc1251e5aa9d4aaf885d206b88d`.
+Its counts describe source inventory, not expanded pytest parameter cases.
+Python counts refer to test functions.
+UE counts refer to `IMPLEMENT_SIMPLE_AUTOMATION_TEST` declarations.
+
+The audit compared checked-in test paths with runners, pytest configuration, and contribution documentation.
+The inventory remains tied to that revision.
+It is not a current execution result.
 
 ## Inventory
 
@@ -21,77 +23,68 @@ configuration, and contribution documentation.
 | Real UE E2E | 7 | 20 | Unreal process, Worker lifecycle, DirectEnv, and terrain scenarios |
 | UE Automation | 31 C++ files | 149 | Native module tests for interface, transport, policy, robot, terrain, and Worker behavior |
 
-`pyproject.toml` collects Python unit, Python integration, protocol, tooling, and
-parity tests by default. Real UE E2E tests are intentionally excluded and are
-run through `scripts/run_e2e.py`, which fails early when its UE executable or
-project is absent. `scripts/run_all_tests.py` runs the default pytest collection,
-two filtered UE Automation groups, and the real UE E2E suite. The test guide
-states that mocks do not verify Chaos or other engine behavior.
+Default `pyproject.toml` collection includes Python unit, Python integration, protocol, tooling, and parity tests.
+It excludes real UE E2E.
+The command `scripts/run_e2e.py` runs those cases and fails early without the UE executable or project.
+The full runner, `scripts/run_all_tests.py`, adds two filtered UE Automation groups and real UE E2E to default pytest collection.
+The test guide separates mock evidence from Chaos and engine evidence.
 
 ## Findings
 
-1. **The test layers are already explicit and broad.** Python behavioral tests,
-   reviewed parity fixtures, native UE Automation, and real UE E2E have separate
-   homes and commands. The existing guide clearly distinguishes mock evidence
-   from engine evidence. There is no evidence for replacing these layers or
-   mechanically rewriting the existing suite.
-2. **CI is intentionally limited to static checks.**
-   `.github/workflows/static-checks.yml` runs Ruff and Mypy. The user had
-   previously selected that basic CI scope, so the absence of pytest in CI is a
-   recorded boundary, not a defect or authorization to broaden the workflow.
-   Local changes still follow the contributor workflow's Python validation; that
-   requirement does not imply adding pytest to CI.
-3. **The native UE suite needs a Windows/UE host.** This audit does not
-   establish UE Automation, Chaos, or real Worker E2E results. Run those checks
-   on the required Windows/UE 5.8 host and keep their evidence separate from
-   Python and static-check results.
-4. **The external Direct package path is narrower than the public hooks.** The
-   existing Direct/Manager equivalence coverage exercises an external-entry
-   point fixture, while `uerl new external-cartpole` produces a Manager package.
-   The public Direct hooks do not yet have a generated, installed package path
-   covered through discovery and CLI/configuration behavior. Add that coverage
-   with independent numeric assertions; matching response lengths or reading
-   generated source alone is insufficient.
-5. **UE Automation completion thresholds are smoke checks, not case identity
-   proofs.** `run_all_tests.py` checks successful log completion and minimum
-   counts for each filter. The filters are currently explicit, but threshold
-   counts alone would not prove that every expected case ran if a filter or
-   test name drifted. Issue #13 is closed with reason `not_planned`; it is not
-   reactivated by this audit. The current layered audit and follow-up verification
-   are tracked in Issue #19.
+1. **Explicit test layers already exist.**
+   Python behavior cases, reviewed parity data, native Automation, and real E2E have separate locations and commands.
+   The guide separates mock and engine evidence.
+   The audit found no reason to replace these layers or mechanically rewrite the complete suite.
+2. **CI has a deliberate static-only scope.**
+   The workflow `.github/workflows/static-checks.yml` runs Ruff and Mypy.
+   The user selected this scope.
+   The absence of pytest is a recorded boundary, not authorization to expand CI.
+   Changes still require the contributor workflow's Python validation.
+3. **Native UE validation needs a Windows/UE host.**
+   This audit establishes no UE Automation, Chaos, or real Worker E2E execution result.
+   Run those cases on the required Windows/UE 5.8 host.
+   Keep their evidence separate from Python and static checks.
+4. **The generated external Direct path has a coverage gap at the audited revision.**
+   Existing Direct/Manager equivalence cases use an external-entry fixture.
+   The command `uerl new external-cartpole` generates a Manager package.
+   Public Direct hooks lack equivalent generated-package installation, discovery, CLI, and configuration coverage.
+   Add independent numerical assertions.
+   Response lengths or generated-source inspection alone are insufficient.
+5. **Completion thresholds do not identify completed cases.**
+   The full runner examines successful completion logs and minimum counts per filter.
+   Explicit filters are useful, but count thresholds cannot prove complete coverage after a name or filter changes.
+   Issue #13 has the closed reason `not_planned` and remains closed.
+   Issue #19 tracks this layered audit and later verification.
 
 ## Isaac Lab comparison
 
-The comparison uses the official Isaac Lab `v2.3.2` release
-(`37ddf626871758333d6ed89cf64ad702aef127d0`), which is listed as compatible
-with Isaac Sim 4.5/5.0/5.1. The comparison and release-source links below pin
-their upstream revisions.
+The comparison uses official Isaac Lab `v2.3.2`, revision `37ddf626871758333d6ed89cf64ad702aef127d0`.
+Its listed Isaac Sim compatibility is 4.5/5.0/5.1.
+The references below pin the upstream revisions.
 
-The official contribution guide calls for pytest coverage of normal and edge
-behavior and provides full-suite, file, and individual-test commands. Its
-`run_all_tests.py` runs tests in isolated processes with test timeouts; the
-source tree has CPU-friendly unit cases as well as tests that launch Isaac Sim.
-For example, the termination-manager tests use a small dummy environment and
-assert the changing termination and timeout masks. Task environment smoke tests
-instantiate registered tasks, reset them, apply batched actions, and check
-returned tensors; those are launch/shape/finite-value smoke checks rather than
-independent physics or reward oracles.
+The contribution guide requires pytest coverage for normal and edge behavior.
+It gives suite, file, and individual-case commands.
+Its `run_all_tests.py` uses isolated processes and timeouts.
+The source has CPU-friendly unit cases and cases that launch Isaac Sim.
 
-The official Direct workflow inherits `DirectRLEnv` and separates environment
-configuration from the environment class. Its template tooling creates
-installable projects and registers generated tasks. This is useful precedent
-for packaging, registration, and generated-project validation, but it does not
-provide an engine-independent Python-hooks contract. Isaac Lab's `env_ids` are
-valid vectorized environment indices; they do not define EmbodiedUE's invalid
-Worker Slot behavior. Likewise, Isaac Sim test fixtures cannot stand in for UE
-Automation or prove UE slot routing.
+Termination-manager cases use a small dummy environment with changing termination and timeout masks.
+Task smoke cases instantiate registered Tasks, reset them, apply batched actions, and inspect output tensors.
+Those cases establish launch, shape, and finite-value behavior.
+They do not supply independent physics or reward oracles.
 
-The current official Isaac Lab PR workflow also runs pytest suites in its GPU
-Docker environment and stores JUnit reports. That is useful comparison evidence,
-not a reason to change EmbodiedUE's explicitly scoped static-check workflow. The
-external task installer and capability preflight remain EmbodiedUE
-responsibilities; they need package-discovery, CLI-boundary, and independent
-behavior tests.
+The Direct entry point inherits `DirectRLEnv` and separates configuration from the environment class.
+Template tools generate installable projects with Task registration.
+These patterns inform package and registration validation.
+They do not define an engine-independent Python-hooks contract.
+
+Isaac Lab `env_ids` refer to valid vectorized environment indices.
+They do not define invalid Worker Slot behavior in EmbodiedUE.
+Isaac Sim fixtures cannot replace UE Automation or prove UE Slot routing.
+
+The separately referenced Isaac Lab PR workflow runs pytest in a GPU Docker environment and saves JUnit reports.
+That comparison does not authorize changes to EmbodiedUE's selected static-only CI scope.
+External-package installation and capability preflight remain EmbodiedUE responsibilities.
+They require discovery, CLI-boundary, and independent behavior tests.
 
 ## Layer-by-layer comparison
 

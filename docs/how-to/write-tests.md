@@ -90,6 +90,8 @@ Do not confuse a compact batch row with its original Slot ID.
 
 ## Control fixtures and state
 
+A fixture supplies test data, objects, or resources with a defined lifetime.
+
 Use `tmp_path` for temporary files.
 Use a separate output directory for each invocation.
 Do not write test output into checked-in assets or an existing Run.
@@ -173,8 +175,8 @@ Install it into an isolated target.
 Run the probe outside the source directory.
 
 Make sure that discovery does not depend on the source checkout.
-Verify resource access after removal of staged source files.
-Verify Task construction and CLI configuration behavior.
+Make sure that resources remain accessible after removal of staged source files.
+Make sure that Task construction and CLI configuration meet the contract.
 Assert that package import does not change built-in defaults.
 
 For generator changes, use [test_cli_new.py](../../tests/python/unit/test_cli_new.py).
@@ -195,7 +197,7 @@ For a physical requirement, use the actual engine object and completed solver st
 A pure arithmetic case does not establish correct Chaos integration.
 For lifecycle changes, include start, stop, repeated use, reset, and applicable callback interruption.
 
-Retain the assertion output and completed case names.
+Keep the assertion output and completed case names.
 A success count alone cannot identify which cases ran.
 `[VERIFY]` messages supplement assertions.
 They do not replace them.
@@ -207,7 +209,7 @@ and [test_p2_direct_env.py](../../tests/e2e/test_p2_direct_env.py).
 Use the existing process and Session helpers.
 
 Give the case a bounded timeout.
-Retain enough output to identify the failing stage.
+Keep enough output to identify the failing stage.
 In cleanup, release only processes and files owned by that invocation.
 Do not terminate an unrelated Editor or all processes with the same executable name.
 
@@ -279,7 +281,7 @@ See the [test guide](../../tests/README.md) for native filters and commands.
 
 1. Add a case that reproduces the actual defect.
 2. Run it against the defective implementation, where practical.
-3. Confirm that the intended assertion fails.
+3. Make sure that the intended assertion fails.
 4. Apply the repair.
 5. Run the case again.
 6. Run the affected aggregate checks.
@@ -303,7 +305,7 @@ Before review, answer these questions:
 - Do the commands use the tested revision?
 - Are unexecuted checks identified?
 
-Retain the commit, any dirty diff, command, tool versions, seed, and report location.
+Keep the commit, any dirty diff, command, tool versions, seed, and report location.
 Use the workflow result states: Passed, Failed, Skipped, or Blocked.
 A required skipped or blocked case prevents a full-pass claim.
 

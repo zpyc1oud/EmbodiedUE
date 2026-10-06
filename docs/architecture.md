@@ -1,16 +1,32 @@
 # Architecture and design rationale
 
-UE RL Engine trains robot policies in Unreal Engine 5.8 Chaos and deploys observation/action plans and an exported network into the same physics backend. The product includes CartPole and PhantomX. Python owns training semantics; the UE plugin owns physical execution.
+UE RL Engine trains robot policies in Unreal Engine 5.8 Chaos.
+It deploys observation and action plans with an exported network into the same physics backend.
+The product includes CartPole and PhantomX.
+Python owns training semantics.
+The UE plugin owns physical execution.
 
-For executable commands, use the [README](../README.md); for precise vocabulary, use [CONTEXT](../CONTEXT.md).
+Use the [README](../README.md), [configuration guide](configuration.md), [training guide](how-to/phantomx-robust-training.md), [recording guide](how-to/record-video.md), and [deployment guide](in-game-deployment-guide.md) for executable procedures.
+For scene comparisons, use a fixed map, start, command sequence, and seed.
+Compare survival, Pursuit success, root height, and non-foot contact separately.
+The CLI reports metrics but does not automatically compare a baseline report.
 
 ## Motivation and scope
 
-Physically driven game robots need to respond to ground geometry, slipping, and disturbances at runtime. A useful training system must produce more than loadable weights: the deployed robot must be evaluated in its intended game environment.
+Physical game robots must respond to ground geometry, slipping, and disturbances during execution.
+Loadable weights alone do not establish a useful training result.
+Evaluate the deployed robot in its intended game environment.
 
-Training and deployment can differ in articulation representation, joint-drive response, contact/friction behavior, and unit/frame/timing conventions. Matching a stiffness number does not establish matching closed-loop dynamics. A policy can depend on contact transitions and actuator responses learned during training, so static standing alone is a weak transfer test.
+Training and deployment can use different articulation representations, joint-drive responses, contact behavior, friction, units, frames, and timing.
+Equal stiffness values do not establish equal closed-loop dynamics.
+A policy can depend on contact transitions and actuator responses learned during training.
+Static standing alone is therefore a weak transfer test.
 
-The chosen approach was to build the training loop on Chaos. It trades repeated transfer tuning for infrastructure work: request-driven fixed stepping, batched isolated robot instances, Python/UE communication, sparse reset, declared observations/actions, and a validated host physics baseline. Sharing a backend reduces one source of mismatch; changes in timing, geometry, commands, or deployment conditions still require evaluation.
+The selected design trains on Chaos.
+It replaces some repeated transfer tuning with infrastructure work.
+That work includes fixed stepping, isolated Robot batches, Python/UE communication, sparse reset, declared observations and actions, and a validated host baseline.
+A shared backend removes one source of difference.
+Timing, geometry, commands, and deployment conditions still require evaluation.
 
 ## Responsibility boundaries
 
@@ -22,7 +38,10 @@ The chosen approach was to build the training loop on Chaos. It trades repeated 
 | Action application, state collection, fixed stepping, isolation | UE Worker and Robot runtime |
 | Framing, transport, negotiated layouts | Codec / Transport |
 
-The interface carries numeric data. A robot declaration is compiled into the runtime semantics used during training and the plans stored in the deployment artifact. Deployment serializes the actual trained task's plans, rather than independently reconstructing them from configuration.
+The interface carries numerical data.
+The Robot declaration compiles into training runtime semantics and deployment plans.
+Export serializes the actual trained Task plans.
+It does not independently rebuild them from configuration.
 
 ### Training and deployment paths
 
@@ -39,9 +58,16 @@ Policy artifact: observation plan + ONNX + action plan
   -> Skeletal Mesh in the game
 ```
 
-Training has one synchronous request in flight. A Step carries the batched actions and returns batched state. Timeouts, protocol errors, and ambiguous transport failures invalidate the Session instead of silently replaying requests.
+Training has one synchronous request in flight.
+A Step carries batched actions and returns batched state.
+Timeouts, protocol errors, and ambiguous transport failures invalidate the Session.
+The runtime does not silently replay requests.
 
-The deployment controller does not need a Python training process, Worker session, or wire protocol. Its core dependency direction is `UERLPolicy → UERLRobot → UERLProvider → UERLInterface`. The plugin descriptor still declares Worker and Transport as Runtime modules; a minimal packaged module set must be checked in the actual build rather than inferred from the controller's dependency graph.
+The deployment controller needs no Python training process, Worker Session, or wire protocol.
+Its core dependency direction is `UERLPolicy → UERLRobot → UERLProvider → UERLInterface`.
+The plugin descriptor still declares Worker and Transport as Runtime modules.
+Examine the actual build to establish a minimal packaged module set.
+The controller dependency graph alone is insufficient.
 
 ### Python modules
 
@@ -60,7 +86,10 @@ The deployment controller does not need a Python training process, Worker sessio
 | `policy/` | Artifact reading/validation and reference inference for parity |
 | `presentation/` | UE frame consumption and video encoding |
 
-`policy/` must not depend on `training/`, and generic `core/mdp/` must not depend on concrete `tasks/`. Plan operators have matching Python and C++ implementations. Dependency tests enforce these boundaries.
+The module `policy/` must not depend on `training/`.
+Generic `core/mdp/` must not depend on concrete `tasks/`.
+Plan operators have matching Python and C++ implementations.
+Dependency tests enforce these boundaries.
 
 ### UE modules
 
@@ -75,51 +104,94 @@ The deployment controller does not need a Python training process, Worker sessio
 | `UERLWorker` | Lifecycle, stepping, Slot pool, Environments, safety monitoring, viewport/recording |
 | `UERLPolicyEditor` | Editor-only import, reimport, asset checks, and project checks |
 
-The host project owns global physics settings that must be effective before the physics scene is created. The plugin reads and validates them. Terrain geometry is generated or loaded locally in UE, not transmitted over the training protocol.
+The host owns global physics settings that must be active before physics-scene creation.
+The plugin reads and validates those settings.
+UE generates or loads terrain geometry.
+The training protocol does not transmit that geometry.
 
 ## Configuration and robot integration
 
-Robot declarations in `assets/robots/*.py` describe how to use physical assets. Task YAML and factories describe the training run. Terrain YAML describes ground generation. Mass, inertia, geometry, and joint limits remain asset facts.
+Robot declarations in `assets/robots/*.py` describe physical asset use.
+Task YAML and factories describe the training Run.
+Terrain YAML describes ground generation.
+Mass, inertia, geometry, and joint limits remain asset facts.
 
-Python declarations replaced duplicate robot YAML because they support derivation and regular-expression matching directly. Numeric experiments use validated dotted-path overrides; runtime projections are generated, not maintained as a second source of truth. At initialization, reflected topology and field descriptors establish observation shapes and stable indices before the immutable Session contract is committed. Resolved configuration, git identity, build identity, and layout identity are retained with the Run.
+Python declarations replaced duplicate Robot YAML because they directly support derivation and regular-expression matching.
+Numerical experiments use validated dotted-path overrides.
+Runtime projections are generated, not maintained as a second configuration source.
+Initialization reflects topology and field descriptors to establish observation shapes and stable indices.
+It then commits the immutable Session contract.
+The Run keeps resolved configuration, Git identity, build identity, and layout identity.
 
 ### Robot integration
 
-A supported robot integration adds UE content, a Python robot declaration, a Task, and trained artifacts. Existing generic runtime code is reused. See [Add a robot](how-to/add-a-robot.md).
+A supported Robot integration adds UE content, a Python Robot declaration, a Task, and trained artifacts.
+It uses existing generic runtime code.
+See [Add a robot](how-to/add-a-robot.md).
 
-The runtime rejects missing PhysicsAssets and unsupported structural contracts rather than guessing a robot. Reflection supplies bodies, joints, motion types, the supported unlocked coordinate, SI limits, and hierarchy. Training selects which names are actuated and observed. Declaration/descriptor mismatches fail during initialization with a field path.
+The runtime rejects missing PhysicsAssets and unsupported structural contracts.
+It does not guess a Robot configuration.
+Reflection supplies bodies, joints, motion types, the supported unlocked coordinate, SI limits, and hierarchy.
+Training selects names for actuation and observation.
+A declaration/descriptor mismatch fails initialization with a field path.
 
-CartPole provides the minimal balance/training test with one actuator; PhantomX has 18 actuators and a floating base. New mechanisms outside the current topology or operator contracts require explicit runtime design and tests; the existing integration path is not a promise of arbitrary robot support.
+CartPole has one actuator and supplies a minimal balance and training test.
+PhantomX has 18 actuators and a floating base.
+Mechanisms outside the supported topology or operator contracts require explicit runtime design and tests.
+The existing integration path does not promise arbitrary Robot support.
 
 ## Fixed physics steps and variable control intervals
 
-The Worker advances training time only after accepting a Step request. A custom timestep gate advances the application by `physics_dt` for each permitted physics frame; idle ticks do not advance training time. The requested `step_decimation` counts down to zero, then the Worker returns state and closes the gate. Action targets remain unchanged for the whole window, including drive modes that reapply the target on each physics frame.
+The Worker advances training time only after it accepts a Step request.
+A custom timestep gate advances the application by `physics_dt` for each permitted physics frame.
+Idle ticks do not advance training time.
+When `step_decimation` reaches zero, the Worker returns state and closes the gate.
+Action targets stay constant for the complete window.
+This includes drive modes that apply the same target again on each physics frame.
 
-A Session fixes `physics_dt` and the inclusive `decimation` range. Each Step carries one value from that range. For frame k:
+A Session fixes `physics_dt` and the inclusive `decimation` range.
+Each Step carries one value within that range.
+For frame k:
 
 ```text
 dt_k = physics_dt × step_decimation_k
 o_k -> a_k -> physics(step_decimation_k) -> o_(k+1)
 ```
 
-The returned observation interval belongs to the completed control frame. The first observation after Initialize or Reset uses `DtMin`. PhantomX uses 5 ms physics steps and `[1,7]`, producing 5–35 ms control intervals. CartPole uses `1/120 s` and `[2,2]`, producing a `1/60 s` control interval. This is variable **decimation**, not per-Step variation of the solver timestep.
+The returned observation interval belongs to the completed control frame.
+The first observation after Initialize or Reset uses `DtMin`.
+PhantomX uses 5 ms physics steps and `[1,7]`, for 5–35 ms control intervals.
+CartPole uses `1/120 s` and `[2,2]`, for a `1/60 s` control interval.
+This is variable **decimation**.
+The solver timestep does not change with each Step.
 
 ## Parallel Slots and collision isolation
 
-Each Slot contains a robot instance and its task state. Robot collisions and contacts must not cross Slot boundaries; spacing alone does not enforce isolation.
+Each Slot contains one Robot instance and its Task state.
+Robot collisions and contacts must not cross Slot boundaries.
+Distance between Slots alone does not enforce isolation.
 
 | Scope | Geometry and queries |
 |---|---|
 | Slot-isolated | Each Slot owns geometry and uses its collision/query isolation plan |
 | Shared World | Robots share procedural or authored static terrain while robot-to-robot collisions remain isolated |
 
-The Environment places Slots on a grid, traces ground height/normal, and establishes local Ground frames. Body poses and velocities use those frames, rather than absolute UE positions. This removes absolute placement from those observations; it does not guarantee identical observation distributions on different terrain.
+The Environment places Slots on a grid, traces ground height and normal, and establishes local Ground frames.
+Body poses and velocities use these frames instead of absolute UE positions.
+This removes absolute placement from those observations.
+It does not guarantee equal observation distributions on different terrain.
 
-Flat walking defaults to 512 Slots; CartPole to 64. Continuous terrain defaults to 64 Slots with independent geometry and an 8×8 layout. Discrete terrain defaults to 64 Slots on a shared atlas. Each terrain definition is maintained once, independent of the number of generated geometry instances. Review runtime isolation and coverage before increasing parallelism.
+Flat walking defaults to 512 Slots, and CartPole defaults to 64.
+Continuous terrain uses 64 Slots with independent geometry and an 8×8 layout.
+Discrete terrain uses 64 Slots on a shared atlas.
+Each terrain definition is maintained once, independently of the generated geometry count.
+Before an increase in parallelism, examine isolation and terrain coverage.
 
 ## Actuation and observations
 
-The actuator calculation combines stiffness, damping, effort limit, target, position, and velocity, then clamps the resulting effort. Position, effort, and passive behavior use the common actuator semantics rather than robot-specific control code.
+The actuator calculation uses stiffness, damping, effort limit, target, position, and velocity.
+It clamps the resulting effort.
+Position, effort, and passive behavior share actuator semantics instead of robot-specific control code.
 
 | Observation | Shape and semantics |
 |---|---|
@@ -131,39 +203,92 @@ The actuator calculation combines stiffness, damping, effort limit, target, posi
 | Contact force | Net impulse magnitude from that solver step divided by its duration, converted to newtons |
 | Terrain-height scan | 7×5 world-horizontal footprint, heights relative to robot root |
 
-Contact is sampled at the window end; it does not accumulate earlier collision events. Contact force is `|I| / (100 × SolverStepSeconds)`, neither the maximum force during the window nor an average over the control interval. Old impulses are not reused when no new solve completes.
+Contact samples the final completed solver step at the window end.
+It does not accumulate earlier collision events.
+Contact force is `|I| / (100 × SolverStepSeconds)`.
+It is neither the window maximum nor an average over the control interval.
+Without a new completed solve, the runtime does not reuse old impulses.
 
-The terrain scan stores `(hit.Z-root.Z)/100` in meters. Training ray queries use the Environment owner whitelist in Shared World or the Slot channel in isolated geometry. Deployment uses blocking WorldStatic. Successful hit points are cached and re-expressed relative to the current robot during brief query loss; missing initial/reset hits are errors. Contact filtering is distinct from terrain-scan filtering.
+The terrain scan stores `(hit.Z-root.Z)/100` in meters.
+Training ray queries use the Environment owner whitelist in Shared World or the Slot channel in isolated geometry.
+Deployment uses blocking WorldStatic.
+During brief query loss, cached successful hit points supply new root-relative values.
+Missing initial or reset hits cause errors.
+Contact filtering is separate from terrain-scan filtering.
 
-The simulation publishes dtype, shape, units, reference frame, and semantics for every field at initialization. Python compiles its observation plan from those descriptors and validates binding before stepping. Unit/frame conversion belongs at the runtime observation boundary.
+At initialization, simulation publishes each field’s dtype, shape, units, reference frame, and semantics.
+Python compiles the observation plan from those descriptors and validates binding before stepping.
+Unit and frame conversion occurs at the runtime observation boundary.
 
 ## Protocol and reset
 
-Local TCP carries strict JSON for control and negotiated binary batches for data. Frames have a fixed 48-byte big-endian header containing magic, protocol version, message type, flags, payload length, sequence, Session UUID, and layout identity. Control payloads are limited to 1 MiB and data payloads to 64 MiB.
+Local TCP carries strict JSON control messages and negotiated binary data batches.
+The fixed 48-byte big-endian header contains magic, version, message type, flags, payload length, sequence, Session UUID, and layout identity.
+Control payloads have a 1 MiB limit.
+Data payloads have a 64 MiB limit.
 
-The lifecycle includes Hello, Initialize, InitialState, Ready, Shutdown, Step, Reset, and structured errors with stable codes. Both sides enforce phase transitions before entering physics. Canonical JSON supplies configuration/schema/layout identities.
+The lifecycle includes Hello, Initialize, InitialState, Ready, Shutdown, Step, Reset, and structured errors with stable codes.
+Both sides enforce phase transitions before physics execution.
+Canonical JSON supplies configuration, schema, and layout identities.
 
-Five negotiated layouts cover initial state, action, step result, reset request, and reset result. Named segments declare dtype, shape, alignment, and zero padding. Batched robot fields have a Slot dimension; per-Step metadata such as the shared `step_decimation` scalar is separate. Layout offsets are compiled at initialization. Sparse reset carries a Slot mask, per-Slot terrain level, and reset values. Each selected Slot first restores its complete canonical physical state, then applies sampled overrides.
+Five negotiated layouts cover initial state, action, step result, reset request, and reset result.
+Named segments declare dtype, shape, alignment, and zero padding.
+Batched Robot fields have a Slot dimension.
+Per-Step metadata, such as the shared `step_decimation` scalar, is separate.
+Initialization compiles layout offsets.
+Sparse reset carries a Slot mask, per-Slot terrain level, and reset values.
 
-The first policy-visible episode starts with a normal reset of all Slots after Ready. The Initialize state establishes the runtime; it is not a substitute for sampling the initial episode distribution.
+Each selected Slot first restores its complete canonical physical state.
+It then applies sampled overrides.
+
+The first policy-visible episode starts with a normal reset of all Slots after Ready.
+Initialize state establishes the runtime.
+It does not replace a sample from the initial episode distribution.
 
 ## Declarative MDP and cross-language plans
 
-Observation and action terms compile to a topologically ordered operator graph with explicit inputs, outputs, widths, and parameters. The same plan object is executed by Python during training and serialized for C++ deployment. Rewards, termination, events, and curriculum remain Python task mathematics.
+Observation and action terms compile into a topologically ordered operator graph.
+The graph has explicit inputs, outputs, widths, and parameters.
+Python executes the same plan object that export serializes for C++ deployment.
+Rewards, termination, events, and curriculum remain Python Task mathematics.
 
-Operators cover field selection, concatenation, slicing, inverse rotation, gravity projection, commands, control-frame duration, previous/current policy action, relative joint position, scaling, offset, and clipping. PhantomX observes `control_frame_dt` scaled by 100. The plan quaternion convention is `xyzw` throughout.
+Operators include field selection, concatenation, slicing, inverse rotation, gravity projection, commands, and control-frame duration.
+They also include previous/current policy action, relative joint position, scaling, offset, and clipping.
+PhantomX observes `control_frame_dt` scaled by 100.
+All plan quaternions use `xyzw`.
 
-A new operator requires Python and C++ implementations, reviewed expected values in shared parity cases, and a negative self-check in one change. Each implementation is compared with the reviewed expected values, rather than treating the other implementation as the oracle. See [operator admission](../engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md).
+A new operator requires Python and C++ implementations, reviewed parity values, and a negative self-check in one change.
+Each implementation must match the reviewed expected values.
+Neither implementation is the reference result for the other.
+See [operator admission](../engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md).
 
-Manager-composed declarative tasks are the exportable task path. Export reads both plans directly from the task. Interfaces remain where there are actual alternative implementations, such as command sources.
+Manager-composed declarative Tasks supply the exportable Task path.
+Export reads both plans directly from the Task.
+Interfaces remain where alternative implementations exist, such as command sources.
 
 ## PPO, curriculum, and physical time
 
-The training stack uses rsl-rl PPO, a vector-environment adapter, checkpointed curriculum state, and PhantomX-specific physical-time return calculations. Continuous rewards scale with actual elapsed time relative to 20 ms; event costs occur once. Discount and GAE factors are exponentiated by `actual_dt / reference_dt`. Episodes end after 20 seconds of accumulated solver time. Initial episode timeout phases are randomized per Slot, including on resume. CartPole retains fixed-step PPO behavior.
+Training uses rsl-rl PPO, a vector-environment adapter, saved curriculum state, and PhantomX physical-time return calculations.
+Continuous rewards scale with elapsed time relative to 20 ms.
+Event costs occur once.
+Discount and GAE factors use the exponent `actual_dt / reference_dt`.
+Episodes end after 20 seconds of accumulated solver time.
+Initial episode timeout phases are random per Slot, including after resume.
 
-Reset distributions use deterministic stream identities. Terrain geometry is generated at Session initialization; curriculum selects a level at episode reset using progress along command direction and commanded distance. Normal changes move one level, and promotion beyond the highest tier resamples all tiers. Turning and straight paths follow the same rule.
+CartPole keeps fixed-step PPO behavior.
 
-Task terms cover velocity/yaw tracking and progress, vertical velocity, body angular velocity, uprightness, clearance, action changes, joint velocity, and falls. Commands enter observations through explicit channels. PhantomX checkpoints mark their training objective, and incompatible old-objective resumes are rejected before UE startup. Full rules are in the [training guide](how-to/phantomx-robust-training.md).
+Reset distributions use deterministic stream identities.
+The Session generates terrain geometry during initialization.
+At episode reset, curriculum selects a level from command-direction progress and commanded distance.
+Normal changes move one level.
+Promotion above the highest tier causes random selection across all tiers.
+Turning and straight paths use the same rule.
+
+Task terms cover velocity/yaw tracking and progress, vertical velocity, angular velocity, uprightness, clearance, action changes, joint velocity, and falls.
+Commands enter observations through explicit channels.
+PhantomX checkpoints identify their training objective.
+Incompatible old-objective resume fails before UE startup.
+See the [training guide](how-to/phantomx-robust-training.md) for complete rules.
 
 ## Artifact and in-game inference
 
@@ -178,17 +303,36 @@ onnx_length  uint64
 onnx_bytes   network exported by the training framework
 ```
 
-The JSON does not duplicate network layers, weights, normalization, or deterministic output transforms already represented in ONNX. Loading checks observation-plan width against network input and network output against action-plan policy width.
+The JSON does not duplicate network layers, weights, normalization, or deterministic output transforms already in ONNX.
+Loading compares the observation-plan width with network input width.
+It compares network output width with the action-plan policy width.
 
-The controller compiles plans, binds the robot adapter, then executes state collection → observation plan → inference → action plan → physical commands. Host gameplay chooses the artifact, map, and commands. Actuator/observation definitions come from the artifact. Gameplay uses a completed-solver clock and a deployment-specific synchronous-substep gate; see [deployment](in-game-deployment-guide.md).
+The controller compiles plans and binds the Robot adapter.
+It then executes state collection → observation plan → inference → action plan → physical commands.
+Host gameplay selects the artifact, map, and commands.
+Actuator and observation definitions come from the artifact.
+Gameplay uses a completed solver clock and a deployment-specific synchronous-substep gate.
+See [deployment](in-game-deployment-guide.md).
 
 ## Reproducibility and fault boundaries
 
-A Slot fault affects one robot's physical state. Its state is marked invalid, task math avoids it, and explicit sparse reset can attempt recovery. A Session-fatal fault violates protocol, assets, plans, fixed-frame relationships, or isolation and stops the whole Session. It is not converted into ordinary task termination or silently retried.
+A Slot fault affects one Robot’s physical state.
+The runtime marks that state invalid, and Task mathematics excludes it.
+An explicit sparse reset can attempt recovery.
+A Session-fatal fault affects protocol, assets, plans, fixed-frame relationships, or isolation and stops the complete Session.
+It does not become ordinary Task termination or cause a silent retry.
 
-Keep a checkpoint with its resolved configuration, manifest, commit/local diff, random seed, build/layout identities, and evaluation conditions. A weight file alone is insufficient evidence. Deterministic streams and fixed timing support reproducibility, but do not promise identical numerical trajectories across hardware or engine versions.
+Keep each checkpoint with its resolved configuration, manifest, commit, dirty diff, seed, build/layout identities, and evaluation conditions.
+A weights file alone is insufficient evidence.
+Deterministic streams and fixed timing support repeatable execution.
+They do not guarantee equal numerical trajectories across hardware or engine versions.
 
-Python tests cover configuration and task math; protocol tests use an independent wire oracle; shared parity cases check language equivalence; UE Automation tests cover engine behavior; E2E tests start a real Editor. Required missing external dependencies cause the full runtime gate to fail. See [tests](../tests/README.md).
+Python tests cover configuration and Task mathematics.
+Protocol cases use an independent wire oracle.
+Shared parity cases establish language equivalence against reviewed data.
+UE Automation covers native behavior, and E2E cases start a real Editor.
+Missing required external dependencies cause the full runtime gate to fail.
+See [tests](../tests/README.md) and [Write tests](how-to/write-tests.md).
 
 ## Reference defaults and workflow
 
@@ -205,9 +349,17 @@ Python tests cover configuration and task math; protocol tests use an independen
 | Episode limit | 300 control steps | 20 simulated seconds |
 | PPO MLP | 2×32, ELU, learning rate 1e-3, no observation normalization | 3×128, ELU, learning rate 3e-4, observation normalization |
 
-These values come from the base task YAML, not every registered task. Continuous terrain uses eight levels (noise range ±0.015 to ±0.12 m), discrete terrain six, and pursuit an authored map. The terrain tasks default to 64 Slots. Deployment parity cases use `atol=rtol=2e-5`; this numerical comparison is not a physical trajectory guarantee.
+These values come from base Task YAML, not every registered Task.
+Continuous terrain has eight levels with noise ranges from ±0.015 to ±0.12 m.
+Discrete terrain has six levels, and Pursuit uses an authored map.
+Terrain Tasks default to 64 Slots.
+Deployment parity cases use `atol=rtol=2e-5`.
+That numerical limit is not a physical trajectory guarantee.
 
-The normal workflow is configuration resolution → UE startup or attach → handshake/initialization/Ready → initial reset → Step/Reset loop → checkpoints and manifest → evaluation → export → asset import → in-game validation. Recording uses UE viewport frames without changing the configured physics frequency. For long training sessions, an already-installed environment can avoid dependency synchronization while starting a run.
+The normal procedure is configuration resolution → UE startup or attachment → handshake/initialization/Ready → initial reset.
+Next come the Step/Reset loop, checkpoints and manifest, evaluation, export, asset import, and in-game validation.
+Video recording uses UE viewport frames without changes to the configured physics frequency.
+For a long training session, a prepared environment can avoid dependency synchronization at startup.
 
 Use the [README](../README.md), [configuration guide](configuration.md), [training guide](how-to/phantomx-robust-training.md), [recording guide](how-to/record-video.md), and [deployment guide](in-game-deployment-guide.md) for executable procedures. Use a fixed map, start, command sequence, and seed when comparing scene generalization. Compare survival, pursuit success, root height, and non-foot contact individually; the CLI reports metrics but does not automatically compare a baseline report.
 

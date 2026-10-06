@@ -1,27 +1,41 @@
 # Next release roadmap
 
-Status: design accepted; implementation planning. Version number and release date are not assigned.
+Status: design accepted, implementation planning.
+The version number and release date are not assigned.
 
 ## Goal
 
-Let an external developer install EmbodiedUE, create a Task outside this repository, train and evaluate a policy, and deploy it into a supported UE game scene.
+An external developer can install EmbodiedUE and create a Task outside this repository.
+The developer can then train and evaluate a policy and deploy it into a supported UE game scene.
 
-The maintainer has completed the training workflow on one Windows machine. This release builds on that working path. The primary audience can write Python and build a UE project, but should not need to understand framework internals before changing a Task.
+The maintainer completed the training procedure on one Windows machine.
+This release extends that working path.
+The target reader can write Python and build a UE project.
+A Task change should not require knowledge of framework internals.
 
 ## Required outcomes
 
-1. **Configure the host once.** Training, evaluation, and export share the selected UE installation and host settings. Failures identify the next corrective action.
-2. **Develop an external Task.** A runnable minimal template and advanced Manager composition use the same runtime core. Export capability is explicit.
-3. **Operate on a saved run.** Continuation, evaluation, and export recover the correct Task configuration and policy semantics from the run.
-4. **Deploy with a defined contract.** Supported Robot assets, timing, observations, actions, and static-ground scenes pass both compatibility checks and behavioral evaluation.
+1. **Configure the host once.**
+   Training, evaluation, and export use the selected UE installation and host settings.
+   Each failure identifies a corrective action.
+2. **Develop an external Task.**
+   A runnable minimal template and advanced Manager composition use the same runtime core.
+   Export capability is explicit.
+3. **Operate on a saved run.**
+   Continuation, evaluation, and export recover the saved Task configuration and policy semantics.
+4. **Deploy with a defined contract.**
+   Supported Robot assets, timing, observations, actions, and static-ground scenes pass compatibility and behavior checks.
 
-The design and tradeoffs are in [RFC 0001](../rfcs/0001-developer-workflow.md). These are planned outcomes, not current feature claims.
+[RFC 0001](../rfcs/0001-developer-workflow.md) gives the design and reasons for its choices.
+These outcomes are planned requirements, not current feature claims.
 
 ## Release boundary
 
-Start with the supported Windows/UE setup, CartPole, and PhantomX on static ground. Freeze the tested software versions before the release candidate.
+Start with the supported Windows/UE setup, CartPole, and PhantomX on static ground.
+Before the release candidate, freeze the tested software versions.
 
-Multi-platform support, distributed training, arbitrary dynamic scenes, and automatic conversion of arbitrary Isaac Lab Tasks are outside this release. Offline export is not required to establish the workflow.
+This release excludes multi-platform support, distributed training, arbitrary dynamic scenes, and automatic conversion of arbitrary Isaac Lab Tasks.
+Offline export is not required for the procedure.
 
 ## Stages
 
@@ -33,23 +47,37 @@ Multi-platform support, distributed training, arbitrary dynamic scenes, and auto
 | Release candidate | Frozen interfaces, migration guide, reference results | An independent Windows setup completes the workflow; blocking defects are resolved |
 | Release | Tagged code, supported-version matrix, change notes, known limitations | Installation, learning quality, continuation, and target-scene behavior meet the frozen criteria |
 
-Measure throughput, learning quality, and deployment behavior separately. Use the benchmark protocol as supporting acceptance evidence; do not duplicate its experiment matrix here.
+Measure throughput, learning quality, and deployment behavior separately.
+Use the benchmark protocol as acceptance evidence.
+Keep its experiment matrix in that protocol rather than duplicate it here.
 
 ## Tracking
 
-The accepted design is tracked by four theme Issues:
+Four theme Issues track the accepted design:
 
 - [Host setup and diagnostics](https://github.com/zpyc1oud/EmbodiedUE/issues/5)
 - [External Tasks and shared entry points](https://github.com/zpyc1oud/EmbodiedUE/issues/6)
 - [Saved-run operations](https://github.com/zpyc1oud/EmbodiedUE/issues/7)
 - [Game deployment validation](https://github.com/zpyc1oud/EmbodiedUE/issues/8)
 
-Link implementation PRs to the relevant Issue. Group these under the release Milestone when it is created; the release number/date remain unassigned.
+Link each implementation PR to the applicable Issue.
+When a release Milestone exists, put the theme Issues in it.
+The release number and date remain unassigned.
 
-This page owns release scope. The RFC owns design decisions. Issues own execution status. The links above identify the execution records; progress is maintained there.
+This page defines release scope.
+The RFC records design decisions.
+The linked Issues record execution status.
 
 ## Release decision
 
-On a Windows machine not used for development, a non-author must be able to train the reference Task, change one reward, and deploy the policy into the named test scene using the documentation. Preserve the configuration, policy-quality results, performance baseline, and deployment results.
+Use an independent Windows machine and a developer who did not write the implementation.
+That developer must complete these steps through the documentation:
 
-Publish the supported configuration and remaining limitations. Estimate remaining work after the first complete path, rather than committing to a date before the interface is proven.
+1. Train the reference Task.
+2. Change one reward.
+3. Deploy the policy into the named test scene.
+
+Keep the configuration, policy-quality results, performance baseline, and deployment results.
+Publish the supported configuration and remaining limitations.
+Estimate the remaining work after the first complete path succeeds.
+Do not promise a date before the interface is proven.

@@ -1,31 +1,35 @@
 # Operator admission (UERLPolicy)
 
-A new plan operator must land in one change set with all four of:
+A new plan operator requires all four items in the same change set:
 
-1. **Python** — registry entry in `src/uerl/core/mdp/operators.py` and any
-   source specialization in `executor.py`.
-2. **C++** — `RegisterPlanOperator` entry (usually in
-   `RegisterBuiltinPlanOperators`) and runtime wiring if it is a source op.
-3. **Parity corpus** — at least one case under
-   `tests/parity/cases/<operator>/` with reviewed `expected` floats.
-4. **Negative self-check** — temporarily break the C++ (or Python) implementation
-   and confirm the corpus test fails; record the check on the ticket.
+1. **Python**: add the registry entry in `src/uerl/core/mdp/operators.py`.
+   Add applicable source specialization in `executor.py`.
+2. **C++**: add a `RegisterPlanOperator` entry, usually in `RegisterBuiltinPlanOperators`.
+   For a source operator, add the runtime connection.
+3. **Parity corpus**: add at least one case under `tests/parity/cases/<operator>/`.
+   Review its `expected` floating-point values.
+4. **Negative self-check**: introduce a temporary defect in the C++ or Python implementation.
+   Make sure that the corpus test detects it.
+   Remove the temporary defect.
+   Record the result in the issue.
 
-Missing any of the four blocks merge. Both sides assert against the reviewed
-`expected` field — never against each other.
+All four items are required before merge.
+Both implementations must match the reviewed `expected` field.
+Do not use one implementation as the expected result for the other.
 
 ## Quaternion convention (xyzw)
 
-Plan-layer quaternions are **xyzw** everywhere:
+All plan-layer quaternions use **xyzw**:
 
 - Robot `body_pose` units are `m,quat_xyzw` (position then quat).
 - Python `rotate_inverse` / `projected_gravity` read `quat[:, 0:3]` as xyz and
   `quat[:, 3]` as w.
-- C++ builds `FQuat(Q[0], Q[1], Q[2], Q[3])` — Unreal's `(X,Y,Z,W)` matches
-  plan xyzw. Do **not** pass plan storage as if it were wxyz.
+- C++ constructs `FQuat(Q[0], Q[1], Q[2], Q[3])`.
+  Unreal's `(X,Y,Z,W)` matches the plan's xyzw order.
+  Do not interpret plan storage as wxyz.
 
-Corpus case `rotate_inverse/asymmetric_rotation.json` exists specifically so an
-xyzw/wxyz swap fails parity (identity and axis-aligned rotations can hide the bug).
+The case `rotate_inverse/asymmetric_rotation.json` detects an xyzw/wxyz swap.
+Identity and axis-aligned rotations can hide that defect.
 
 ## Built-in source ops
 
@@ -37,13 +41,13 @@ xyzw/wxyz swap fails parity (identity and axis-aligned rotations can hide the bu
 | `previous_action` | 0 | `width` | `params.width` | Prior-frame policy action |
 | `policy_action` | 0 | `width` | `params.width` | Current-frame policy output (action plans) |
 
-`command` error timing: **Compile** rejects plan width ≠ `AvailableCommands` /
-`command_channels` (`channels()`); **Execute** rejects a missing channel key
-(no silent zero-fill). Message includes the channel name.
+For `command`, **Compile** rejects a plan width different from `AvailableCommands` / `command_channels` (`channels()`).
+**Execute** rejects a missing channel key instead of supplying zeros.
+The error message includes the channel name.
 
-Action-plan `command_fields` error timing: **Compile** rejects produced slot
-width ≠ physical-command declaration in `command_channels` /
-`AvailableCommands`. `policy_action` width must equal `ActionPlan.policy_width`.
+For action-plan `command_fields`, **Compile** compares the produced slot width with the physical-command declaration in `command_channels` / `AvailableCommands`.
+Different widths cause rejection.
+The `policy_action` width must equal `ActionPlan.policy_width`.
 
 ## Built-in transform ops (body frame)
 
@@ -60,10 +64,18 @@ width ≠ physical-command declaration in `command_channels` /
 
 Conventional world gravity for PhantomX-style observations is `(0, 0, -1)`.
 
-`joint_pos_rel` rejects `default` length ≠ input width at **Compile** (message includes both widths). Evaluate is plain subtraction with no joint-count / leg-count / modulo assumptions.
+For `joint_pos_rel`, **Compile** rejects a `default` length different from the input width.
+The message includes both widths.
+Evaluation performs subtraction without assumptions about joint counts, leg counts, or modulo indexing.
 
-`scale` / `offset` reject vector-param length ≠ input width at **Compile**. `clip` rejects `low > high` at **Compile** (do not rely on runtime clamp order for illegal bounds).
+For `scale` and `offset`, **Compile** rejects a vector parameter length different from the input width.
+For `clip`, **Compile** rejects `low > high`.
+Do not depend on runtime clamp order for invalid bounds.
 
 ### NaN passthrough (shaping ops)
 
-`scale`, `offset`, and `clip` pass NaN inputs through unchanged. Operators do not treat NaN as a soft error; upper-layer finiteness checks (e.g. post-control-step state) are responsible for terminating on physical divergence. There is no dedicated NaN parity corpus.
+The operators `scale`, `offset`, and `clip` pass NaN inputs through unchanged.
+They do not treat NaN as a soft error.
+Upper-layer finiteness checks must terminate execution after physical divergence.
+The post-control-step state is one such check location.
+There is no dedicated NaN parity corpus.

@@ -1,6 +1,8 @@
 # UE RL Engine Context
 
-The domain vocabulary for UE RL Engine: Sessions, Environments, Robots, assets, semantics, and the training/simulation boundary. Implementation detail belongs in the architecture and source code.
+This glossary defines Sessions, Environments, Robots, assets, semantics, and the boundary between training and simulation.
+Use these terms consistently.
+Implementation details belong in the architecture guide and source code.
 
 ## Robot domain
 
@@ -35,19 +37,28 @@ The executable robot description obtained by merging asset Topology with RobotCo
 _Avoid_: raw config, raw topology
 
 **SessionSpec**:
-The immutable Session contract compiled by Python at initialization from the Robot, Environment, Slots, physics_dt, inclusive decimation range, and wire projection. The [min,max] endpoints are positive int32 values; [N,N] denotes fixed decimation.
+The immutable Session contract that Python compiles at initialization.
+It includes the Robot, Environment, Slots, physics_dt, inclusive decimation range, and wire projection.
+The [min,max] endpoints are positive int32 values.
+The form [N,N] specifies fixed decimation.
 _Avoid_: mutable runtime state, training source config
 
 **Execution plan**:
-The immutable simulation hot-path plan compiled from SessionSpec at Initialize commit. It caches body, constraint, column, and unit-conversion indices.
+The immutable plan for the simulation execution path, compiled from SessionSpec at Initialize commit.
+It caches body, constraint, column, and unit-conversion indices.
 _Avoid_: plugin framework, user configuration
 
 **Canonical default state**:
-The complete default physical state captured for each Slot at Initialize. Reset restores this state before applying the requested overrides.
+The complete default physical state captured for each Slot at Initialize.
+Reset restores this state before it applies the requested overrides.
 _Avoid_: current state, partial reset fallback
 
 **Initial episode state**:
-The Post-Reset State produced by a normal reset of every Slot after Session Ready. It uses the same reset distribution as later episodes and is the first policy-visible state. The canonical state returned during initialization establishes the runtime and validates the protocol; it does not begin the first episode.
+The Post-Reset State from a normal reset of every Slot after Session Ready.
+It uses the same reset distribution as later episodes.
+It is the first policy-visible state.
+The canonical initialization state establishes the runtime and validates the protocol.
+It does not start the first episode.
 _Avoid_: asset spawn pose, startup grace period
 
 **Actuator**:
@@ -63,7 +74,17 @@ A value read by the training Task from current robot physics, with explicit type
 _Avoid_: sensor plugin
 
 **Terrain-height scan**:
-A fixed 7×5 terrain-height primitive with a world-horizontal footprint referenced to the Robot root. Each sample is (hit.Z-root.Z)/100 in meters. Robot Runtime computes it at observation collection; it neither copies terrain configuration nor exposes UE world coordinates. Shared World training restricts ray hits to the Environment terrain-owner whitelist; Slot-isolated training uses the Slot collision query channel. Deployment explicitly queries blocking WorldStatic geometry. Successful hits cache world-space hit points and recompute root-relative values during brief query loss. Missing initial or reset hits produce a diagnostic error.
+A fixed 7×5 terrain-height primitive with a world-horizontal footprint relative to the Robot root.
+Each sample is (hit.Z-root.Z)/100 in meters.
+Robot Runtime calculates it during observation collection.
+It does not copy terrain configuration or expose UE world coordinates.
+
+Shared World training restricts ray hits to the Environment terrain-owner whitelist.
+Slot-isolated training uses the Slot collision query channel.
+Deployment queries blocking WorldStatic geometry.
+Successful hits cache world-space hit points.
+During a brief query loss, the runtime calculates new root-relative values from those points.
+Missing initial or reset hits cause a diagnostic error.
 _Avoid_: terrain seed, heightfield mesh, world-space elevation
 
 **Reset distribution**:
@@ -71,11 +92,19 @@ Rules for sampling a robot’s initial state on each reset.
 _Avoid_: terrain curriculum
 
 **Contact observation**:
-Binary geometric support (0/1) for a selected body at the last completed solver step of a control window. It is queried at the window end and does not accumulate earlier support or OnComponentHit events. Slot-isolated contact counts only the owning Environment; Shared World contact counts WorldStatic ground. The terrain-scan owner whitelist does not restrict contact.
+Binary geometric support (0/1) for a selected body at the last completed solver step of a control window.
+The runtime queries it at the window end.
+It does not accumulate earlier support or OnComponentHit events.
+Slot-isolated contact counts only the owning Environment.
+Shared World contact counts WorldStatic ground.
+The terrain-scan owner whitelist does not restrict contact.
 _Avoid_: contact force, collision manifold
 
 **Contact-force observation**:
-The magnitude of the net impulse from that same final completed solver step, converted to newtons as |I| / (100 * SolverStepSeconds). It is neither a window maximum nor a value divided by game DeltaTime, the whole control window, or clamped observation dt. Old impulses are not reused when there is no new physics result.
+The net impulse magnitude from the same final completed solver step, converted to newtons as |I| / (100 * SolverStepSeconds).
+It is not a window maximum.
+The divisor is not game DeltaTime, the complete control window, or clamped observation dt.
+Without a new physics result, the runtime does not reuse old impulses.
 _Avoid_: window force maximum, control-frame impulse
 
 ## Runtime boundaries
@@ -85,11 +114,14 @@ One robot instance and its task state within a parallel simulation.
 _Avoid_: world, environment process
 
 **Session**:
-An immutable training connection served by one Worker bridge in one UWorld. Slot count, execution plans, physics_dt, and decimation range are fixed; each Step carries one step_decimation scalar within that range.
+An immutable training connection served by one Worker bridge in one UWorld.
+Slot count, execution plans, physics_dt, and decimation range are fixed.
+Each Step carries one step_decimation scalar within that range.
 _Avoid_: episode, task
 
 **Environment**:
-The simulation context providing placement, ground, and terrain to Slots. It does not own Robot semantics, robot control, or task mathematics.
+The simulation context that supplies placement, ground, and terrain to Slots.
+It does not own Robot semantics, robot control, or Task mathematics.
 _Avoid_: robot, task
 
 **Collision scope**:
@@ -101,19 +133,27 @@ An Environment where each Slot owns collision geometry that interacts only with 
 _Avoid_: cloned world, private scene
 
 **Shared World Environment**:
-An Environment where several Slot Robots share terrain geometry while preserving robot-to-robot Slot isolation. Geometry can come from a loaded World Map or be generated procedurally in that World.
+An Environment where several Slot Robots share terrain geometry and keep robot-to-robot Slot isolation.
+Geometry can come from a loaded World Map or procedural generation in that World.
 _Avoid_: Shared Map Environment, global environment, multi-agent environment
 
 **Terrain source**:
-The source of Environment geometry and Ground frames: procedural terrain or an authored World Map. Changing the source does not change collision scope.
+The source of Environment geometry and Ground frames: procedural terrain or an authored World Map.
+A change to the source does not change collision scope.
 _Avoid_: collision mode, map mode
 
 **Terrain curriculum**:
-All difficulty regions are generated at Session initialization. At episode reset, training adjusts difficulty using accumulated progress along the command direction and accumulated commanded distance. Normal promotion/demotion moves one level; promotion past the highest level resamples across all levels. Terminations and timeouts use the same rule. Geometry is not modified or regenerated during walking.
+The Session generates all difficulty regions during initialization.
+At episode reset, training changes difficulty from accumulated command-direction progress and commanded distance.
+Normal promotion or demotion moves one level.
+Promotion above the highest level causes random selection across all levels.
+Terminations and timeouts use the same rule.
+Geometry does not change or regenerate during walking.
 _Avoid_: Reset distribution, runtime terrain mutation
 
 **World Map identity**:
-The long UE package name of the World actually loaded for a Session, confirmed jointly by the resolved configuration, Worker projection, and Run manifest.
+The long UE package name of the World loaded for a Session.
+The resolved configuration, Worker projection, and Run manifest jointly establish this identity.
 _Avoid_: launch argument, level filename
 
 **Ground frame**:
@@ -121,7 +161,9 @@ A Slot-local ground reference frame used to express root/body poses and velociti
 _Avoid_: world transform, terrain random seed
 
 **Slot isolation**:
-The invariant that robot collisions and contacts in one Slot cannot affect another. Slot-isolated Environments also isolate terrain and queries. Spatial separation alone is not isolation.
+The invariant that robot collisions and contacts in one Slot cannot affect another.
+Slot-isolated Environments also isolate terrain and queries.
+Distance between Slots alone does not establish isolation.
 _Avoid_: spacing heuristic
 
 **Task**:
@@ -133,11 +175,19 @@ The simulation-side runtime coordinating Slot lifecycle, initialization, fixed s
 _Avoid_: trainer, task
 
 **Control frame**:
-A complete control cycle: training submits an action target and step_decimation; simulation holds that target for the specified number of physics steps and returns one observation. The window is physics_dt × step_decimation. ArtifactTiming stores physics_dt and the decimation range and derives minimum/maximum control intervals.
+A complete control cycle.
+Training submits an action target and step_decimation.
+Simulation holds that target for the specified physics steps and returns one observation.
+The window is physics_dt × step_decimation.
+ArtifactTiming stores physics_dt and the decimation range and derives the minimum and maximum control intervals.
 _Avoid_: physics substep
 
 **Control frame length**:
-The actual duration of frame k is dt_k = physics_dt × d_k, where d_k is that Step’s step_decimation. The sequence is o_k → a_k → physics(d_k) → o_(k+1); the returned observation interval belongs to the completed frame. The first observation after Initialize or Reset uses DtMin by convention.
+The actual duration of frame k is dt_k = physics_dt × d_k.
+Here, d_k is that Step’s step_decimation.
+The sequence is o_k → a_k → physics(d_k) → o_(k+1).
+The returned observation interval belongs to the completed frame.
+The first observation after Initialize or Reset uses DtMin by convention.
 _Avoid_: nominal control period, wall-clock latency
 
 **Slot fault**:
@@ -159,19 +209,24 @@ _Avoid_: robot owner
 ## Configuration ownership and training host
 
 **Training configuration**:
-The Task, Worker, Environment, runner parameters, and Robot asset/semantics references for a training run. It does not duplicate the physical facts in Robot assets.
+The Task, Worker, Environment, runner parameters, and Robot asset/semantics references for a training Run.
+It does not duplicate the physical facts in Robot assets.
 _Avoid_: robot definition
 
 **Robot semantics configuration**:
-How training uses a Robot: actuators, gains, reference pose, action scaling, observations, and reset distributions. It excludes mass, inertia, geometry, and joint limits.
+The training use of a Robot: actuators, gains, reference pose, action scaling, observations, and reset distributions.
+It excludes mass, inertia, geometry, and joint limits.
 _Avoid_: asset metadata
 
 **Worker projection**:
-The training-side projection of a resolved RobotSpec into simulation runtime configuration. This is an internal artifact, not a second user-maintained Robot configuration.
+The training-side projection of a resolved RobotSpec into simulation runtime configuration.
+It is an internal artifact, not a second Robot configuration maintained by the user.
 _Avoid_: source configuration
 
 **Training UE host**:
-The dedicated UE project containing the Worker and project-level Chaos baseline. The host owns global physics configuration; the plugin reads and validates it.
+The dedicated UE project that contains the Worker and project-level Chaos baseline.
+The host owns global physics configuration.
+The plugin reads and validates it.
 _Avoid_: plugin installer
 
 **Chaos baseline**:
@@ -179,9 +234,13 @@ Global fixed-step-related physics settings that must be active before the traini
 _Avoid_: per-robot semantics
 
 **Deployment physics gate**:
-A read-only pre-start check of the actual World, Chaos solver, synchronous substep settings, and artifact timing. It requires valid synchronous substeps, does not reuse the training Worker’s substeps-disabled gate, and does not modify host settings.
+A read-only pre-start check of the actual World, Chaos solver, synchronous substep settings, and artifact timing.
+It requires valid synchronous substeps.
+It does not reuse the training Worker’s substeps-disabled gate or change host settings.
 _Avoid_: training physics gate, configured time as completed time
 
 **Completed solver clock**:
-Chaos GetSolverTime, current frame, and GetLastDt read at a safe completion point in the same World. Only actual frame/time advancement produces a new completed sample; pause or lack of a solve does not fabricate progress.
+Chaos GetSolverTime, current frame, and GetLastDt from a safe completion point in the same World.
+Only actual frame/time advancement produces a new completed sample.
+Pause or the absence of a solve does not create progress.
 _Avoid_: game DeltaTime, configured physics window

@@ -60,7 +60,7 @@ Measurements from one host do not establish compatibility or performance guarant
 
 For documentation changes, do these checks:
 
-- Verify relative links and anchors.
+- Make sure that relative links and anchors resolve.
 - Compare commands and flags with CLI help or their parser definitions.
 - Compare Task IDs with `uerl tasks` or the registry.
 - Compare defaults with resolved configurations.
@@ -70,7 +70,7 @@ Do not start training solely for a documentation change.
 ## Review evidence
 
 Describe the problem, final behavior, completed validation, and remaining limitations.
-For an experiment, retain the configuration, seed, commit, dirty diff, manifest, checkpoint identity, and evaluation procedure together.
+For an experiment, keep the configuration, seed, commit, dirty diff, manifest, checkpoint identity, and evaluation procedure together.
 Generated `runs/` output is not source content.
 Agree on a location before you share large artifacts.
 

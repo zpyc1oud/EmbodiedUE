@@ -1,10 +1,12 @@
 # Optional Stylized Egypt demo
 
-The Egypt integration is optional. Fab meshes, materials, textures, map, built data,
-and text map export are not included in the current tree. Original host GameMode and
-Pursuit task code remain available. The default game map is `/Engine/Maps/Entry`, an empty engine map. Open the
-optional Egypt map explicitly in the Editor; `GameDefaultMap` does not configure
-Editor startup.
+The Egypt integration is optional.
+The current tree excludes Fab meshes, materials, textures, map, built data, and text map export.
+Original host GameMode and Pursuit Task code remain available.
+
+The default game map is the empty engine map `/Engine/Maps/Entry`.
+Open the optional Egypt map explicitly in the Editor.
+The setting `GameDefaultMap` does not configure Editor startup.
 
 ## Acquire and install your copy
 
@@ -13,62 +15,75 @@ Editor startup.
    the displayed price is not public redistribution permission. The inspected page
    did not expose a specific license value and displayed “Allows usage with AI: No”.
    Confirm that the terms cover your intended use, including any RL experiment.
-2. Acquire it through your own Fab account and add its Unreal Engine content to the
-   local `engine/UERLHost.uproject` through the supported Fab/Epic workflow. If the
-   current package requires a supported-version staging project, use Unreal's asset
-   migration workflow into this project. Do not rename the content root or copy only
-   the map without its dependencies. UE5.8 compatibility is not established here.
-3. Confirm this physical path exists with an actual map package, not an LFS pointer:
+2. Acquire the content through your own Fab account.
+   Add it to `engine/UERLHost.uproject` through the supported Fab/Epic procedure.
+   If the package requires a supported-version staging project, migrate its assets through Unreal's asset migration procedure.
+   Keep the content root name and all map dependencies.
+3. Make sure that this file contains an actual map package:
    `engine/Content/Stylized_Egypt/Maps/Stylized_Egypt_Demo.umap`.
    Its Unreal package path must be `/Game/Stylized_Egypt/Maps/Stylized_Egypt_Demo`.
-   Check missing materials, textures and collisions in the Editor. The repository
-   ignores `engine/Content/Stylized_Egypt/` so locally installed content stays private.
-4. Open that map explicitly in the Editor. Keep local edits to the vendor map private.
-   This checkout does not include a modified vendor map or guarantee that the current
-   Fab download matches the previously used revision.
+   An LFS pointer is not sufficient.
+4. Examine materials, textures, and collisions in the Editor.
+5. Open the map explicitly.
+   Keep local vendor-map changes private.
+
+The repository ignores `engine/Content/Stylized_Egypt/` to keep installed content private.
+UE 5.8 compatibility is not established here.
+This checkout does not supply a modified vendor map.
+It does not guarantee that the current Fab package matches the historical revision.
 
 ## Restore the integration settings locally
 
-The original source integration is preserved in
+The original integration remains in
 [`UERLEgyptChaseGameMode.cpp`](../../engine/Source/UERLHost/UERLEgyptChaseGameMode.cpp)
-and [`registration.py`](../../src/uerl/tasks/phantomx/registration.py):
+and [`registration.py`](../../src/uerl/tasks/phantomx/registration.py).
 
-- Gameplay: set the local map's GameMode Override to `UERLEgyptChaseGameMode` if an
-  asset-specific override selects another mode. The project retains this global
-  GameMode, which only activates its chase logic on map names containing
-  `Stylized_Egypt`. Ensure Player 0 possesses a Pawn and has a usable PlayerStart.
-- The GameMode loads `/Game/UERLEngine/Policies/PhantomXContinuousTerrain` and spawns
-  the policy robot near the player. Verify that the separately tracked robot and
-  policy assets are available. See [deployment](../in-game-deployment-guide.md).
-- The optional `UERL-PhantomX-Pursuit-v0` task still selects the Egypt map. It requires
-  one Slot, Player 0, an actor with the configured PhantomX Skeletal Mesh, and
-  WorldStatic ground below **(-9.4, 1.6) metres**, traced from z=10 m to z=-10 m.
-  These original coordinates and `robot.claim_authored_actor=1` were not changed.
-  For Worker Pursuit, use a local non-chase GameMode with a Player 0 Pawn and one
-  authored actor using the configured PhantomX Skeletal Mesh. Do not simultaneously
-  enable the chase GameMode's separately controlled policy robot or another automatic
-  policy component. Launch with `--presentation gameplay` to preserve the map's
-  player setup. A fresh Fab environment does not itself include this project's
-  authored robot integration. Keep gameplay-demo and Worker-task GameMode settings
-  separate in your local setup.
+### Gameplay demo
 
-For a different pack revision, inspect whether these assumptions still hold. Do not
-silently change ground origin, robot topology, policy contracts or task semantics to
-make it run. Native map load, gameplay and Pursuit validation remain outstanding.
+1. If the map overrides the project GameMode, select `UERLEgyptChaseGameMode` for the local map.
+2. Make sure that Player 0 possesses a Pawn and has a usable PlayerStart.
+3. Make sure that the separate Robot and policy assets are available.
+
+The project keeps this global GameMode.
+Its chase logic activates only on map names that contain `Stylized_Egypt`.
+It loads `/Game/UERLEngine/Policies/PhantomXContinuousTerrain` and spawns the policy Robot near the player.
+See [deployment](../in-game-deployment-guide.md).
+
+### Worker Pursuit
+
+The optional `UERL-PhantomX-Pursuit-v0` Task selects the Egypt map.
+It requires one Slot, Player 0, and an authored actor with the configured PhantomX Skeletal Mesh.
+It also requires WorldStatic ground below **(-9.4, 1.6) metres**.
+The ground trace extends from z=10 m to z=-10 m.
+The original coordinates and `robot.claim_authored_actor=1` remain unchanged.
+
+1. Select a local non-chase GameMode with a Player 0 Pawn.
+2. Add one authored actor with the configured PhantomX Skeletal Mesh.
+3. Disable the chase GameMode's separate policy Robot and any other automatic policy component.
+4. Launch with `--presentation gameplay` to keep the map's player setup.
+
+A fresh Fab package does not include this project's authored Robot integration.
+Keep gameplay-demo and Worker-task GameMode settings separate.
+
+For another pack revision, examine each integration assumption.
+Do not silently change ground origin, Robot topology, policy contracts, or Task semantics to obtain a successful launch.
+Native map loading, gameplay, and Pursuit validation remain outstanding in this guide.
 
 ## Missing-content behavior and non-Fab workflows
 
-Python launch argument preparation for training, playback and export rejects the
-Egypt map when its `.umap` is missing, empty or an LFS pointer. The error supplies the
-Fab link and this guide before starting UE. This is a presence check, not validation
-of asset dependencies, map customization, license rights or package compatibility.
-Attach mode uses an already running host and cannot inspect that remote map locally.
-`uerl check task` continues to validate declarations only.
+Before training, playback, or export starts UE, Python examines the selected Egypt map file.
+An absent, empty, or LFS-pointer `.umap` causes rejection with the Fab link and this guide.
+This is a presence check only.
+It does not establish asset dependencies, map customization, license rights, or package compatibility.
 
-CartPole and continuous/discrete PhantomX terrain retain `/Engine/Maps/Entry`; no
-Egypt map substitution occurs. Flat walking still uses `/Game/Maps/NewMap`, whose
-binary dependency closure needs an Editor check. Robot asset provenance and LFS
-availability remain separate prerequisites.
+Attach mode uses an existing host and cannot inspect its remote map locally.
+The command `uerl check task` validates declarations only.
 
-No historical assets were purged. See [publication status and recovery](../asset-publication-plan.md)
-before changing repository visibility.
+CartPole and continuous/discrete PhantomX terrain keep `/Engine/Maps/Entry`.
+They do not substitute another map for Egypt.
+Flat walking keeps `/Game/Maps/NewMap`.
+Its binary dependency closure still requires an Editor inspection.
+Robot asset provenance and LFS availability remain separate prerequisites.
+
+The exclusion did not purge historical assets.
+Before a repository visibility change, read [publication status and recovery](../asset-publication-plan.md).

@@ -94,7 +94,7 @@ All three commands accept `--host-profile`, `--ue-executable`, and `--project`.
 An explicit path replaces only its own field.
 An executable override therefore retains the profile's project path.
 
-Advanced overrides retain priority over computed launch values, including explicit path flags.
+Advanced overrides have priority over computed launch values, including explicit path flags.
 These overrides are `--session.worker_executable` and `--session.worker_args`.
 The latter replaces the complete argument list.
 Map and port precedence remain unchanged.

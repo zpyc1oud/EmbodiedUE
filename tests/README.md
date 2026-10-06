@@ -56,7 +56,7 @@ These cases do not establish physical behavior or the real UE training procedure
 
 These commands require a UE 5.8 Windows host and a built `UERLHostEditor`.
 This documentation update adds no new Windows/UE execution evidence.
-The E2E Worker runner selects `UE_ROOT`, then `UE_58_ROOT`, then the default Epic `UE_5.8` installation.
+The E2E runner in `tests/e2e/support/worker_runner.py` selects `UE_ROOT`, then `UE_58_ROOT`, then the default Epic `UE_5.8` installation.
 This selection is separate from the product CLI host profile.
 
 ```powershell
