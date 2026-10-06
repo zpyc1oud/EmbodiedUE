@@ -16,6 +16,7 @@ from tensordict import TensorDict
 
 from uerl.core.direct.task import DirectTask
 from uerl.core.mdp.plan import PLAN_VERSION, ActionPlan, ObservationPlan, PlanOp
+from uerl.errors import ConfigError
 from uerl.policy.artifact import (
     ARTIFACT_FORMAT_VERSION,
     ArtifactMetadata,
@@ -24,7 +25,7 @@ from uerl.policy.artifact import (
     RobotRuntime,
     RobotRuntimeActuator,
 )
-from uerl.training.export import export_policy
+from uerl.training.export import _export_policy_artifact, export_policy
 
 
 def _make_rsl_deterministic_export(
@@ -222,47 +223,15 @@ def _robot_runtime(*, actuator_count: int) -> RobotRuntime:
     )
 
 
-class _StaticDirectTask(DirectTask):
-    """DirectTask test double holding the two plans used by export."""
+def _bound_manager_task() -> DirectTask:
+    """Create a real Manager Task whose capability can safely authorize export."""
 
-    def __init__(self, observation_plan: ObservationPlan, action_plan: ActionPlan) -> None:
-        super().__init__()
-        self._observation_plan = observation_plan
-        self._action_plan = action_plan
+    from tests.python.unit.test_cartpole_product_task import CARTPOLE_SHAPES, _robot_spec
+    from uerl.tasks.cartpole import CartPoleTaskConfig, create_cartpole_task
 
-    @property
-    def observation_plan(self) -> ObservationPlan:
-        return self._observation_plan
-
-    @property
-    def action_plan(self) -> ActionPlan:
-        return self._action_plan
-
-
-class _CountingDirectTask(DirectTask):
-    """DirectTask that records how many times each plan property is read.
-
-    Distinguishes "take the held object" (one access, JSON matches) from
-    "rebuild from config" (would not touch these properties, or would lose a
-    sentinel slot name).
-    """
-
-    def __init__(self, observation_plan: ObservationPlan, action_plan: ActionPlan) -> None:
-        super().__init__()
-        self._observation_plan = observation_plan
-        self._action_plan = action_plan
-        self.observation_plan_access_count = 0
-        self.action_plan_access_count = 0
-
-    @property
-    def observation_plan(self) -> ObservationPlan:
-        self.observation_plan_access_count += 1
-        return self._observation_plan
-
-    @property
-    def action_plan(self) -> ActionPlan:
-        self.action_plan_access_count += 1
-        return self._action_plan
+    task = create_cartpole_task(CartPoleTaskConfig())
+    task.bind_robot_spec(_robot_spec(), observation_shapes=CARTPOLE_SHAPES)
+    return task
 
 
 class _FakeOnnxRunner:
@@ -295,12 +264,13 @@ def test_ac_py_unit_export_001_artifact_read_validate_matches_plan_widths(tmp_pa
     """AC_PY_UNIT_EXPORT_001: exported artifact is readable/valid; widths match ONNX."""
 
     # Arrange
-    obs_width, act_width = 4, 2
+    task = _bound_manager_task()
+    assert task.robot_spec is not None
+    observation_plan = task.observation_plan
+    action_plan = task.action_plan
+    obs_width = observation_plan.group_widths["policy"]
+    act_width = action_plan.policy_width
     onnx_bytes = _make_onnx(obs_width, act_width)
-    task = _StaticDirectTask(
-        observation_plan=_observation_plan(obs_width),
-        action_plan=_action_plan(act_width),
-    )
     runner = _FakeOnnxRunner(onnx_bytes)
     output = tmp_path / "policy.uerlpol2"
 
@@ -310,7 +280,7 @@ def test_ac_py_unit_export_001_artifact_read_validate_matches_plan_widths(tmp_pa
         runner=runner,
         output=output,
         metadata=_metadata(),
-        robot_runtime=_robot_runtime(actuator_count=2),
+        robot_runtime=_robot_runtime(actuator_count=len(task.robot_spec.actuators)),
         timing=_timing(),
         task_id="cartpole.balance",
         robot_id="cartpole",
@@ -328,42 +298,32 @@ def test_ac_py_unit_export_001_artifact_read_validate_matches_plan_widths(tmp_pa
 
 
 def test_ac_py_unit_export_002_takes_direct_task_objects_not_rebuild(tmp_path: Path) -> None:
-    """AC_PY_UNIT_EXPORT_002: exporter reads DirectTask plans (access count + sentinel).
+    """AC_PY_UNIT_EXPORT_002: export keeps the exact plans held by a supported Task."""
 
-    Assertion strategy (ticket choice): counting property access proves the
-    exporter consulted the DirectTask; a sentinel slot name proves it did not
-    rebuild from a config that never contained that name. Content equality alone
-    would not distinguish "same object" from "rebuild from same config".
-    """
-
-    # Arrange — sentinel slot name would be lost if the exporter rebuilt plans.
-    sentinel = "sentinel_export_slot"
-    plan = _observation_plan(4, sentinel_output=sentinel)
-    action = _action_plan(2)
-    source = _CountingDirectTask(plan, action)
-    runner = _FakeOnnxRunner(_make_onnx(4, 2))
+    task = _bound_manager_task()
+    assert task.robot_spec is not None
+    observation_plan = task.observation_plan
+    action_plan = task.action_plan
+    runner = _FakeOnnxRunner(
+        _make_onnx(observation_plan.group_widths["policy"], action_plan.policy_width)
+    )
     output = tmp_path / "policy.uerlpol2"
 
     # Act
     artifact = export_policy(
-        task=source,
+        task=task,
         runner=runner,
         output=output,
         metadata=_metadata(),
-        robot_runtime=_robot_runtime(actuator_count=2),
+        robot_runtime=_robot_runtime(actuator_count=len(task.robot_spec.actuators)),
         timing=_timing(),
         task_id="cartpole.balance",
         robot_id="cartpole",
     )
 
-    # Assert — DirectTask plans were read (not ignored / not rebuilt from elsewhere).
-    assert source.observation_plan_access_count == 1
-    assert source.action_plan_access_count == 1
-    assert artifact.observation_plan.to_json() == plan.to_json()
-    assert artifact.action_plan.to_json() == action.to_json()
-    assert artifact.observation_plan.ops[0].output == sentinel
-    assert "policy" in artifact.observation_plan.groups
-    assert artifact.observation_plan.groups["policy"] == (sentinel,)
+    # Assert object identity excludes reconstruction from task config.
+    assert artifact.observation_plan is observation_plan
+    assert artifact.action_plan is action_plan
 
 
 def test_ac_py_unit_export_003_same_checkpoint_yields_identical_artifact_bytes(
@@ -378,17 +338,16 @@ def test_ac_py_unit_export_003_same_checkpoint_yields_identical_artifact_bytes(
 
     # Arrange
     onnx_bytes = _make_onnx(4, 2)
-    task = _StaticDirectTask(
-        observation_plan=_observation_plan(4),
-        action_plan=_action_plan(2),
-    )
+    observation_plan = _observation_plan(4)
+    action_plan = _action_plan(2)
     metadata = _metadata()
     first_out = tmp_path / "a.uerlpol2"
     second_out = tmp_path / "b.uerlpol2"
 
     # Act
-    export_policy(
-        task=task,
+    _export_policy_artifact(
+        observation_plan=observation_plan,
+        action_plan=action_plan,
         runner=_FakeOnnxRunner(onnx_bytes),
         output=first_out,
         metadata=metadata,
@@ -397,8 +356,9 @@ def test_ac_py_unit_export_003_same_checkpoint_yields_identical_artifact_bytes(
         task_id="cartpole.balance",
         robot_id="cartpole",
     )
-    export_policy(
-        task=task,
+    _export_policy_artifact(
+        observation_plan=observation_plan,
+        action_plan=action_plan,
         runner=_FakeOnnxRunner(onnx_bytes),
         output=second_out,
         metadata=metadata,
@@ -422,15 +382,14 @@ def test_ac_py_unit_export_004_onnx_segment_matches_runner_file_bytes(tmp_path: 
     # Arrange
     onnx_bytes = _make_onnx(4, 2)
     runner = _FakeOnnxRunner(onnx_bytes)
-    task = _StaticDirectTask(
-        observation_plan=_observation_plan(4),
-        action_plan=_action_plan(2),
-    )
+    observation_plan = _observation_plan(4)
+    action_plan = _action_plan(2)
     output = tmp_path / "policy.uerlpol2"
 
     # Act
-    artifact = export_policy(
-        task=task,
+    artifact = _export_policy_artifact(
+        observation_plan=observation_plan,
+        action_plan=action_plan,
         runner=runner,
         output=output,
         metadata=_metadata(),
@@ -468,17 +427,16 @@ def test_ac_py_unit_export_005_temp_files_cleaned_on_success_and_failure(
 
     monkeypatch.setattr(tempfile, "mkdtemp", tracking_mkdtemp)
 
-    task = _StaticDirectTask(
-        observation_plan=_observation_plan(4),
-        action_plan=_action_plan(2),
-    )
+    observation_plan = _observation_plan(4)
+    action_plan = _action_plan(2)
     onnx_bytes = _make_onnx(4, 2)
     success_out = tmp_path / "ok.uerlpol2"
     fail_out = tmp_path / "fail.uerlpol2"
 
     # Act — success path
-    export_policy(
-        task=task,
+    _export_policy_artifact(
+        observation_plan=observation_plan,
+        action_plan=action_plan,
         runner=_FakeOnnxRunner(onnx_bytes),
         output=success_out,
         metadata=_metadata(),
@@ -489,8 +447,9 @@ def test_ac_py_unit_export_005_temp_files_cleaned_on_success_and_failure(
     )
     # Act — failure path (runner writes then raises)
     with pytest.raises(RuntimeError, match="forced export failure"):
-        export_policy(
-            task=task,
+        _export_policy_artifact(
+            observation_plan=observation_plan,
+            action_plan=action_plan,
             runner=_FakeOnnxRunner(onnx_bytes, fail=True),
             output=fail_out,
             metadata=_metadata(),
@@ -506,3 +465,59 @@ def test_ac_py_unit_export_005_temp_files_cleaned_on_success_and_failure(
         assert not path.exists(), f"temp export dir left behind: {path}"
     assert success_out.is_file()
     assert not fail_out.exists()
+
+
+def test_export_capability_rejects_python_only_task_before_onnx_export(tmp_path: Path) -> None:
+    """Unsupported Python task math must fail before the expensive exporter runs."""
+
+    task = DirectTask()
+    runner = _FakeOnnxRunner(b"not reached")
+
+    with pytest.raises(ConfigError) as raised:
+        export_policy(
+            task=task,
+            runner=runner,
+            output=tmp_path / "unsupported.uerlpol2",
+            metadata=_metadata(),
+            robot_runtime=_robot_runtime(actuator_count=1),
+            timing=_timing(),
+            task_id="python.only",
+            robot_id="test.robot",
+        )
+
+    assert raised.value.code == "TASK_CAPABILITY_UNSUPPORTED"
+    assert raised.value.path == "task.capabilities.export"
+    assert "Manager-generated" in str(raised.value)
+    assert runner.export_calls == 0
+    assert not (tmp_path / "unsupported.uerlpol2").exists()
+
+
+def test_export_capability_rejects_unknown_before_onnx_export(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An unresolved Manager export status cannot proceed as an assumption."""
+
+    from uerl.tasks.cartpole import CartPoleTaskConfig, create_cartpole_task
+
+    task = create_cartpole_task(CartPoleTaskConfig())
+    runner = _FakeOnnxRunner(b"not reached")
+
+    with pytest.raises(ConfigError) as raised:
+        export_policy(
+            task=task,
+            runner=runner,
+            output=tmp_path / "unknown.uerlpol2",
+            metadata=_metadata(),
+            robot_runtime=_robot_runtime(actuator_count=1),
+            timing=_timing(),
+            task_id="cartpole.unbound",
+            robot_id="test.robot",
+        )
+
+    assert raised.value.code == "TASK_CAPABILITY_UNKNOWN"
+    assert raised.value.path == "task.capabilities.export"
+    assert "after binding" in str(raised.value)
+    assert "export=unknown" in capsys.readouterr().out
+    assert runner.export_calls == 0
+    assert not (tmp_path / "unknown.uerlpol2").exists()

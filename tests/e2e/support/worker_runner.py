@@ -15,15 +15,16 @@ from typing import Any, TextIO, cast
 
 import torch
 
+from tests.e2e.support.host import resolve_test_host, worker_log_path
 from uerl import PresentationMode, UERLDirectEnv, UERLSession, UERLSessionAdapter
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID, create_cartpole_task
 from uerl.training import WORKER_LOCKSTEP_PHYSICS_ARGS, build_launch_overrides, build_run_config
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-UE_ROOT = Path(os.environ.get("UE_ROOT") or os.environ.get("UE_58_ROOT") or r"C:\Program Files\Epic Games\UE_5.8")
-UE_CMD = str(UE_ROOT / "Engine" / "Binaries" / "Win64" / "UnrealEditor-Cmd.exe")
-UPROJECT = os.path.join(REPO_ROOT, "engine", "UERLHost.uproject")
+HOST_PROFILE = resolve_test_host()
+UE_CMD = str(HOST_PROFILE.ue_executable)
+UPROJECT = str(HOST_PROFILE.project)
 TRAIN_MAP = "/Engine/Maps/Entry"
 
 N = 64
@@ -110,7 +111,7 @@ def run_session(
 
     port = _free_port()
     ownership = "attached" if attached else "process"
-    log_path = os.path.join(os.path.dirname(__file__), f"_ue_worker_{presentation}_{ownership}.log")
+    log_path = worker_log_path(f"_ue_worker_{presentation}_{ownership}")
     presentation_mode = PresentationMode(presentation)
     stats: dict[str, object] = {
         "resets": 0,
@@ -299,7 +300,7 @@ def run_pie_attach() -> bool:
         success markers are observed.
     """
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), "_ue_worker_pie_attach.log")
+    log_path = worker_log_path("_ue_worker_pie_attach")
     with tempfile.TemporaryDirectory(prefix="uerl-pie-attach-") as run_directory:
         overrides = build_launch_overrides(
             ue_executable=Path(UE_CMD),

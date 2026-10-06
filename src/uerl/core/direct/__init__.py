@@ -1,5 +1,6 @@
 """Expose framework-independent Direct runtime primitives."""
 
+from .capabilities import CapabilityOperation, CapabilityStatus, TaskCapabilities, TaskCapability
 from .curriculum import CurriculumManager, CurriculumStep, CurriculumTerm, TerrainCurriculum
 from .env import UERLDirectEnv
 from .robot_action import ROBOT_ACTUATOR_TARGET_FIELD, resolve_robot_actions, robot_actuator_action_schema
@@ -35,6 +36,8 @@ from .types import (
 __all__ = [
     "CommandSource",
     "CurriculumBindableCommandSource",
+    "CapabilityOperation",
+    "CapabilityStatus",
     "DirectSession",
     "EmptyCommandSource",
     "ROBOT_ACTUATOR_TARGET_FIELD",
@@ -49,6 +52,8 @@ __all__ = [
     "validate_robot_shape_agreement",
     "DirectTask",
     "DirectTaskCfg",
+    "TaskCapabilities",
+    "TaskCapability",
     "TerminationEvaluator",
     "TerminationTerm",
     "combine_termination_terms",
