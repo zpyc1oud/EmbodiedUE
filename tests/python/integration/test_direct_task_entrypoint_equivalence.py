@@ -136,7 +136,7 @@ class _ScriptedCartPoleSession:
             ((0.0, 0.0, 0.0, 0.0),) * _SLOT_COUNT,
             episode_index=(0, 0, 0, 0),
         )
-        self.reset_states = (
+        self.reset_states: tuple[PostResetState, ...] = (
             _make_batch(
                 PostResetState,
                 ((0.0, 0.0, 0.0, 0.0),) * _SLOT_COUNT,
@@ -163,7 +163,7 @@ class _ScriptedCartPoleSession:
                 episode_index=(1, 1, 1, 1),
             ),
         )
-        self.transitions = (
+        self.transitions: tuple[TransitionState, ...] = (
             _make_batch(
                 TransitionState,
                 (
@@ -259,8 +259,15 @@ def _make_batch(
     )
 
 
-def _run_scripted_trajectory(task: DirectTask) -> _Trajectory:
+def _run_scripted_trajectory(task: DirectTask, *, scalar_fields: bool = False) -> _Trajectory:
     session = _ScriptedCartPoleSession()
+    if scalar_fields:
+        def flatten(batch: _StateBatchT) -> _StateBatchT:
+            return replace(batch, values={name: value.reshape(-1) for name, value in batch.values.items()})
+
+        session.initial_state = flatten(session.initial_state)
+        session.reset_states = tuple(flatten(batch) for batch in session.reset_states)
+        session.transitions = tuple(flatten(batch) for batch in session.transitions)
     env = UERLDirectEnv(session, task)
     try:
         initial = dict(env.get_observations())
@@ -326,9 +333,7 @@ def _assert_reviewed_behavior(result: _Trajectory, *, edited_reward: bool) -> No
         torch.zeros(4),
     )
     assert torch.equal(first.info["terminal_observation_valid"], torch.tensor([True, True, True, False]))
-    assert torch.equal(
-        first.info["terminal_raw_state"][_OBSERVATION_FIELDS[0]][3], torch.tensor([100.0])
-    )
+    assert first.info["terminal_raw_state"][_OBSERVATION_FIELDS[0]][3].item() == 100.0
     assert torch.equal(first.info["episode_index"], torch.tensor([0, 1, 0, 1], dtype=torch.uint64))
 
     torch.testing.assert_close(second.rewards, second_rewards, atol=1.0e-6, rtol=0.0)
@@ -441,3 +446,10 @@ def test_external_minimal_and_manager_entrypoints_match_behavior_and_reward_edit
         external_result.steps[0].rewards[0].item()
         - baseline_result.steps[0].rewards[0].item()
     ) == pytest.approx(-0.01)
+
+
+def test_external_direct_task_handles_worker_scalar_fields_and_sparse_reset() -> None:
+    """Actual Worker scalar fields have shape (slots,), including reset states."""
+    task = _create_external_minimal_task(_external_config())
+    result = _run_scripted_trajectory(task, scalar_fields=True)
+    _assert_reviewed_behavior(result, edited_reward=True)

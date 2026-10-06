@@ -71,14 +71,14 @@ class DirectCartPoleTask(DirectTask):
         control_frame_dt: torch.Tensor | None = None,
     ) -> Mapping[str, torch.Tensor]:
         del previous_policy_actions, control_frame_dt
-        observations = torch.cat([raw_state[name] for name in _OBSERVATION_FIELDS], dim=1)
+        observations = torch.cat([raw_state[name].reshape(-1, 1) for name in _OBSERVATION_FIELDS], dim=1)
         valid = state_valid.to(device=observations.device, dtype=torch.bool).unsqueeze(1)
         return {"policy": torch.where(valid, observations, torch.zeros_like(observations))}
 
     def compute_terminations(self, context: StepContext) -> TerminationResult:
         state = context.transition_state
-        cart_out = state[_CART_POSITION].abs().amax(dim=1) > self.params.max_cart_position
-        pole_fell = state[_POLE_POSITION].abs().amax(dim=1) > self.params.pole_angle_limit
+        cart_out = state[_CART_POSITION].reshape(-1).abs() > self.params.max_cart_position
+        pole_fell = state[_POLE_POSITION].reshape(-1).abs() > self.params.pole_angle_limit
         terminated = cart_out | pole_fell
         timed_out = (
             context.episode_steps >= self.params.max_episode_steps - 1

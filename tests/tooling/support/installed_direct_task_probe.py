@@ -152,7 +152,7 @@ class _ScriptedSession:
 
 def _state_batch(batch_type: type[_StateBatchT], values: tuple[float, float, float, float]) -> _StateBatchT:
     named_values = {
-        name: torch.tensor([[value]], dtype=torch.float32)
+        name: torch.tensor([value], dtype=torch.float32)
         for name, value in zip(_STATE_FIELDS, values, strict=True)
     }
     return batch_type(
