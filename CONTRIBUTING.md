@@ -77,3 +77,27 @@ Agree on a location before you share large artifacts.
 Keep credentials, private host paths, confidential logs, and unauthorized assets out of contributions.
 Git LFS applies to `.uasset` and `.umap` files.
 Before you add binary content, obtain the applicable redistribution permission.
+
+## Check documentation
+
+Run the project documentation check after you change prose, links, or CLI arguments:
+
+```powershell
+uv run python scripts/check_docs.py
+```
+
+The pre-commit hook runs the same command for Markdown and CLI changes.
+The default Python suite also checks the project documents.
+The command selects tracked project Markdown files and excludes imported `.agents/skills` documents.
+Stage a new Markdown file before you run this check.
+
+The check finds missing local link targets, missing heading anchors, and unclosed code fences.
+It supports inline and reference links, encoded paths, and duplicate headings.
+It parses fenced `uerl` and `uv run uerl` examples with the actual CLI argument parsers.
+It joins PowerShell and POSIX continuation lines.
+Shell variables and explicit placeholders use representative typed values where needed.
+The check does not execute the examples or start UE.
+
+Review runtime semantics, Task IDs, defaults, shell expressions, and external URLs separately.
+The check does not validate those items or generated README templates.
+GitHub Actions retains its Ruff/Mypy scope.

@@ -87,6 +87,7 @@ uv sync --locked
 uv run ruff check src scripts tests
 uv run mypy src tests
 uv run pytest -q
+uv run python scripts/check_docs.py
 
 # Built Windows/UE host required:
 uv run python scripts/run_all_tests.py
@@ -198,6 +199,8 @@ This workflow does not validate documentation links or configuration files.
 It does not run Python tests, UE, Chaos, or GPU checks.
 A green status proves static checks only.
 Required statuses and repository controls remain separate maintainer decisions.
+The local documentation hook and default Python suite run `scripts/check_docs.py`.
+Use [the documentation check](../CONTRIBUTING.md#check-documentation) for its scope and limitations.
 
 AI assistants use this workflow within the user's authorization.
 Preparation, review, or implementation requests alone do not authorize merge, release publication, deployment, access changes, or history changes.
