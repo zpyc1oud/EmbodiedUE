@@ -175,7 +175,9 @@ class TestRun:
             stage.status = "failed"
             stage.detail = str(exc)
         finally:
-            if process is not None and stage.status in {"timed_out", "interrupted"}:
+            if process is not None and (
+                process.poll() is None or stage.status in {"timed_out", "interrupted"}
+            ):
                 try:
                     stop_owned_process(process)
                 except (OSError, subprocess.SubprocessError) as exc:

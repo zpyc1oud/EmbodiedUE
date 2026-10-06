@@ -194,3 +194,18 @@ def test_timeout_stops_descendant_that_ignores_termination(tmp_path: Path) -> No
             break  # Exited and awaiting reaping by the container's init process.
         time.sleep(0.02)
     assert not state_file.exists() or state_file.read_text().split(") ", 1)[1].split()[0] == "Z"
+
+
+def test_report_write_failure_after_spawn_still_cleans_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    run = TestRun(tmp_path, ["report failure"], 10)
+    process = Mock()
+    process.pid = 12345
+    process.poll.return_value = None
+    monkeypatch.setattr("scripts.test_runner_support.subprocess.Popen", Mock(return_value=process))
+    monkeypatch.setattr(run, "save", Mock(side_effect=[None, OSError("disk full"), None]))
+    cleanup = Mock()
+    monkeypatch.setattr("scripts.test_runner_support.stop_owned_process", cleanup)
+    assert run.run(0, ["owned-child"]) == 2
+    assert run.stages[0].status == "failed"
+    assert run.stages[0].detail == "disk full"
+    cleanup.assert_called_once_with(process)
