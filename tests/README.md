@@ -55,9 +55,13 @@ These cases do not establish physical behavior or the real UE training procedure
 ## Windows and UE checks
 
 These commands require a UE 5.8 Windows host and a built `UERLHostEditor`.
-This documentation update adds no new Windows/UE execution evidence.
-The E2E runner in `tests/e2e/support/worker_runner.py` selects `UE_ROOT`, then `UE_58_ROOT`, then the default Epic `UE_5.8` installation.
-This selection is separate from the product CLI host profile.
+Both runners use the product host profile resolver.
+Select `--host-profile`, `UERL_HOST_PROFILE`, or the default `~/.uerl/host.toml`.
+Explicit `--ue-executable` and `--project` paths override profile fields.
+Relative paths in a profile start at the profile's directory.
+If the profile omits the executable, `UE_ROOT`, then `UE_58_ROOT`, supplies the engine root before the default Epic installation.
+The default project remains `engine/UERLHost.uproject`.
+The runner prints the selected paths and their sources.
 
 ```powershell
 # Python, UE Automation, and real UE E2E.
@@ -89,7 +93,35 @@ uv run python scripts/run_e2e.py --suite ue -k "u4_005 or u4_006"
 uv run python scripts/run_e2e.py --suite ue -k "u5_007 or u5_008 or u5_009 or u5_010"
 ```
 
-For a custom UE installation, set `$env:UE_ROOT` (or `$env:UE_58_ROOT`) before running the full suite or E2E scripts. These runners use the repository host project.
+For a custom host, use the same profile as the product CLI:
+
+```powershell
+uv run python scripts/run_e2e.py --suite ue --host-profile E:/uerl/host.toml
+uv run python scripts/run_all_tests.py --host-profile E:/uerl/host.toml --timeout 2400 --output-dir E:/uerl/test-results
+```
+
+`--timeout` limits each stage in seconds; its default is 1800.
+`--output-dir` selects the parent of a new, unique directory.
+Its default is `.scratch/test-runs`.
+Each invocation writes `summary.yaml`, separate stage output, and separate Automation logs.
+Worker helper logs also use unique filenames in that directory.
+Direct helper invocations use unique files in the system temporary directory.
+The scripts capture detailed output in these files and print stage progress to the console.
+
+The summary records commands, return codes, durations, host paths, and result states.
+A stage can be `passed`, `failed`, `blocked`, `timed_out`, `interrupted`, or `not_run`.
+A stage in progress is `running`.
+The runner stops after an unsuccessful stage and leaves later stages as `not_run`.
+Timeout returns 124; operator interruption returns 130.
+A missing host returns 2 before the selected UE stage starts.
+An Automation process must also produce its current successful completion log.
+Existing Automation filters and minimum completion counts remain unchanged.
+
+On timeout or interruption, cleanup targets the stage's own child tree on Windows or its new process group on POSIX.
+It does not search for processes by executable name.
+A cleanup error remains in the report and requires inspection of the recorded child process.
+The test runner changes require a Windows/UE smoke run before a host-validation claim.
+Python subprocess tests do not establish Windows process-tree or Unreal behavior.
 
 For direct UE Automation, run the complete core and extended filters.
 Use a separate Editor process for each group.

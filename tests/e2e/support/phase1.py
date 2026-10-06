@@ -1,10 +1,10 @@
 """Run bounded UE Worker regressions over the target SocketBridge."""
 from __future__ import annotations
 
-import os
 import sys
 from typing import cast
 
+from tests.e2e.support.host import worker_log_path
 from tests.e2e.support.worker_runner import SEED, N, _free_port, _launch, _stop_process, run_session
 from tests.protocol.support.socket_client import SocketBridgeClient, SocketBridgeError
 
@@ -17,7 +17,7 @@ def run_negative_gate() -> bool:
     """
 
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), "_ue_worker_negative.log")
+    log_path = worker_log_path("_ue_worker_negative")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(port, log_file, ["-uerlforcebadgate=1"])
         rejected = False
