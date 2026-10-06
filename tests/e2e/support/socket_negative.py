@@ -1,7 +1,6 @@
 """Run destructive real-process checks for the U4 SocketBridge state machine."""
 from __future__ import annotations
 
-import os
 import socket
 import subprocess
 import time
@@ -9,6 +8,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from uuid import uuid4
 
+from tests.e2e.support.host import worker_log_path
 from tests.e2e.support.worker_runner import SEED, N, _free_port, _launch, _stop_process
 from tests.protocol.support import protocol
 from tests.protocol.support.socket_client import SocketBridgeClient, SocketBridgeError
@@ -16,7 +16,7 @@ from tests.protocol.support.socket_client import SocketBridgeClient, SocketBridg
 
 def _run_error_case(name: str, action: Callable[[SocketBridgeClient], dict[str, object]]) -> str:
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), f"_ue_worker_{name}.log")
+    log_path = worker_log_path(f"_ue_worker_{name}")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(port, log_file)
         client = SocketBridgeClient("127.0.0.1", port, N, SEED)
@@ -145,7 +145,7 @@ def run_timeout_and_half_close() -> dict[str, float]:
     durations: dict[str, float] = {}
     for name, send_partial in (("timeout", False), ("half_close", True)):
         port = _free_port()
-        log_path = os.path.join(os.path.dirname(__file__), f"_ue_worker_{name}.log")
+        log_path = worker_log_path(f"_ue_worker_{name}")
         with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
             proc = _launch(port, log_file, ["-uerlhandshaketimeoutms=500"])
             connection = _connect_raw(port)
@@ -174,7 +174,7 @@ def run_post_ready_disconnect() -> float:
     """
 
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), "_ue_worker_post_ready_disconnect.log")
+    log_path = worker_log_path("_ue_worker_post_ready_disconnect")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(port, log_file)
         client = SocketBridgeClient("127.0.0.1", port, 1, SEED)
@@ -208,7 +208,7 @@ def run_pre_ready_shutdown() -> float:
     """
 
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), "_ue_worker_pre_ready_shutdown.log")
+    log_path = worker_log_path("_ue_worker_pre_ready_shutdown")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(port, log_file)
         client = SocketBridgeClient("127.0.0.1", port, 1, SEED)
@@ -243,7 +243,7 @@ def run_active_step_timeout() -> float:
     """
 
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), "_ue_worker_active_step_timeout.log")
+    log_path = worker_log_path("_ue_worker_active_step_timeout")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(
             port, log_file,
@@ -300,7 +300,7 @@ def run_reset_failure(*, attached: bool) -> bool:
 
     ownership = "attached" if attached else "process"
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), f"_ue_worker_reset_failure_{ownership}.log")
+    log_path = worker_log_path(f"_ue_worker_reset_failure_{ownership}")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(
             port,
@@ -359,7 +359,7 @@ def run_initialize_failure() -> bool:
     """Fail after Pool creation and verify no initialized resources survive."""
 
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), "_ue_worker_initialize_failure.log")
+    log_path = worker_log_path("_ue_worker_initialize_failure")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(port, log_file, ["-uerltestinitializefailure"])
         client = SocketBridgeClient("127.0.0.1", port, N, SEED)
@@ -399,7 +399,7 @@ def run_invalid_attached_config() -> bool:
     """
 
     port = _free_port()
-    log_path = os.path.join(os.path.dirname(__file__), "_ue_worker_invalid_attached_config.log")
+    log_path = worker_log_path("_ue_worker_invalid_attached_config")
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(
             port,
