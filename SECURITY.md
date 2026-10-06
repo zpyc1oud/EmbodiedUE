@@ -2,14 +2,30 @@
 
 ## Intended deployment
 
-The Worker protocol is designed for cooperating processes on a developer-controlled machine. The documented training flow uses local TCP. This is not a hardened multi-tenant service or a public network API. Keep Worker endpoints within that trusted boundary.
+The Worker protocol connects cooperating processes on a developer-controlled machine.
+The documented training procedure uses local TCP.
+The protocol is not a hardened multi-tenant service or a public network API.
+Keep Worker endpoints inside that trust boundary.
 
-Treat checkpoints, ONNX policies, `.uerlpol2` files, UE assets, and plugins as executable or parser-sensitive inputs. Load artifacts from sources you trust. Deployment commands copy files and change project settings; review their target paths and use version control for recovery.
+Checkpoints, ONNX policies, `.uerlpol2` files, UE assets, and plugins can contain executable data or data that affects a parser.
+Load artifacts only from trusted sources.
+Deployment commands copy files and change project settings.
+Before execution, examine the target paths.
+Use version control to recover project files.
 
 ## Reporting an issue
 
-A dedicated private security contact and supported-release policy have not yet been established. Before public release, the owner needs to enable a private reporting channel and document it here.
+The project does not yet have a dedicated private security contact or a supported-release policy.
+Before public release, the owner must provide a private reporting channel and document it here.
 
-For a suspected vulnerability or exposed credential, use an existing private channel to the repository owner. If none is available, request a private contact without disclosing exploit details or secret values publicly. Include the affected version/commit, component, impact, and a minimal reproduction with sensitive data removed. For ordinary bugs, follow [Contributing](CONTRIBUTING.md).
+For a suspected vulnerability or exposed credential, use an existing private channel to the repository owner.
+If no private channel is available, request a private contact.
+Keep exploit details and secret values out of the public request.
 
-If a credential is found, the owner should revoke or rotate it and review any affected repository history. Editing the current file alone does not remove historical exposure.
+Include the affected version or commit, component, impact, and a minimal reproduction.
+Remove sensitive data from the report.
+For ordinary bugs, use [Contributing](CONTRIBUTING.md).
+
+If a credential is exposed, the owner should revoke or rotate it.
+The owner should also examine the affected repository history.
+A change to the current file does not remove the historical exposure.

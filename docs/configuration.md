@@ -1,6 +1,8 @@
 # Task configuration
 
-Use `uerl config` to inspect the resolved configuration for a registered task. Base YAML alone is insufficient: terrain and pursuit factories override parts of the base PhantomX configuration.
+Use `uerl config` to examine resolved configuration for a registered Task.
+Base YAML alone is insufficient.
+Terrain and Pursuit factories replace parts of the base PhantomX configuration.
 
 ```powershell
 uv run uerl tasks --filter PhantomX
@@ -8,7 +10,8 @@ uv run uerl config --task UERL-PhantomX-ContinuousTerrain-v0
 uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
 ```
 
-These commands do not start UE. A successful task check validates declarations, not physical asset contents or runtime performance.
+These commands do not start UE.
+A successful Task check validates declarations, not physical asset contents or runtime performance.
 
 ## Sources of truth
 
@@ -21,11 +24,13 @@ These commands do not start UE. A successful task check validates declarations, 
 | `src/uerl/configs/environments/terrains/phantomx/*.yaml` | Terrain tiers and generation parameters |
 | Run `resolved_config.yaml` and `manifest.yaml` | The configuration and identities recorded for an actual run |
 
-Robot declarations support derivation and regular-expression joint selection. Runtime Worker projections are generated from those declarations and reflected topology; they are not a second configuration to edit.
+Robot declarations support derivation and regular-expression joint selection.
+The runtime generates Worker projections from those declarations and reflected topology.
+They are not a second configuration for manual changes.
 
 ## Overrides
 
-Everyday training flags map to typed configuration fields:
+Common training flags select typed configuration fields:
 
 | Flag | Field |
 |---|---|
@@ -34,64 +39,73 @@ Everyday training flags map to typed configuration fields:
 | `--device` | `runner.device` |
 | `--max-iterations` | `runner.max_iterations` |
 
-`play` exposes `--seed` and `--device`; `export` exposes `--device`. Other configurable values use repeated dotted-path arguments. For example, inspect a shorter training configuration before running it:
+The command `play` supplies `--seed` and `--device`.
+The command `export` supplies `--device`.
+Use repeated dotted-path arguments for other configurable values.
+For example, examine a shorter training configuration:
 
 ```powershell
 uv run uerl config --task UERL-PhantomX-ContinuousTerrain-v0 --runner.max_iterations 100
 ```
 
-Unknown or non-configurable paths are rejected. Do not combine an everyday flag with a dotted override for the same field. `--run-dir` conflicts with `--logging.run_directory`, and `--resume` conflicts with `--runner.checkpoint`.
+Unknown or non-configurable paths cause rejection.
+Do not combine a common flag with a dotted override for the same field.
+The option `--run-dir` conflicts with `--logging.run_directory`.
+The option `--resume` conflicts with `--runner.checkpoint`.
 
-Changing dimensions, timing, robot semantics, or the training objective can make an existing checkpoint incompatible. `play` and `export` restore recorded settings from the Run. Prefer Run directories or checkpoints kept inside their Run over detached weight files when reproducing results.
+Dimension, timing, Robot-semantic, or objective changes can make a checkpoint incompatible.
+The commands `play` and `export` restore saved Run settings.
+For repeatable results, prefer a Run directory or a checkpoint inside its Run over detached weights.
 
 ## Saved-run configuration
 
-`play --run` and `export --run` use the shared application resolver in
-[`application/run_config.py`](../src/uerl/application/run_config.py). They read
-the Task ID from `resolved_config.yaml`, the checkpoint's embedded config, or
-the Run manifest, then restore the saved Worker, Task, runner, map, and protocol
-settings and retain the saved training hash. `--task` is
-optional for an explicit Run directory; when supplied, it must match the saved
-Task. `--run latest` still requires `--task` because latest Runs are selected
-within a Task. A `--checkpoint` located under a directory containing saved Run
-config or manifest also identifies its Run automatically. A checkpoint copied
-outside its Run can restore Task identity and settings from its embedded
-versioned YAML config. When checkpoint and Run metadata both exist, their typed
-config values must agree. Saved files are not edited.
+The commands `play --run` and `export --run` use [application/run_config.py](../src/uerl/application/run_config.py).
+The resolver reads Task identity from `resolved_config.yaml`, embedded checkpoint configuration, or the Run manifest.
+It restores saved Worker, Task, runner, map, and protocol settings and keeps the training hash.
 
-Play and export require a complete saved configuration and the same registered
-Task version that trained the checkpoint. A missing snapshot, missing required
-field, or Task version change fails before Session startup; current Task defaults
-are never used to fill those gaps. Evaluation and export preserve the saved Task,
-reward, timing, Robot, plan, and PPO settings. Play allows an explicit `--seed`
-and both commands allow `--device`, one Slot, map, Session connection/launch,
-and presentation settings as evaluation or local-machine choices. Dotted
-overrides that change the saved training semantics are rejected.
+For an explicit Run directory, `--task` is optional.
+If supplied, the Task must match the saved identity.
+The selection `--run latest` requires `--task`, because latest selection occurs within a Task.
+A `--checkpoint` inside a directory with saved Run configuration or a manifest identifies its Run automatically.
 
-Map selection is `--map`, then `--session.map_path`, then the recorded map. The
-selected map is used both in Worker launch arguments and the Session
-configuration. Python callers of the former `uerl.cli.run_config` module should import
-`resolve_run_config` from `uerl.application.run_config` instead; map restoration
-is included in the returned configuration.
+A detached checkpoint can restore settings from embedded versioned YAML.
+When checkpoint and Run metadata both exist, their typed configuration values must agree.
+The resolver does not edit saved files.
+
+Play and export require complete saved configuration and the registered Task version used for training.
+A missing snapshot, missing required field, or changed Task version fails before Session startup.
+Current defaults never fill those gaps.
+The saved Task, reward, timing, Robot, plan, and PPO settings remain unchanged.
+
+Play permits an explicit `--seed`.
+Both commands permit `--device`, one Slot, map, Session connection/launch settings, and presentation settings for evaluation or the host.
+Dotted overrides that change saved training semantics cause rejection.
+
+Map priority is `--map`, then `--session.map_path`, then the saved map.
+The selected map appears in Worker launch arguments and Session configuration.
+Python callers must import `resolve_run_config` from `uerl.application.run_config` instead of the former `uerl.cli.run_config`.
+The returned configuration includes map restoration.
 
 ### Recovering historical Runs and detached checkpoints
 
-The current reader accepts schema version 1 YAML in `resolved_config.yaml`, the
-same versioned YAML embedded in new RSL-RL checkpoints, and the current YAML Run
-manifest. Embedded checkpoint metadata is read through PyTorch's weights-only
-loader. Historical JSON files and earlier YAML sidecar schemas are not read by
-training, play, or export.
+Current readers accept schema version 1 YAML in `resolved_config.yaml` and new RSL-RL checkpoint metadata.
+They also accept the current YAML Run manifest.
+Metadata inspection uses PyTorch's weights-only loader.
+Training, play, and export do not read historical JSON or earlier YAML sidecar schemas.
 
-The one-time migration command previews a new recovery copy by default. It
-accepts a historical JSON or unversioned YAML config, or a JSON/YAML manifest
-that contains the resolved config. It requires every saved field and the exact
-registered Task version; it never fills gaps from current defaults. On apply,
-it writes current `resolved_config.yaml`, converts a manifest when present,
-copies the source config/manifest into `legacy/`, and copies the selected
-checkpoint byte-for-byte without loading or changing it. The source Run stays
-untouched. This default creates a recovery directory whose sidecar supplies
-the config; it does not make the checkpoint self-contained or certify that it
-is loadable for detached play/export.
+The separate migration command previews a new recovery copy by default.
+It accepts historical JSON or unversioned YAML configuration, or a JSON/YAML manifest with resolved configuration.
+Every saved field and the exact registered Task version are required.
+Current defaults never fill missing values.
+
+On apply, migration writes current `resolved_config.yaml` and converts an existing manifest.
+It copies source configuration and manifest files into `legacy/`.
+It copies the selected checkpoint byte-for-byte without loading or changing it.
+The source Run stays unchanged.
+
+The default recovery directory uses a configuration sidecar.
+Its checkpoint is not self-contained.
+The copy operation does not establish that detached play or export can load it.
 
 ```powershell
 uv run python -m uerl.application.run_migration `
@@ -104,20 +118,19 @@ uv run python -m uerl.application.run_migration `
 uv run uerl play --run runs/recovered-run
 ```
 
-The output must not already contain different files. A repeated apply to an
-identical output is a no-op. If configuration is incomplete, conflicting, or
-does not match an installed Task version, the command stops without writing.
-Recover missing values from the original command, exact Task package and source
-revision, archived configuration, and experiment records, then retry with a
-complete snapshot. If those values cannot be established, retrain and evaluate
-a new Run. A detached checkpoint can be handled by making a small recovery Run
-directory containing the checkpoint and the complete historical metadata, then
-running the same migration command.
+The output must not contain different files already.
+Repeated apply to an identical output makes no changes.
+Incomplete configuration, conflicts, or an installed Task-version mismatch stop migration before writes.
 
-For a weights-only-compatible checkpoint, the explicit
-`--embed-checkpoint-config` option creates a checkpoint copy with the migrated
-YAML embedded. Preview this separately, then apply only after reviewing the
-plan:
+Recover missing values from the original command, exact Task package and revision, archived configuration, and experiment records.
+Then retry with a complete snapshot.
+If the values are unavailable, train and evaluate a new Run.
+For a detached historical checkpoint, create a small source Run with its complete historical metadata.
+Use the same migration command on that directory.
+
+For a weights-only-compatible checkpoint, `--embed-checkpoint-config` creates a copy with migrated YAML inside it.
+Preview this mode separately.
+Examine the plan before apply:
 
 ```powershell
 uv run python -m uerl.application.run_migration `
@@ -129,113 +142,122 @@ uv run python -m uerl.application.run_migration `
   --embed-checkpoint-config --apply
 ```
 
-This mode only uses PyTorch's `weights_only=True` loader; there is no pickle
-fallback. It rejects unsupported state and verifies that model, optimizer,
-iteration, and all other loaded checkpoint data remain unchanged after saving.
-The original checkpoint bytes are retained under `legacy_checkpoint/` in the
-recovery copy, and the source Run is left untouched. If the checkpoint cannot
-be safely inspected or verified, sidecar migration can preserve the config but
-cannot make that checkpoint readable by the current safe loader. Keep the Run
-metadata with it and recover a weights-only-compatible checkpoint, or retrain;
-do not treat the copied checkpoint as self-contained.
+This mode uses only `weights_only=True`, without a pickle fallback.
+It rejects unsupported state.
+After saving, it verifies that model, optimizer, iteration, and all other loaded data are unchanged.
+The recovery copy keeps original checkpoint bytes under `legacy_checkpoint/`.
+The source Run remains unchanged.
+
+If safe inspection or verification fails, sidecar migration can keep the configuration but cannot make that checkpoint safely readable.
+Keep its Run metadata.
+Recover a weights-only-compatible checkpoint or train a new Run.
+Do not treat the copied checkpoint as self-contained.
 
 ## Continue training
 
-`train --resume` restores the source Run's Worker, Task, runner, map and protocol
-settings, then applies permitted machine, output and budget changes. A Run
-reference, `latest`, or a checkpoint within the Run root, `rsl_rl/`, or
-`checkpoints/` is supported. A new detached checkpoint carries its config
-snapshot; a historical detached checkpoint needs a complete historical config
-or manifest copied into a small source directory and migrated into a separate
-recovery directory because weights alone cannot establish the training
-semantics.
-The dotted `--runner.checkpoint` option follows the same continuation rules.
+The command `train --resume` restores saved Worker, Task, runner, map, and protocol settings.
+It then applies permitted host, output, and budget changes.
+Supported inputs include a Run reference, `latest`, or a checkpoint inside the Run root, `rsl_rl/`, or `checkpoints/`.
+The dotted option `--runner.checkpoint` uses the same rules.
+
+A new detached checkpoint includes its configuration snapshot.
+A historical detached checkpoint needs complete historical configuration or a manifest in a small source directory.
+Migrate that source into a separate recovery directory.
+Weights alone cannot establish training semantics.
 
 ```powershell
 uv run uerl train --task UERL-CartPole-Direct-v0 --resume runs/cartpole_source --run-dir runs/cartpole_continued --max-iterations 100
 ```
 
-`--max-iterations` is an **additional** iteration budget, not an absolute target.
-The source is captured once and reused when launch arguments and the final
-configuration are assembled. `[CONFIG]` lines show changed field paths, saved
-and effective values, and whether each change came from explicit overrides,
-launch settings, local defaults, or generated output. The new snapshot and
-`command.txt` retain the effective configuration and selected checkpoint.
+The option `--max-iterations` is an **additional** budget, not an absolute iteration target.
+The source snapshot is captured once for launch arguments and final configuration.
+The `[CONFIG]` lines show changed field paths, saved values, effective values, and change sources.
+Sources include explicit overrides, launch settings, local defaults, and generated output.
+The new snapshot and `command.txt` keep the effective configuration and selected checkpoint.
 
-Allowed changes are Session launch/attach mode, executable, host, port, timeouts,
-presentation, runner device, output directory, iteration budget, and runner
-`run_name`, `experiment_name` and `save_interval`. The project and window size
-are supplied through the ordinary launch flags. Arbitrary
-`--session.worker_args` changes are rejected; use the launch flags instead.
-When supplied directly as a dotted override, `session.worker_args` is a YAML
-sequence of strings; legacy JSON string arrays remain valid YAML input.
-The destination must be empty or new, outside the source Run.
+Permitted changes include:
 
-Changes to Slot count, seed, map, rewards, timing, Robot/terrain semantics,
-network structure or PPO settings are rejected even when tensor dimensions
-would still match. Repeating a saved value is accepted. Machine overrides do
-not establish that a different UE installation or project has equivalent assets.
+- Session launch/attach mode, executable, host, port, timeouts, and presentation
+- Runner device, iteration budget, `run_name`, `experiment_name`, and `save_interval`
+- Output directory
+
+Supply the project and window size through ordinary launch flags.
+Arbitrary `--session.worker_args` changes cause rejection.
+Use the launch flags instead.
+When supplied as a dotted override, `session.worker_args` is a YAML sequence of strings.
+Earlier JSON string arrays are valid YAML input.
+The destination must be empty or new and outside the source Run.
+
+Changes to Slot count, seed, map, rewards, timing, Robot/terrain semantics, network structure, or PPO settings cause rejection.
+This applies even when tensor dimensions match.
+An explicit value equal to the saved value is accepted.
+Host overrides do not establish equivalent assets in another UE installation or project.
 
 ### Checkpoint state and old Runs
 
-Only load checkpoints from trusted sources. Checkpoint loading uses
-`torch.load(..., weights_only=False)` to recover Python training state; pickle
-can execute code during deserialization. Empty, truncated, invalid or Git LFS
-pointer files produce a checkpoint-path error before Session startup. Restore a
-complete trusted checkpoint, including the actual LFS content when applicable,
-and retry. This error handling does not make untrusted checkpoints safe.
+Only load checkpoints from trusted sources.
+Training-state recovery uses `torch.load(..., weights_only=False)`.
+Pickle can execute code during deserialization.
+Empty, truncated, invalid, or Git LFS pointer files cause a checkpoint-path error before Session startup.
+Restore a complete trusted checkpoint, including actual LFS content where applicable, before retry.
+These error checks do not make untrusted checkpoints safe.
 
-The existing runner loader restores actor and critic state (including enabled
-observation-normalization statistics and actor distribution parameters), PPO
-optimizer state and iteration, named curriculum state, the saved decimation RNG,
-and RND state when enabled. Episodes start fresh. UE physical state, rollout
-buffers, event timers and the complete set of process RNG states are not saved;
-continuation is not a promise of an uninterrupted identical trajectory.
+The runner restores actor and critic state, enabled normalization statistics, and actor distribution parameters.
+It also restores PPO optimizer state, iteration, named curriculum state, the decimation RNG, and enabled RND state.
+Episodes start fresh.
+Checkpoints do not save UE physical state, rollout buffers, event timers, or all process RNG states.
+Continuation does not guarantee the same trajectory as uninterrupted execution.
 The PhantomX physical-time objective check remains required.
 
-New training checkpoints record `terrain_level` and
-`freeze_observation_normalization` in `infos.uerl_training_options`; continuation
-recovers them automatically. `[RESTORE]` prints the selected state policy.
+New training checkpoints store `terrain_level` and `freeze_observation_normalization` in `infos.uerl_training_options`.
+Continuation recovers them automatically.
+The `[RESTORE]` output gives the selected restoration policy.
 
-Complete current-schema Run snapshots can resume when their checkpoint state is
-compatible. Historical JSON and earlier YAML schemas must first be migrated.
-Missing semantic fields (including required runner parameter keys), a different
-Task/version, or missing required checkpoint state fail before Session startup.
-Continuation never fills those gaps with current Task defaults. For saved
-runtime options:
+A complete current-schema snapshot can resume with compatible checkpoint state.
+Historical JSON and earlier YAML schemas require migration first.
+Missing semantic fields, required runner parameters, a Task/version mismatch, or missing checkpoint state fail before Session startup.
+Continuation never fills those gaps with current defaults.
 
-- A saved terrain curriculum term identifies adaptive terrain. Without that
-  term, a Run with terrain requires its original explicit `--terrain-level N`.
-- A Run with observation normalization enabled but no recorded update policy
-  requires `--resume-normalization update` or `--resume-normalization frozen`.
-  Supply the policy actually used in that Run; the checkpoint's statistics alone
-  do not reveal whether updates were frozen.
-- Explicit recovery inputs must match recorded options when those are present.
-  The next checkpoint persists the recovered options.
-- Variable decimation requires its saved generator state. With fixed decimation,
-  a missing unused sampler state is reported and accepted.
+For saved runtime options:
 
-Neither source files nor checkpoints are rewritten. Recover missing configuration
-from original experiment evidence before retrying; there is no automatic migration.
-The strict contract applies to the training CLI. Programmatic
-callers can use `Continuation` and `inspect_resume_checkpoint` before passing the
-resolved configuration and recovered options to `run_training`.
+- A saved terrain-curriculum term identifies adaptive terrain.
+  Without it, a terrain Run requires its original explicit `--terrain-level N`.
+- A Run with normalization but no saved update policy requires `--resume-normalization update` or `--resume-normalization frozen`.
+  Supply the policy actually used.
+  Statistics alone do not show whether updates were frozen.
+- Explicit recovery inputs must match recorded options when those exist.
+  The next checkpoint saves recovered options.
+- Variable decimation requires its saved generator state.
+  Fixed decimation accepts an absent unused sampler state and reports that condition.
+
+The source files and checkpoints remain unchanged.
+Recover missing configuration from original experiment evidence before retry.
+There is no automatic migration.
+
+The strict contract applies to the training CLI.
+Programmatic callers can use `Continuation` and `inspect_resume_checkpoint` before `run_training`.
+Supply the resolved configuration and recovered options to that training call.
 
 ### Continuation, evaluation, export, and deployment boundary
 
-`train --resume` is strict continuation from a compatible saved Run, restoring
-its saved configuration and compatible training state. The CLI has no warm-start
-mode that initializes a new experiment from selected prior weights.
-`play` and `export` require a complete current-schema saved configuration; they
-reject missing fields, unsupported schema versions, and a Task identity or
-version mismatch before Session startup. Current defaults never fill missing
-saved settings. These restoration rules do not establish learning quality or
-deployment compatibility across target scenes. Full target-map and in-game
-deployment validation remains tracked in
-[Issue #8](https://github.com/zpyc1oud/EmbodiedUE/issues/8).
+The command `train --resume` continues a compatible saved Run with its configuration and compatible training state.
+The CLI has no warm-start mode for a new experiment initialized from selected earlier weights.
+
+Play and export require complete current-schema saved configuration.
+They reject missing fields, unsupported schemas, and Task identity or version mismatches before Session startup.
+Current defaults do not fill missing saved settings.
+These restoration rules do not establish learning quality or target-scene deployment compatibility.
+[Issue #8](https://github.com/zpyc1oud/EmbodiedUE/issues/8) tracks full target-map and in-game deployment validation.
 
 ## Timing and parallelism
 
-CartPole uses `physics_dt=1/120` and `decimation=[2,2]`. PhantomX uses `physics_dt=0.005` and `decimation=[1,7]`. The range is immutable within a Session; each Step specifies one value in that range. This varies how long an action is held, not the physics solver timestep.
+CartPole uses `physics_dt=1/120` and `decimation=[2,2]`.
+PhantomX uses `physics_dt=0.005` and `decimation=[1,7]`.
+The range is fixed within a Session.
+Each Step selects one value within that range.
+This changes action duration, not the physics solver timestep.
 
-Flat walking defaults to 512 Slots, continuous and discrete terrain to 64, and pursuit to one. Increasing the count may require changes to placement and terrain coverage. See [PhantomX training](how-to/phantomx-robust-training.md) for objective scaling and curriculum behavior.
+Flat walking defaults to 512 Slots.
+Continuous and discrete terrain default to 64, and Pursuit defaults to one.
+A larger count can require different placement or terrain coverage.
+See [PhantomX training](how-to/phantomx-robust-training.md) for objective scaling and curriculum behavior.

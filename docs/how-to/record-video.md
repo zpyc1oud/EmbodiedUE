@@ -1,10 +1,19 @@
 # Recording video after training
 
-`uerl play --record` captures frames from the UE viewport and encodes an MP4 at the requested path. Recording requires `viewport` presentation (the playback default) and a newly launched Worker; non-viewport presentation and attached Sessions are rejected. Playback uses one robot and requires a working Unreal Editor plus a trained checkpoint. Viewport rendering reduces throughput; use it for inspection and presentation.
+`uerl play --record` captures UE viewport frames and encodes an MP4 at the selected path.
+Playback uses one robot.
+It requires a working Unreal Editor and a trained checkpoint.
+
+Recording requires `viewport` presentation and a newly launched Worker.
+The CLI rejects other presentation modes and attached Sessions.
+The default playback presentation is `viewport`.
+Viewport rendering reduces throughput.
+Use recordings for inspection and presentation.
 
 ## Record a policy
 
-Replace the placeholder with the directory printed by training:
+Replace the placeholder with the Run directory printed during training.
+Then run:
 
 ```powershell
 $runDir = 'runs/UERL-PhantomX-ContinuousTerrain-v0/<run-directory>'
@@ -17,17 +26,22 @@ uv run uerl play `
 
 | Option | Meaning |
 |---|---|
-| `--task` | Optional with an explicit Run directory; when supplied, it must match the saved Task ID. Required with `--run latest`. |
-| `--run` | Run directory or `latest`; `--checkpoint` can select a specific file instead |
+| `--task` | Optional for an explicit Run directory. If supplied, the ID must match the saved Task. Required for `--run latest`. |
+| `--run` | Run directory or `latest`. Use `--checkpoint` to select a file instead. |
 | `--record` | Output MP4 path |
-| `--record-seconds` | Maximum recording duration; default 20 seconds |
-| `--record-fps` | Encoded frame rate; default 30 fps |
-| `--controller` | `task` for task commands (default), or `player` for keyboard control |
-| `--terrain-level` | Fixed procedural terrain tier; otherwise single-robot playback starts with registered Task curriculum settings |
+| `--record-seconds` | Maximum duration. Default: 20 seconds. |
+| `--record-fps` | Encoded frame rate. Default: 30 fps. |
+| `--controller` | `task` for Task commands, or `player` for keyboard control. Default: `task`. |
+| `--terrain-level` | Fixed procedural terrain tier. Without this option, playback uses registered Task curriculum settings. |
 
-For objective comparisons, name the intended Run explicitly. `latest` selects by time and does not distinguish training objectives. Recordings illustrate behavior; use [per-level evaluation](phantomx-robust-training.md#per-level-evaluation) to measure performance. Recording also writes a JSON evidence file beside the video.
+For an objective comparison, select an explicit Run directory.
+The value `latest` selects by time, not by training objective.
+Use [per-level evaluation](phantomx-robust-training.md#per-level-evaluation) to measure performance.
+The recorder also writes a JSON evidence file beside the video.
 
 ## Keyboard control
+
+Run:
 
 ```powershell
 $runDir = 'runs/UERL-PhantomX-ContinuousTerrain-v0/<run-directory>'
@@ -40,9 +54,16 @@ uv run uerl play `
   --steps 20000
 ```
 
-With the viewport focused, hold **W** to move forward. While moving, use **A/D** or **Q/E** to steer. Release W or press **S** to command the default standing joint targets. The supplied task commands train forward motion and turns while moving; reverse, lateral motion, and in-place turns are not established capabilities of the historical policies. They require appropriate training and evaluation.
+1. Give keyboard focus to the viewport.
+2. Hold **W** for forward motion.
+3. During forward motion, use **A/D** or **Q/E** to turn.
+4. Release W or press **S** for the default standing joint targets.
 
-Without `--controller player`, the task continues to publish its own commands.
+The supplied Task commands teach forward motion and turns during motion.
+Historical policies do not establish reverse motion, lateral motion, or turns without forward motion.
+Those behaviors require suitable training and evaluation.
+
+Without `--controller player`, the Task publishes its own commands.
 
 ## Historical examples
 

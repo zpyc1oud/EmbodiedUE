@@ -1,52 +1,77 @@
 # UE RL Engine
 
-Train robot policies in Unreal Engine 5.8 Chaos and deploy the same artifact on a game Skeletal Mesh.
+Train robot policies in Unreal Engine 5.8 Chaos.
+Deploy the same artifact on a Skeletal Mesh in a game.
 
-- Read `README.md` for installation, commands, and the directory layout.
-- Read `CONTEXT.md` when changing domain contracts or timing semantics.
-- Read `docs/architecture.md` for system boundaries and design rationale.
-- Use `docs/README.md` to locate topic-specific documentation.
-- Follow `docs/contribution-workflow.md` for proposals, validation evidence, review, merge, and release; it does not grant action permissions beyond the user's authorization.
-- Read `docs/how-to/README.md` for robot integration, recording, and deployment workflows.
+## Read the applicable guide
 
-Integrating a robot adds UE assets, Python robot/task declarations, and a policy artifact; it does not add robot-specific UE runtime code. The product robots are CartPole and PhantomX. Training, evaluation, export, and deployment use `uerl`. A Session owns `physics_dt` and an inclusive `decimation` range; each Step carries a `step_decimation` inside that range. Contact observations are geometric support values (0/1) from the final completed solver step at the end of the control window.
+- For installation, commands, and directory layout, read `README.md`.
+- For domain contracts or timing changes, read `CONTEXT.md`.
+- For system boundaries and design decisions, read `docs/architecture.md`.
+- For topic-specific documentation, use `docs/README.md`.
+- For proposals, validation, review, merge, and release, use `docs/contribution-workflow.md`.
+- For robot integration, video, and deployment, use `docs/how-to/README.md`.
+- Before you add or change tests, read `docs/how-to/write-tests.md` and `tests/README.md`.
 
-=== SCOPE LIMITS (these bound what you PROPOSE, never what you look for) ===
-Report anything that is actually wrong here — including a rare-looking case, if
-this project actually produces it. Then keep the fix in scope:
-1. This is not a security paper. Verification is welcome; over-defense is not.
-   Unless this project states otherwise, assume a cooperating operator on their
-   own machine; if it has a real adversary, it will say so and that scope wins.
-2. Do not add hashes, checksums or fingerprints unless the hash replaces a
-   materially more expensive operation AND its result changes what happens next.
-3. No defensive scaffolding: no feature flags, migration frameworks, compat
-   layers or wrappers for cases that do not occur here.
-4. No corner-case obsession: exotic encodings, symlink races, RTL text and
-   millisecond races are out of scope unless the case is reachable through this
-   project's supported use — its documented inputs, its published interface, its
-   real data. Reachable is enough; you do not need a reproduction. Constructible
-   in principle is not enough.
-5. Where judgement is needed, judge. Do not replace it with a scoring table, a
-   checklist, or a re-verification loop over something already settled.
-6. None of this overrides security, migration, verification or review that the
-   user, this project's own conventions, or a higher-priority rule asked for.
-   Those were requested; they are the work, not scope creep.
-7. Deliverable text is not a defense transcript. State plainly what holds;
-   collect caveats in one section (Limitations, Known Issues) instead of
-   sprinkling a disclaimer into every paragraph; and never write instructions
-   into the product: "do not mention X" means X is absent — not "we do not
-   address X".
-Shapes already seen, for calibration. Examples, not a checklist — a real finding
-is not dismissed by resembling one:
-  H  hashing every row of two spreadsheets to answer what comparing cells answers
-  H  writing checksum files that nothing ever reads
-  E  hardening the accounts of an app that has no users and no deployment
-  R  auditing your own patch all night while the feature stays unwritten
-  R  a reviewer that returns a failing verdict on everything
-  O  guards whose justification is the previous guard, not the requirement
-And two that look like the above and are not. Report these:
-  ✓  a digest that lets you skip re-reading a large file you already have
-  ✓  a rare-looking input this project's own documentation example produces
-Before running any check, answer: what specific failure would this detect, and
-what would I do differently if it occurred? No answer means do not run it.
-Say plainly when something is correct. Do not manufacture findings.
+The contribution workflow does not extend the user's action authorization.
+
+## Product contracts
+
+A robot integration adds UE assets, Python Robot and Task declarations, and a policy artifact.
+It does not add robot-specific UE runtime code.
+The product robots are CartPole and PhantomX.
+Training, evaluation, export, and deployment use `uerl`.
+
+A Session owns `physics_dt` and an inclusive `decimation` range.
+Each Step carries a `step_decimation` within that range.
+Contact observations are geometric support values of 0 or 1.
+They describe the final completed solver step at the end of the control window.
+
+## Scope limits
+
+Report actual defects, including rare cases that the project can produce.
+These limits control proposed changes, not the search for defects.
+
+1. Assume a cooperating operator on their own machine, unless the project specifies an adversary.
+   Use the stated threat model when one exists.
+   Add verification where necessary, without unrelated defensive infrastructure.
+2. Add a hash, checksum, or fingerprint only if it replaces a materially more expensive operation.
+   Its result must also change the next action.
+3. Add no feature flags, migration frameworks, compatibility layers, or wrappers for cases that do not occur here.
+4. Include unusual inputs only when supported project use can reach them.
+   Documented inputs, published interfaces, and real project data establish reachability.
+   A reproduction is not required for a reachable case.
+   A theoretically constructible case alone is insufficient.
+5. Use judgment where judgment is necessary.
+   Do not replace a settled decision with a scoring table, checklist, or repeated verification loop.
+6. Obey security, migration, verification, and review requirements requested by the user, project conventions, or higher-priority instructions.
+   Those requirements remain in scope.
+7. State deliverable facts directly.
+   Put applicable caveats together under Limitations or Known Issues.
+   Do not repeat a prohibition as product text.
+   If the user excludes a topic, omit that topic from the deliverable.
+
+## Examples for scope decisions
+
+These examples explain the limits.
+They do not justify dismissal of a real defect.
+
+Usually unnecessary:
+
+- A hash for every spreadsheet row when a direct cell comparison gives the required answer
+- A checksum file that no operation reads
+- Account hardening for an application with no users or deployment
+- Repeated patch reviews that prevent delivery
+- A reviewer that rejects every result
+- A guard required only by another unnecessary guard
+
+Potentially necessary:
+
+- A digest that avoids another read of a large file already available
+- An unusual input produced by the project's own documented example
+
+Before each check, identify the specific failure it can detect.
+Identify the action that would change after that failure.
+If neither answer is available, omit the check.
+State when the result is correct.
+Do not invent findings.

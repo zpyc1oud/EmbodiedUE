@@ -1,27 +1,38 @@
 # EmbodiedUE · UE RL Engine
 
-Train robot control policies in **Unreal Engine 5.8 / Chaos**, then run the exported policies on Skeletal Mesh robots in a UE game. Python owns the task and PPO training; the UE plugin owns physics, observations, and in-game inference.
+Train robot control policies in **Unreal Engine 5.8 / Chaos**.
+Then run the exported policies on Skeletal Mesh robots in a UE game.
+Python owns the Task and PPO training.
+The UE plugin owns physics, observations, and in-game inference.
 
-The project includes CartPole and PhantomX hexapod tasks. It uses **rsl-rl**, with observation and action plans shared between Python training and C++ deployment. Isaac Sim and Isaac Lab are not runtime dependencies.
+The project includes CartPole and PhantomX hexapod Tasks.
+It uses **rsl-rl**.
+Python training and C++ deployment share observation and action plans.
+Isaac Sim and Isaac Lab are not runtime dependencies.
 
 <video src="docs/media/phantomx-walk.mp4" controls muted playsinline width="720"></video>
 
 [Watch the walking demo](docs/media/phantomx-walk.mp4) · [Terrain demo](docs/media/phantomx-terrain.mp4)
 
-These videos illustrate sample policies, not a performance guarantee for newly trained models.
+These videos show sample policies.
+They do not guarantee the performance of a new model.
 
 ## Project status: Early-Stage
 
-EmbodiedUE is an early-stage project. APIs, artifact formats, and workflows may change;
-backward compatibility and production readiness are not guaranteed. Python checks do
-not establish UE runtime compatibility. Clean-host Windows/UE build, training, import,
-and packaging validation remain outstanding in the current release review.
+EmbodiedUE is an early-stage project.
+APIs, artifact formats, and procedures can change.
+The project does not guarantee backward compatibility or readiness for production.
+Python checks do not establish UE runtime compatibility.
+The release review still requires build, training, import, and packaging validation on a clean Windows/UE host.
 
 The Egypt gameplay scene is an [optional Fab installation](docs/how-to/optional-egypt-demo.md).
 Acquire [Stylized Egypt](https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd)
-yourself; the listing displayed Free on 2026-10-03. Its source assets are excluded from
-this tree. The default game map is the empty Engine Entry map; open the installed
-Egypt map explicitly for gameplay. CartPole and procedural-terrain task maps are unchanged.
+through your own account.
+The listing displayed Free on 2026-10-03.
+Its source assets are not in this tree.
+The default game map is the empty Engine Entry map.
+For gameplay, open the installed Egypt map explicitly.
+CartPole and procedural-terrain Task maps are unchanged.
 
 ## What is included
 
@@ -36,9 +47,11 @@ Egypt map explicitly for gameplay. CartPole and procedural-terrain task maps are
 
 ### Prerequisites
 
-The integrated training and deployment workflow targets **Windows x64 and UE 5.8**. Other UE versions and Linux/macOS UE execution are not validated by this repository's documented workflow. Python-only inspection and tests can run separately from UE.
+The integrated training and deployment procedure targets **Windows x64 and UE 5.8**.
+The documented procedure does not validate other UE versions or Linux/macOS UE execution.
+Python-only inspection and tests can run without UE.
 
-Install these tools before using the commands below:
+Before you use these commands, install the required tools:
 
 | Requirement | Purpose |
 |---|---|
@@ -47,13 +60,21 @@ Install these tools before using the commands below:
 | Python 3.11 and `uv` | Install the Python package and locked dependencies |
 | NVIDIA GPU with a driver compatible with the pinned CUDA 12.8 PyTorch build | Default PhantomX policy training on `cuda:0`; `--device cpu` selects CPU policy execution |
 
-Chaos simulation runs in UE; selecting CPU policy execution does not remove the UE requirement. Use the C++ compiler and Windows SDK accepted by your UE 5.8 installation; this repository does not pin their versions. The project pins `torch==2.11.0+cu128`, `torchvision==0.26.0+cu128`, and `rsl-rl-lib==5.4.2`. No minimum RAM, GPU memory, or throughput guarantee has been established here.
+Chaos simulation runs in UE.
+CPU policy execution still requires UE.
+Use the C++ compiler and Windows SDK accepted by your UE 5.8 installation.
+This repository does not pin their versions.
+The project pins `torch==2.11.0+cu128`, `torchvision==0.26.0+cu128`, and `rsl-rl-lib==5.4.2`.
+The project has no established minimum RAM, GPU memory, or throughput guarantee.
 
-The host enables the bundled `UERLEngine` plugin and its engine dependencies, `ProceduralMeshComponent` and `NNERuntimeORT`. Confirm those engine plugins are available before building; see [troubleshooting](docs/troubleshooting.md).
+The host enables the bundled `UERLEngine` plugin and its engine dependencies, `ProceduralMeshComponent` and `NNERuntimeORT`.
+Before the build, make sure that these engine plugins are available.
+See [troubleshooting](docs/troubleshooting.md).
 
 ### Install and build
 
-Run these commands in **PowerShell**, from your checkout root. Replace placeholder paths with your own paths.
+Replace the placeholder paths with your paths.
+From the checkout root, run these commands in **PowerShell**.
 
 ```powershell
 git lfs install
@@ -65,7 +86,11 @@ $project = (Resolve-Path 'engine/UERLHost.uproject').Path
 & "$ueRoot\Engine\Build\BatchFiles\Build.bat" UERLHostEditor Win64 Development $project -WaitMutex
 ```
 
-An LFS pointer is not a usable UE asset. Confirm LFS access and complete the Editor build before training. Unreal Engine is obtained separately; this repository does not grant rights to redistribute it or third-party content.
+An LFS pointer is not a usable UE asset.
+Before training, make sure that LFS access works.
+Complete the Editor build.
+Obtain Unreal Engine separately.
+This repository does not grant redistribution rights for Unreal Engine or third-party content.
 
 ### Inspect tasks without starting UE
 
@@ -75,9 +100,10 @@ uv run uerl config --task UERL-PhantomX-ContinuousTerrain-v0
 uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
 ```
 
-The task check validates Python declarations, not the installed UE binary, content loading, or GPU readiness.
-Use `uv run uerl check host` for static CartPole host file checks and a reusable
-[machine profile](docs/how-to/ue-host-profile.md).
+The Task check validates Python declarations.
+It does not validate the installed UE binary, content loading, or GPU readiness.
+Use `uv run uerl check host` for static CartPole host file checks.
+Use a [host profile](docs/how-to/ue-host-profile.md) to save reusable paths.
 
 ### Run a small training smoke test
 
@@ -87,10 +113,11 @@ After the Editor build succeeds:
 uv run uerl train --task UERL-CartPole-Direct-v0 --num-envs 2 --max-iterations 1 --device cpu --run-name smoke
 ```
 
-Save a non-default engine/project path in the [host profile](docs/how-to/ue-host-profile.md)
-once; `train`, `play`, and `export` reuse it in launch mode. `--ue-executable` and
-`--project` override individual profile fields. These commands do not read `UE_ROOT`
-automatically. This smoke test starts UE and trains a policy; it is not a configuration-only check.
+Save custom engine and project paths in the [host profile](docs/how-to/ue-host-profile.md).
+The commands `train`, `play`, and `export` use these paths in launch mode.
+The options `--ue-executable` and `--project` replace individual profile fields.
+These commands do not automatically read `UE_ROOT`.
+This smoke test starts UE and trains a policy.
 
 ### Train PhantomX
 
@@ -98,7 +125,12 @@ automatically. This smoke test starts UE and trains a policy; it is not a config
 uv run uerl train --task UERL-PhantomX-ContinuousTerrain-v0 --run-name terrain
 ```
 
-The command prints `[RUN] directory=...`. Keep that directory: it contains the resolved configuration, logs, and checkpoints. `runs/` is local generated output and is not distributed with the source. Continuous-terrain training defaults to 64 Slots; flat-ground walking defaults to 512. See [training and evaluation](docs/how-to/phantomx-robust-training.md) before changing parallelism or resuming an older checkpoint.
+The command prints `[RUN] directory=...`.
+Keep that directory with its resolved configuration, logs, and checkpoints.
+Generated `runs/` output is not distributed with the source.
+Continuous-terrain training defaults to 64 Slots.
+Flat-ground walking defaults to 512 Slots.
+Before you change parallelism or resume an older checkpoint, read [training and evaluation](docs/how-to/phantomx-robust-training.md).
 
 ### Evaluate and record
 
@@ -108,7 +140,10 @@ uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terra
 uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terrain-level 0 --record artifacts/walk.mp4
 ```
 
-Playback uses one robot and starts with the registered Task curriculum. Use `--terrain-level` to evaluate a selected procedural tier. A control-step count is not a fixed duration when decimation varies. For keyboard control, recording options, and interpretation of results, see [recording and playback](docs/how-to/record-video.md).
+Playback uses one robot and starts with the registered Task curriculum.
+Use `--terrain-level` to select a procedural tier for evaluation.
+With variable decimation, a control-step count does not specify a fixed duration.
+See [recording and playback](docs/how-to/record-video.md) for keyboard control, recording options, and result interpretation.
 
 ### Export and deploy
 
@@ -117,7 +152,12 @@ uv run uerl export --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir
 uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task UERL-PhantomX-ContinuousTerrain-v0 --artifact $runDir
 ```
 
-Export initializes a UE Session; it is not an offline checkpoint conversion. Deployment copies the runtime, updates target project settings, and prints an import command. Add `--import` to execute the Editor import after the target Editor build succeeds. Use `deploy --check` for a read-only preflight. Follow the [deployment guide](docs/in-game-deployment-guide.md) for Blueprint setup, physics settings, and packaging.
+Export initializes a UE Session.
+It is not an offline checkpoint conversion.
+Deployment copies the runtime, changes target project settings, and prints an import command.
+After the target Editor build succeeds, add `--import` to execute that import.
+Use `deploy --check` for read-only preflight.
+Use the [deployment guide](docs/in-game-deployment-guide.md) for Blueprint setup, physics settings, and packaging.
 
 ## Tasks
 
@@ -129,7 +169,10 @@ Export initializes a UE Session; it is not an offline checkpoint conversion. Dep
 | `UERL-PhantomX-DiscreteTerrain-v0` | Six levels of discrete obstacles | 64 |
 | `UERL-PhantomX-Pursuit-v0` | Pursuit in an optional locally installed Egypt map | 1 |
 
-Use `uerl config --task <TaskID>` for the resolved defaults. Robot declarations live in `src/uerl/assets/robots/`; task factories can override base YAML settings. See [configuration](docs/configuration.md).
+Use `uerl config --task <TaskID>` for resolved defaults.
+Robot declarations are in `src/uerl/assets/robots/`.
+Task factories can replace base YAML settings.
+See [configuration](docs/configuration.md).
 
 ## Documentation and development
 
@@ -141,7 +184,10 @@ For Python-only development after installation:
 uv run pytest -q
 ```
 
-UE Automation, end-to-end training, recording, and packaging require the Windows/UE host. These Windows/UE workflows have not been rerun during this documentation update. Python-only validation does not establish runtime compatibility or policy performance.
+UE Automation, end-to-end training, recording, and packaging require the Windows/UE host.
+This documentation update does not include new Windows/UE execution evidence.
+Python-only validation does not establish runtime compatibility or policy performance.
+Use [Write tests](docs/how-to/write-tests.md) for project-specific test implementation and review.
 
 ## License
 

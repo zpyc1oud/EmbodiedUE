@@ -1,9 +1,11 @@
 # Release-readiness inventory
 
-The owner selected **Apache-2.0** for original project code, documentation, and
-configuration, and **Early-Stage** status. [LICENSE](../LICENSE) contains the unmodified
-Apache text. Third-party rights remain separate; the current content bundle is not
-cleared for public redistribution. These local changes do not publish the repository.
+The owner selected **Apache-2.0** for original project code, documentation, and configuration.
+The selected project status is **Early-Stage**.
+[LICENSE](../LICENSE) contains the unchanged Apache text.
+Third-party rights remain separate.
+The recorded content review does not clear the complete bundle for public redistribution.
+The inventory itself does not authorize publication.
 
 ## Remaining publication decisions
 
@@ -18,20 +20,22 @@ cleared for public redistribution. These local changes do not publish the reposi
 
 ## Early-Stage validation and distribution readiness
 
-Clean-host Windows/UE build, live Chaos training smoke, policy import and packaged-game
-checks remain outstanding. These are validation limits, not reasons to change the
-chosen code license. Verify LFS availability for authorized assets and document
-optional externally obtained content so default examples remain usable.
+The release review still requires clean-host Windows/UE build, live Chaos training smoke, policy import, and packaged-game checks.
+These validation limits do not change the selected code license.
+Make sure that authorized assets are available through LFS.
+Document optional external content so that default examples remain usable.
 
-UE 5.8 is a separately acquired prerequisite. A source release of original project
-code does not include rights to engine binaries, engine source or Epic/Fab content.
+UE 5.8 is a separately acquired prerequisite.
+A source release of original project code does not include rights to engine binaries, engine source or Epic/Fab content.
 Review applicable engine/content terms for the distribution actually planned.
 
 ## Inspection scope
 
-The current review covers tracked paths, textual references, Git/LFS metadata,
-selected installed dependency licenses, and owner-confirmed Fab provenance. It is
-not an exhaustive legal review, binary asset dependency analysis, or full-history
-secret audit. No credentials were displayed or tested. Earlier credential cleanup
-is not being reported as a new exposure; revocation status is outside this review.
-The Fab collection was recoverably removed from the current tree. No history was rewritten, LFS objects purged, or publication action taken.
+The recorded review covers tracked paths, text references, Git/LFS metadata, selected installed dependency licenses, and owner-confirmed Fab provenance.
+It is not a complete legal review, binary dependency analysis, or full-history secret audit.
+No credentials were displayed or tested in that review.
+Earlier credential cleanup is not a new exposure report.
+Revocation status is outside the review.
+
+The Fab collection was removed recoverably from the current tree.
+That operation did not rewrite history, purge LFS objects, or publish the repository.
