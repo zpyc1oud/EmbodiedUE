@@ -18,6 +18,7 @@ Use this index to find the guide for each topic.
 | New plan operators | [Operator admission](../engine/Plugins/UERLEngine/Source/UERLPolicy/Docs/Operators.md) |
 | Contributions and review | [Contributing](../CONTRIBUTING.md) |
 | Proposals, PRs, merge, and release | [Contribution workflow](contribution-workflow.md) |
+| Batch integration and shared UE checks | [Batch validation](how-to/batch-validation.md) |
 | Trust boundaries and vulnerability reports | [Security](../SECURITY.md) |
 | Third-party code and content | [Notices and inventory](../THIRD_PARTY_NOTICES.md) |
 | Fab asset removal plan | [Asset publication plan](asset-publication-plan.md) |

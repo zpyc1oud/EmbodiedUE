@@ -10,6 +10,7 @@ Deploy the same artifact on a Skeletal Mesh in a game.
 - For system boundaries and design decisions, read `docs/architecture.md`.
 - For topic-specific documentation, use `docs/README.md`.
 - For proposals, validation, review, merge, and release, use `docs/contribution-workflow.md`.
+- For shared UE validation, use `docs/how-to/batch-validation.md`.
 - For robot integration, video, and deployment, use `docs/how-to/README.md`.
 - Before you add or change tests, read `docs/how-to/write-tests.md` and `tests/README.md`.
 
