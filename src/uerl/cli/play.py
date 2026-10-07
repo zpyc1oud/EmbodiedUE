@@ -96,7 +96,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--trace",
         type=Path,
-        help="Write per-policy-step Task input/transition evidence as YAML at this path.",
+        help="Write paired Task/UE step evidence as YAML; requires Task export plans.",
     )
     parser.add_argument(
         "--controller",

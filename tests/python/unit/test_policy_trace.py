@@ -586,3 +586,31 @@ def test_clock_pairing_accepts_accumulated_float32_solver_dt(
     ue_path.write_text(yaml.safe_dump(ue), encoding="utf-8")
     mismatched = compare_policy_traces(task_path, ue_path)
     assert cast(list[dict[str, Any]], mismatched["pairs"])[0]["comparable"] is False
+
+
+def test_python_only_task_trace_rejects_before_worker_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from tests.python.unit.test_task_capabilities import _PythonTask
+    from uerl.errors import ConfigError
+    from uerl.tasks.cartpole import CARTPOLE_TASK_ID
+    from uerl.training import build_run_config
+    from uerl.training import runner as runner_module
+
+    config = build_run_config(CARTPOLE_TASK_ID, overrides={"worker.slot_count": "1"})
+    checkpoint = tmp_path / "model.pt"
+    checkpoint.write_bytes(b"preflight precedes checkpoint loading")
+    registry = SimpleNamespace(
+        create_task=lambda *args: _PythonTask(),
+        create_curriculum=lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(runner_module, "create_default_registry", lambda: registry)
+
+    def unexpected_session(*args: object, **kwargs: object) -> None:
+        pytest.fail("unsupported trace reached Worker Session launch")
+
+    monkeypatch.setattr(runner_module.UERLSession, "open", unexpected_session)
+    with pytest.raises(ConfigError, match="Task export capability is unsupported"):
+        runner_module.run_evaluation(config, checkpoint=checkpoint, steps=1, trace_path=tmp_path / "trace.yaml")
