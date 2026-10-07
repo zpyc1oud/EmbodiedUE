@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Protocol, cast
 
 from ...core.codec import sha256_json
@@ -17,8 +16,6 @@ from ...core.config.robot import RobotSpec, merge_robot_spec
 from ...errors import ConfigError, ProtocolError, SessionError
 from .process import WorkerProcessController
 from .state import SessionState
-
-_SOURCE_REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
 
 class BridgeFactory(Protocol):
@@ -575,5 +572,5 @@ def _build_manifest(config: ResolvedRunConfig, result: InitializeResult) -> RunM
         schema_hashes=schema_hashes,
         layout_hashes=layout_hashes,
         seed_derivation_version=response["seed_derivation_version"],
-        git_identity=capture_git_identity(_SOURCE_REPOSITORY_ROOT),
+        git_identity=capture_git_identity(),
     )

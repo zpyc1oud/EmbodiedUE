@@ -8,7 +8,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from uerl.cli import new
+from uerl.core.config.manifest import GitIdentityError, capture_git_identity
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -83,6 +86,13 @@ import uerl
 assert Path(uerl.__file__).is_relative_to(Path(sys.argv[1]))
 from uerl.tasks.registry import create_default_registry
 from uerl.core.config.paths import repository_config_root
+from uerl.core.config.manifest import capture_git_identity
+original_path = os.environ.get('PATH', '')
+os.environ['PATH'] = ''
+try:
+    assert capture_git_identity() == {"commit": "unavailable", "ref": "package:ue-rl-engine==1.0.0", "dirty": False}
+finally:
+    os.environ['PATH'] = original_path
 from uerl.cli.main import main
 from uerl.training import build_run_config
 from uerl.core.direct.task import DirectTask
@@ -172,3 +182,8 @@ assert main(['check', 'task', 'Example-CartPole-v0']) == 1
                                env=env, text=True, capture_output=True, check=False)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "already registered" in completed.stdout
+
+
+def test_explicit_source_repository_git_error_is_preserved(tmp_path: Path) -> None:
+    with pytest.raises(GitIdentityError, match="cannot capture Git identity"):
+        capture_git_identity(tmp_path)

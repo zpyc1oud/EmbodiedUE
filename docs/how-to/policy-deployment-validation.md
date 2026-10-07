@@ -169,6 +169,10 @@ named command values with ages. The event is opt-in: the component builds and
 copies snapshot arrays only while a listener is bound. The component does not
 persist these events. Start and stop the host recorder explicitly.
 
+Trace capture requires an exportable Task because it records the exported
+policy identity and deployment-plan fields. Known unsupported Tasks fail this
+preflight before Worker startup; ordinary playback remains available.
+
 For a paired record, `uerl play --trace <trace.yaml>` stores the Task-side
 decision sample and the result of its Worker step in the selected Run's trace
 file. The Task `input` record is captured before the Worker step and contains
