@@ -93,6 +93,7 @@ uv sync --locked
 uv run ruff check src scripts tests
 uv run mypy src tests
 uv run pytest -q
+uv run python scripts/check_docs.py
 
 # Built Windows/UE host required:
 uv run python scripts/run_all_tests.py
@@ -149,7 +150,8 @@ Numerical parity does not establish complete scene behavior.
 
 [Issue #13](https://github.com/zpyc1oud/EmbodiedUE/issues/13) has the closed reason `not_planned`.
 Its proposed suite-selection and completion work is not the active plan.
-[Issue #19](https://github.com/zpyc1oud/EmbodiedUE/issues/19) tracks the current layered audit and later verification.
+[Issue #19](https://github.com/zpyc1oud/EmbodiedUE/issues/19) completed the layered audit and Windows follow-up verification on 2026-10-07.
+[Issue #29](https://github.com/zpyc1oud/EmbodiedUE/issues/29) tracks the remaining repository-wide test-quality review.
 Examine selected coverage and completion evidence.
 Aggregate success alone does not prove that every required case ran.
 
@@ -208,6 +210,8 @@ This workflow does not validate documentation links or configuration files.
 It does not run Python tests, UE, Chaos, or GPU checks.
 A green status proves static checks only.
 Required statuses and repository controls remain separate maintainer decisions.
+The local documentation hook and default Python suite run `scripts/check_docs.py`.
+Use [the documentation check](../CONTRIBUTING.md#check-documentation) for its scope and limitations.
 
 AI assistants use this workflow within the user's authorization.
 Preparation, review, or implementation requests alone do not authorize merge, release publication, deployment, access changes, or history changes.

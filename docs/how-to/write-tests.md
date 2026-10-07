@@ -312,3 +312,21 @@ A required skipped or blocked case prevents a full-pass claim.
 Keep startup smoke, numerical parity, physical response, and learning quality separate.
 One training iteration establishes that a path can execute.
 It does not establish policy convergence or reliable scene behavior.
+
+## Test documentation checks
+
+Documentation tooling cases belong in `tests/tooling/test_documentation_checks.py`.
+Use temporary Markdown files with one intended defect.
+For a missing link or heading, assert the source line and destination in the diagnostic.
+Include a valid link to show that the check distinguishes the two cases.
+For CLI examples, test an unknown flag, a missing required argument, and a valid command.
+Use the product parser without calling the command implementation.
+A documentation check must not launch training, UE, or a shell command from an example.
+
+Run the repository-wide check before you submit documentation changes:
+
+```powershell
+uv run python scripts/check_docs.py
+```
+
+See [the documentation check](../../CONTRIBUTING.md#check-documentation) for supported syntax and manual review requirements.
