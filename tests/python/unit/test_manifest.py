@@ -14,7 +14,8 @@ from uerl import (
     SessionConfig,
     WorkerConfig,
 )
-from uerl.core.config.manifest import capture_git_identity
+from uerl.core.config import manifest as manifest_module
+from uerl.core.config.manifest import GitIdentityError, capture_git_identity
 from uerl.core.config.snapshot import resolved_config_from_yaml
 from uerl.core.config.yaml_loader import load_unique_yaml
 
@@ -109,3 +110,21 @@ def test_manifest_is_written_before_ready_boundary(tmp_path: Path) -> None:
     assert not (run_directory / "resolved_config.json").exists()
     assert not (run_directory / "manifest.json").exists()
     print(f"[VERIFY] VC-002: manifest_before_ready=true ready_ack_count=0 hash={manifest_hash}")
+
+
+@pytest.mark.parametrize("enclosing_checkout", [False, True], ids=["outside-checkout", "inside-unrelated-checkout"])
+def test_installed_framework_records_package_identity_without_using_enclosing_git(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, enclosing_checkout: bool,
+) -> None:
+    root = Path(__file__).resolve().parents[3] if enclosing_checkout else tmp_path
+    monkeypatch.setattr(manifest_module, "_SOURCE_REPOSITORY_ROOT", root)
+    monkeypatch.setattr(manifest_module, "__file__", str(root / "installed/uerl/core/config/manifest.py"))
+
+    identity = capture_git_identity()
+
+    assert identity == {"commit": "unavailable", "ref": "package:ue-rl-engine==1.0.0", "dirty": False}
+
+
+def test_explicit_source_repository_git_error_is_preserved(tmp_path: Path) -> None:
+    with pytest.raises(GitIdentityError, match="cannot capture Git identity"):
+        capture_git_identity(tmp_path)

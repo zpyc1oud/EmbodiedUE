@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
+from importlib.metadata import version
 from pathlib import Path
 
 import yaml
@@ -62,7 +63,20 @@ class RunManifest:
 
 
 def capture_git_identity(repo_root: Path | None = None) -> Mapping[str, object]:
-    """Capture the source checkout identity at the Run filesystem boundary."""
+    """Capture checkout Git identity or installed distribution provenance.
+
+    Wheels have no source checkout. Their commit is explicitly unavailable;
+    the package version occupies ref and dirty is not a Git-clean claim.
+    Explicit repository lookups retain their strict Git failure behavior.
+    """
+
+    source_file = _SOURCE_REPOSITORY_ROOT / "src/uerl/core/config/manifest.py"
+    if repo_root is None and Path(__file__).resolve() != source_file.resolve():
+        return {
+            "commit": "unavailable",
+            "ref": f"package:ue-rl-engine=={version('ue-rl-engine')}",
+            "dirty": False,
+        }
 
     root = _SOURCE_REPOSITORY_ROOT if repo_root is None else repo_root
     commit = _git_text(root, "rev-parse", "HEAD")

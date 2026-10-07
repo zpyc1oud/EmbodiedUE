@@ -83,6 +83,13 @@ import uerl
 assert Path(uerl.__file__).is_relative_to(Path(sys.argv[1]))
 from uerl.tasks.registry import create_default_registry
 from uerl.core.config.paths import repository_config_root
+from uerl.core.config.manifest import capture_git_identity
+original_path = os.environ.get('PATH', '')
+os.environ['PATH'] = ''
+try:
+    assert capture_git_identity() == {"commit": "unavailable", "ref": "package:ue-rl-engine==1.0.0", "dirty": False}
+finally:
+    os.environ['PATH'] = original_path
 from uerl.cli.main import main
 from uerl.training import build_run_config
 from uerl.core.direct.task import DirectTask
