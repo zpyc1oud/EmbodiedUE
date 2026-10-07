@@ -221,6 +221,7 @@ void UUERLPolicyComponent::BroadcastControlFrameSnapshot(
 	double SolverTimeSeconds)
 {
 	FUERLPolicyControlFrameSnapshot Snapshot;
+	Snapshot.bBootstrap = bBootstrapPending;
 	Snapshot.Sequence = ControlFrameSequence;
 	Snapshot.SolverFrame = SolverFrame;
 	Snapshot.SolverTimeSeconds = SolverTimeSeconds;

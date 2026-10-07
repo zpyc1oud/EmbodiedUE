@@ -104,33 +104,122 @@ does not assert chase quality or no-fall behavior:
 ## Phase 3: evaluate a held-out static target scene
 
 Use the same saved Run, seed, spawn transform, and command sequence on every
-repeat. First collect the Task-side evaluation on the target map:
+repeat. For a fixed-command diagnostic, pin the PhantomX sampler to a constant
+forward command and record the Task-side trace:
 
 ```powershell
-uv run uerl play --project $project --ue-executable $ueCmd --run $runDir --map $map --seed 0 --steps 4000 --presentation none
+$seed = 0
+$taskTrace = Join-Path $runDir 'traces/task.yaml'
+uv run uerl play --project $project --ue-executable $ueCmd --run $runDir --map $map --seed $seed --steps 4000 --terrain-level 0 --presentation none --trace $taskTrace --controller fixed --fixed-velocity '0.45,0,0'
 ```
 
-Then open that exact map in the Editor, place the imported policy actor on the
-same marked start, set its `Artifact`, and bind its command/events before
-calling `StartPolicy`. For PhantomX the host command channel is `velocity`,
-ordered as body-frame forward speed (m/s), lateral speed (m/s), and yaw rate
-(rad/s). The default training command sampler uses 0.4–0.5 m/s linear speed,
-clamps yaw rate to ±1 rad/s, and includes zero-speed standing episodes. Keep
-comparison commands within the selected Run's training distribution; the
-component checks channel width and finite values, not task-specific units or
-limits. The Egypt chase example uses `[0.45, 0, yaw_rate]`.
+The fixed controller keeps `velocity` at `[0.45, 0, 0]` across episode resets. In the
+Editor, open that same map, place the imported policy actor on the recorded
+start, set its `Artifact` to `/UERLEngine/Policies/PhantomXContinuousTerrain116`,
+and set `bAutoStart=false`. Add a `UERLPolicyTraceRecorder` component to the
+same host (or set its `PolicyComponent` reference). In the host BeginPlay path,
+call `SetCommand(velocity, [0.45, 0, 0])`, then
+`StartTrace("target-scene-ue.yaml", 0)`, then `StartPolicy`. Check the boolean
+return from each call and `GetLastError` on failure. StartTrace writes to
+`engine/Saved/UERLPolicyTraces/target-scene-ue.yaml` and refuses to overwrite an
+existing file. Stop the trace explicitly after the final sample.
 
-Bind `OnControlStepCompleted` to the host's run recorder. Each event carries a
-single post-physics frame with a component-local sequence number, solver
-frame/time, elapsed game/physics time, observation dt, last solver-step dt,
-named raw-state fields and widths, exact network observation, previous action
-input, raw policy action, actuator targets, and named command values with ages.
-The event is opt-in: the component builds and copies the snapshot arrays only
-while a listener is bound. The component does not persist these events, and
-`uerl play` does not emit a corresponding per-step snapshot log. A host recorder
-must persist the UE sequence itself; compare it with Task-side playback using
-the same artifact, map, seed, start, and command schedule. Exact per-step
-Task/UE pairing requires an external recorder that captures both sides.
+`--trace` also exports the loaded policy to a temporary UERLPOL2 artifact and
+records the SHA-1 of its ONNX payload. The UE recorder hashes the imported
+artifact's ONNX bytes the same way. The comparator requires these fingerprints
+to match before it reports a frame pair as comparable. The temporary artifact
+is removed after the fingerprint is recorded.
+
+For every host reset/restart, first call `ResetToReferencePose` or `SoftReset`,
+then call `MarkEpisodeBoundary` with the episode index from the Task trace's
+post-reset row and a reason. The call must occur before the next policy
+bootstrap frame. This marks the new phase and resets the trace's episode clock.
+The trace recorder defers applying that boundary until it receives a bootstrap
+frame whose sequence is greater than the component sequence at the reset call.
+This keeps the callback frame in the old episode whether the host callback runs
+before or after the recorder callback. A boundary record uses the sequence of
+the first new-episode bootstrap frame.
+The first Task input is `post_reset_input`; UE's first-ever control callback is
+`bootstrap_input`, so the comparator will mark that initial pair not comparable.
+Later Task/UE rows pair only when episode index, policy step, command, timing,
+and reset boundaries agree. A reset schedule that differs between the two runs
+will be reported as a mismatch or a missing row.
+
+The PhantomX host channel is `velocity`, ordered as body-frame forward speed
+(m/s), lateral speed (m/s), and yaw rate (rad/s). The component checks channel
+width and finite values; it does not enforce task-specific units or limits.
+
+Bind `OnControlStepCompleted` to the host's run recorder. Each event is one
+**policy-decision sample** emitted at the safe post-physics boundary: the raw
+state, observation, previous action, and command values are the inputs consumed
+to produce that frame's action; actuator targets are that action's outputs.
+The event is broadcast after inference and before the next physics window runs.
+Its raw state is therefore not the successor of the action in the same event.
+The successor is the next event's raw state if the host did not reset or
+otherwise move the Robot between events. A restart/reset must be recorded as a
+separate boundary, and the first sample after it starts a new comparison phase.
+
+The event carries a component-local sequence number, solver frame/time, elapsed
+game/physics time for the preceding window, observation dt used by this input,
+last solver-step dt, named raw-state fields and widths, exact deployment-plan
+observation, previous action input, raw policy action, actuator targets, and
+named command values with ages. The event is opt-in: the component builds and
+copies snapshot arrays only while a listener is bound. The component does not
+persist these events. Start and stop the host recorder explicitly.
+
+For a paired record, `uerl play --trace <trace.yaml>` stores the Task-side
+decision sample and the result of its Worker step in the selected Run's trace
+file. The Task `input` record is captured before the Worker step and contains
+the raw state and observation supplied to the inference policy, previous-action
+history, and current Task command values. The `transition` record is the
+Worker's post-step `TransitionState` **before Reset**, with the actual
+`physics_dt`, sampled `step_decimation`, `transition_dt`, reward, done flags,
+validity, and fault. When done, the `reset` record separately captures the
+post-reset state and the observation returned for the next episode. It must not
+be treated as the terminal transition or paired with that transition's action.
+`field_layout.deployment_state_fields` records the state names selected by the
+bound Task observation plan. The Task trace retains every raw state field,
+including Task-only diagnostics; comparisons require and measure the plan fields
+only. UE's recorded raw-state field set must exactly match those deployment
+requirements, with matching widths. Task-only fields are listed as diagnostic
+fields on each pair and do not block comparison. A required field missing on
+either side, or a non-finite required value, makes the pair not comparable.
+Trace capture is off by default and allocates no per-step copies when disabled.
+The `UERLPolicyTraceRecorder` also records control overruns, stale command
+channels, policy faults, and explicit episode-boundary records while active.
+UE trace files are written as UTF-8 without a BOM, so host-provided Unicode
+reset reasons round-trip through the Python reader. Artifacts with no command
+channels write `commands: []` as an empty YAML sequence.
+
+The UE host trace uses the same YAML field names for decision inputs and action
+outputs; it also records the artifact Task/Robot identity, map package, supplied
+seed (or `null` when the host has none), solver/game clocks, and raw-state field
+layout. The Task trace records its Run/checkpoint identity, Task, map, seed,
+physics timing configuration, and observed field layout. Keep both trace files
+with the Run and host evidence.
+
+Pair rows by episode and policy-step only as candidate decision samples. Before
+comparing values, check the Task/Robot and map identities, seed, command values,
+the exact deployment-required raw-state fields and observation layouts, and dt
+**with the phase stated**. Task input
+observation dt corresponds to the dt used by the UE event's observation plan;
+Task action `transition_dt` corresponds to the following UE event's elapsed
+physics window, not the current event's elapsed window. Game and solver clocks
+may differ. Report the first command, layout, phase, or dt mismatch with both
+actual values and mark affected rows not comparable; do not interpolate or
+silently shift them. A Task transition state can be compared with the next UE
+decision input only when no reset/fault boundary intervened and the elapsed
+window aligns. A numerical difference in a closed-loop state/action/target is a
+diagnostic, not a parity failure threshold. Existing `2e-5` tolerances apply
+only to their fixed-input numerical fixtures.
+
+Overrun, stale-command, and policy-fault events carry the episode/step and
+sequence they affect. UE policy faults and nonzero Task Worker fault codes make
+the comparison `faulted`; `EndPlay` without an explicit successful `StopTrace`
+writes `status: incomplete`. The comparator includes fault events in its
+report and exits nonzero for a faulted trace; it rejects incomplete traces. A
+failed or faulted rollout therefore cannot be presented as a completed
+comparison.
 
 Run the snapshot alignment regression on the UE host:
 
@@ -148,6 +237,27 @@ inside the public frame callback and checks the restart/bootstrap boundary.
 & $ueCmd $project '/Engine/Maps/Entry' `
   '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_020;Quit' `
   -unattended -nullrhi -nosound -NoSplash
+
+& $ueCmd $project '/Engine/Maps/Entry' `
+  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_021;Quit' `
+  -unattended -nullrhi -nosound -NoSplash
+
+& $ueCmd $project '/Engine/Maps/Entry' `
+  '-ExecCmds=Automation RunTests UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_022;Quit' `
+  -unattended -nullrhi -nosound -NoSplash
+```
+
+After both traces are saved, run the pair report. A `comparable` status means
+at least one pair passed task/robot/map/seed/model identity, field-layout,
+phase, command, and clock checks; it is not a learned-behavior verdict. A
+`not_comparable` report prints the actual mismatched values and exits with
+status 2. A `faulted` report retains per-frame fault events and also exits 2;
+`incomplete` traces are rejected. Numerical differences remain diagnostics
+without a rollout-quality threshold.
+
+```powershell
+$ueTrace = Join-Path (Split-Path $project) 'Saved/UERLPolicyTraces/target-scene-ue.yaml'
+uv run python scripts/compare_policy_traces.py $taskTrace $ueTrace
 ```
 
 Use `GetRequiredCommandChannels` to obtain the channel names and widths rather

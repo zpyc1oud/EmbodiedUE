@@ -70,6 +70,7 @@ class UERLDirectEnv:
         event_manager: EventManager | None = None,
         event_manager_factory: Callable[[RobotSpec], EventManager] | None = None,
         initial_terrain_level: int | None = None,
+        step_trace_callback: Callable[[Mapping[str, object]], None] | None = None,
     ) -> None:
         """Create, initialize, ready, and fully reset one typed environment.
 
@@ -97,6 +98,10 @@ class UERLDirectEnv:
                 reset of every Slot. This is used by deterministic playback;
                 normal training leaves it unset so the curriculum starts at
                 level zero.
+            step_trace_callback: Optional observer for one-Slot deployment
+                diagnostics. Each callback row keeps policy inputs, the
+                pre-reset Worker transition, and any post-reset state distinct.
+                ``None`` avoids all trace-row copies.
 
         The Worker-provided InitialState establishes schemas and canonical
         state after UE completes its post-spawn physics stabilization frame.
@@ -116,6 +121,9 @@ class UERLDirectEnv:
         task.align_batch(typed_session.num_slots)
         self._profiler = profiler
         self.num_envs = typed_session.num_slots
+        if step_trace_callback is not None and self.num_envs != 1:
+            raise ValueError("policy step tracing currently supports exactly one Slot")
+        self._step_trace_callback = step_trace_callback
         worker_config = None if resolved_config is None else resolved_config.worker
         self._physics_dt = float(
             _DEFAULT_PHYSICS_DT if worker_config is None else worker_config.physics_dt
@@ -333,6 +341,22 @@ class UERLDirectEnv:
         step_decimation = self._sample_step_decimation()
         transition_dt = self._physics_dt * step_decimation
         previous_state = self._current_state
+        trace_input: dict[str, object] | None = None
+        input_episode_step = 0
+        input_episode_elapsed_s = 0.0
+        input_observation_dt_s = 0.0
+        if self._step_trace_callback is not None:
+            input_episode_step = int(self.episode_length_buf[0].item())
+            input_episode_elapsed_s = float(self.episode_solver_steps[0].item()) * self._physics_dt
+            input_observation_dt_s = float(self._action_interval_dt[0].item())
+            trace_input = {
+                "raw_state": _trace_tensor_mapping(previous_state.values, 0),
+                "state_valid": bool(previous_state.state_valid[0].item()),
+                "fault_code": int(previous_state.slot_fault_code[0].item()),
+                "observation_groups": _trace_tensor_mapping(self._last_observations, 0),
+                "previous_action": _trace_tensor_row(self._previous_policy_actions, 0),
+                "commands": {},
+            }
         previous_task_state = StateBatch(
             self._task_values(previous_state.values),
             previous_state.state_valid,
@@ -343,6 +367,8 @@ class UERLDirectEnv:
             physical_command = self.task.preprocess_actions(policy_actions, previous_task_state.values)
         published_velocity = self.task.published_velocity()
         command_velocity = None if published_velocity is None else published_velocity.clone()
+        if trace_input is not None:
+            trace_input["commands"] = _trace_tensor_mapping(self.task.command_source.current(), 0)
         with self._stage("step_roundtrip"):
             transition = self.session.step(physical_command, step_decimation=step_decimation)
             move_start = perf_counter()
@@ -442,6 +468,7 @@ class UERLDirectEnv:
         # Keep terminal snapshots from TransitionState; only rows selected by
         # the combined mask may be replaced with Post-Reset State.
         reset_mask = terminated | truncated
+        post_reset: StateBatch | None = None
         if bool(reset_mask.any()):
             metrics = {**metrics, **self.task.episode_reward_log(reset_mask)}
         terminal_episode_length = self.episode_length_buf.clone()
@@ -473,18 +500,19 @@ class UERLDirectEnv:
         )
         if bool(reset_mask.any()):
             with self._stage("reset_roundtrip"):
-                post_reset = self._move_state(self._reset_slots(reset_mask))
+                post_reset_state = self._move_state(self._reset_slots(reset_mask))
+            post_reset = post_reset_state
             if self.event_manager is not None:
                 self.event_manager.reset(reset_mask)
-            self.task.on_reset(reset_mask, post_reset.values)
+            self.task.on_reset(reset_mask, post_reset_state.values)
             for name, value in next_values.items():
-                value[reset_mask] = post_reset.values[name][reset_mask]
-            next_state_valid[reset_mask] = post_reset.state_valid[reset_mask]
+                value[reset_mask] = post_reset_state.values[name][reset_mask]
+            next_state_valid[reset_mask] = post_reset_state.state_valid[reset_mask]
             next_fault_code = _merge_metadata_rows(
-                next_fault_code, post_reset.slot_fault_code, reset_mask
+                next_fault_code, post_reset_state.slot_fault_code, reset_mask
             )
             next_episode_index = _merge_metadata_rows(
-                next_episode_index, post_reset.episode_index, reset_mask
+                next_episode_index, post_reset_state.episode_index, reset_mask
             )
             self.episode_length_buf[reset_mask] = 0
             self.episode_solver_steps[reset_mask] = 0
@@ -534,6 +562,51 @@ class UERLDirectEnv:
         }
         if self._terrain_enabled:
             info["terrain_level"] = self._terrain_levels.clone()
+        if self._step_trace_callback is not None and trace_input is not None:
+            self._step_trace_callback(
+                {
+                    "kind": "step",
+                    "episode_index": int(previous_state.episode_index[0].item()),
+                    "episode_step": input_episode_step,
+                    "phase": "post_reset_input" if input_episode_step == 0 else "post_window_input",
+                    "clocks": {
+                        "physics_dt_s": self._physics_dt,
+                        "input_observation_dt_s": input_observation_dt_s,
+                        "step_decimation": step_decimation,
+                        "transition_dt_s": transition_dt,
+                        "input_episode_elapsed_s": input_episode_elapsed_s,
+                        "transition_episode_elapsed_s": float(episode_elapsed_s[0].item()),
+                    },
+                    "input": trace_input,
+                    "action": {
+                        "policy_action": _trace_tensor_row(policy_actions, 0),
+                        "physical_commands": _trace_tensor_mapping(physical_command.values, 0),
+                    },
+                    "transition": {
+                        "raw_state": _trace_tensor_mapping(transition.values, 0),
+                        "state_valid": bool(transition.state_valid[0].item()),
+                        "fault_code": int(transition.slot_fault_code[0].item()),
+                        "episode_index": int(transition.episode_index[0].item()),
+                        "observation_groups": _trace_tensor_mapping(terminal_observation, 0),
+                        "reward": float(rewards[0].item()),
+                        "terminated": bool(terminated[0].item()),
+                        "truncated": bool(truncated[0].item()),
+                        "termination_reason": _trace_row_value(reason, 0),
+                        "terminal_episode_step": int(terminal_episode_length[0].item()),
+                    },
+                    "reset": (
+                        None
+                        if post_reset is None
+                        else {
+                            "raw_state": _trace_tensor_mapping(next_values, 0),
+                            "state_valid": bool(next_state_valid[0].item()),
+                            "fault_code": int(next_fault_code[0].item()),
+                            "episode_index": int(next_episode_index[0].item()),
+                            "observation_groups": _trace_tensor_mapping(observations, 0),
+                        }
+                    ),
+                }
+            )
         return observations, rewards, terminated, truncated, info
 
     def close(self, reason: str = "direct_env_close") -> None:
@@ -771,6 +844,35 @@ def _clone_observations(values: Mapping[str, torch.Tensor]) -> dict[str, torch.T
     """Copy Task observation groups so terminal data cannot alias live state."""
 
     return {name: value.clone() for name, value in values.items()}
+
+
+def _trace_tensor_row(value: torch.Tensor, slot_index: int) -> list[bool | float | int]:
+    """Copy one batch row into YAML-safe scalars only when tracing is enabled."""
+
+    return cast(list[bool | float | int], value[slot_index].detach().cpu().reshape(-1).tolist())
+
+
+def _trace_tensor_mapping(
+    values: Mapping[str, torch.Tensor],
+    slot_index: int,
+) -> dict[str, list[bool | float | int]]:
+    """Copy named tensor fields for one traced Slot."""
+
+    return {name: _trace_tensor_row(value, slot_index) for name, value in values.items()}
+
+
+def _trace_row_value(value: object, slot_index: int) -> object:
+    """Select one Slot from termination details and convert tensors to YAML values."""
+
+    if isinstance(value, torch.Tensor):
+        if value.ndim == 0:
+            return value.item()
+        return value[slot_index].detach().cpu().reshape(-1).tolist()
+    if isinstance(value, Mapping):
+        return {str(name): _trace_row_value(item, slot_index) for name, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_trace_row_value(item, slot_index) for item in value]
+    return value
 
 
 def _expand_mapping(

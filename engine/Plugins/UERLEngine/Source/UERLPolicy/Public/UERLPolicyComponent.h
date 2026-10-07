@@ -56,6 +56,10 @@ struct UERLPOLICY_API FUERLPolicyControlFrameSnapshot
 {
 	GENERATED_BODY()
 
+	/** True when this is the first decision after StartPolicy or an explicit reset. */
+	UPROPERTY(BlueprintReadOnly, Category = "Policy")
+	bool bBootstrap = false;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Policy")
 	int64 Sequence = 0;
 
@@ -190,6 +194,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "UERL|Policy")
 	bool IsRunning() const { return bRunning; }
+
+	/** True until the first policy step after StartPolicy, SoftReset, or pose reset. */
+	UFUNCTION(BlueprintPure, Category = "UERL|Policy")
+	bool IsBootstrapPending() const { return bBootstrapPending; }
+
+	/** Last completed decision sequence; remains monotonic across policy restarts. */
+	UFUNCTION(BlueprintPure, Category = "UERL|Policy")
+	int64 GetControlFrameSequence() const { return ControlFrameSequence; }
 
 	UFUNCTION(BlueprintPure, Category = "UERL|Policy")
 	FString GetLastError() const { return LastError; }
