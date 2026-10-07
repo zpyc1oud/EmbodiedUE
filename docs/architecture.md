@@ -121,7 +121,11 @@ Numerical experiments use validated dotted-path overrides.
 Runtime projections are generated, not maintained as a second configuration source.
 Initialization reflects topology and field descriptors to establish observation shapes and stable indices.
 It then commits the immutable Session contract.
-The Run keeps resolved configuration, Git identity, build identity, and layout identity.
+The Run keeps resolved configuration, framework provenance, build identity, and layout identity.
+Source checkouts record Git commit, ref and dirty status. Installed wheels record
+`commit: unavailable`, `ref: package:ue-rl-engine==<version>` and `dirty: false`;
+Git state is unavailable for a wheel, so that value does not claim a clean checkout.
+The same identity is retained in policy artifacts and video audit metadata.
 
 ### Robot integration
 

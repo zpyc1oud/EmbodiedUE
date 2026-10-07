@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import argparse
 import runpy
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import NoReturn, cast
 
 import pytest
 
@@ -97,3 +100,95 @@ def test_worker_logs_are_unique_in_selected_output_directory(tmp_path: Path, mon
     assert first != second
     assert first.parent == second.parent == tmp_path
     assert first.read_text() == "previous evidence"
+
+
+class _LaunchBoundaryReached(Exception):
+    pass
+
+
+@pytest.mark.parametrize(
+    ("module", "case"),
+    [
+        ("test_phantomx_worker", "test_phantomx_contact_force_fields_round_trip_as_nonnegative_finite_values"),
+        ("test_phantomx_worker", "test_phantomx_default_pose_settles_without_spurious_reset"),
+        ("test_event_manager", "test_startup_terrain_level_event_reaches_session"),
+        ("test_terrain_curriculum", "test_real_ue_negotiates_all_terrain_tiers_and_resets_each_slot"),
+    ],
+)
+def test_e2e_session_launch_uses_selected_host(
+    module: str, case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.e2e.support import worker_runner
+    from uerl import ResolvedRunConfig, UERLSession
+
+    executable = tmp_path / "selected-engine.exe"
+    project = tmp_path / "selected-host.uproject"
+    executable.touch()
+    project.touch()
+    monkeypatch.setattr(worker_runner, "UE_CMD", str(executable))
+    monkeypatch.setattr(worker_runner, "UPROJECT", str(project))
+    settings = runpy.run_path(str(Path(worker_runner.__file__).parents[1] / (module + ".py")))
+
+    def capture(config: ResolvedRunConfig, **kwargs: object) -> NoReturn:
+        assert config.session.worker_executable == executable
+        assert Path(config.session.worker_args[0]) == project
+        raise _LaunchBoundaryReached
+
+    monkeypatch.setattr(UERLSession, "open", capture)
+    callback = cast(Callable[..., None], settings[case])
+    with pytest.raises(_LaunchBoundaryReached):
+        if case == "test_phantomx_default_pose_settles_without_spurious_reset":
+            callback(tmp_path, terrain_level=0)
+        else:
+            callback(tmp_path)
+
+
+def test_e2e_training_child_uses_selected_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.e2e.support import worker_runner
+
+    executable = tmp_path / "selected-engine.exe"
+    project = tmp_path / "selected-host.uproject"
+    monkeypatch.setattr(worker_runner, "UE_CMD", str(executable))
+    monkeypatch.setattr(worker_runner, "UPROJECT", str(project))
+    settings = runpy.run_path(str(Path(worker_runner.__file__).parents[1] / "test_phantomx_worker.py"))
+
+    def capture(command: list[str], **kwargs: object) -> NoReturn:
+        assert command[command.index("--ue-executable") + 1] == str(executable)
+        assert command[command.index("--project") + 1] == str(project)
+        raise _LaunchBoundaryReached
+
+    monkeypatch.setattr(subprocess, "run", capture)
+    with pytest.raises(_LaunchBoundaryReached):
+        cast(Callable[..., None], settings["test_generic_phantomx_training_retains_position_targets"])(tmp_path)
+
+
+@pytest.mark.parametrize("stage", ["variant_train", "walk_train", "walk_export"])
+def test_e2e_variant_children_use_selected_host(
+    stage: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.e2e.support import worker_runner
+
+    executable = tmp_path / "selected-engine.exe"
+    project = tmp_path / "selected-host.uproject"
+    monkeypatch.setattr(worker_runner, "UE_CMD", str(executable))
+    monkeypatch.setattr(worker_runner, "UPROJECT", str(project))
+    settings = runpy.run_path(str(Path(worker_runner.__file__).parents[1] / "test_phantomx_variants_composed.py"))
+
+    def capture(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if stage == "walk_export" and command[2] == "uerl.cli.train":
+            # Materialize only the external training boundary's expected file.
+            checkpoint = tmp_path / "walk-export-train/model_final.pt"
+            checkpoint.parent.mkdir()
+            checkpoint.touch()
+            return subprocess.CompletedProcess(command, 0, "", "")
+        assert command[command.index("--ue-executable") + 1] == str(executable)
+        assert command[command.index("--project") + 1] == str(project)
+        raise _LaunchBoundaryReached
+
+    monkeypatch.setattr(subprocess, "run", capture)
+    with pytest.raises(_LaunchBoundaryReached):
+        if stage == "variant_train":
+            callback = cast(Callable[..., None], settings["test_phantomx_composed_variant_trains_one_iteration"])
+            callback(settings["PHANTOMX_TASK_ID"], tmp_path)
+        else:
+            cast(Callable[..., None], settings["test_phantomx_walk_export_produces_valid_uerlpol2"])(tmp_path)

@@ -451,6 +451,9 @@ def run_evaluation(
         registry = create_default_registry()
         task = registry.create_task(config.task_id, config.task)
         task.capabilities.require("evaluate", allow_unknown=True)
+        if trace_recorder is not None:
+            # Paired traces fingerprint the exported policy and its deployment plan.
+            task.capabilities.require("export", allow_unknown=True)
         task.align_batch(config.worker.slot_count)
         player_controller = None
         if play_controller != "task":
