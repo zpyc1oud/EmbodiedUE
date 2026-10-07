@@ -8,7 +8,8 @@ Make failures in supported behavior visible at the smallest useful test layer.
 Keep effective tests. Change a test only when its review identifies a missing contract, a weak oracle, or avoidable cost.
 This document specifies the implementation. It does not report completion of the test-quality audit.
 
-Source baseline: `352ec4a827e1801e26a2bf891a9b174b9cb58200`, inspected on 2026-10-07.
+Original inspection: `352ec4a827e1801e26a2bf891a9b174b9cb58200` on 2026-10-07.
+Implementation baseline: `b67cd6e2f60e57afd28ac8c6690b0fb0ab7b83c4`, refreshed on 2026-10-08.
 Follow the [contribution workflow](../contribution-workflow.md),
 [batch validation](../how-to/batch-validation.md), and [test-authoring guide](../how-to/write-tests.md).
 The [earlier audit](../testing-audit-2026-10.md) supplies history. Refresh findings against this baseline before editing tests.
@@ -24,10 +25,13 @@ The [earlier audit](../testing-audit-2026-10.md) supplies history. Refresh findi
 | PR #28 | Short-lived integration batches | Share applicable UE validation on a frozen candidate |
 | [PR #33](https://github.com/zpyc1oud/EmbodiedUE/pull/33) | Selected host propagation into E2E Sessions and CLI children | Reuse this focused repair. Do not duplicate it in the design PR |
 
-PR #33 is Draft at `1bd225d9e162087f301cf1b48d6194ce00338e8e`.
-Its recorded focused checks pass. Its final full Python and real E2E checks remain pending.
-An earlier full Python run failed in an installed-wheel child with Windows commit-memory exhaustion.
-This is an execution failure, not proof that the host-propagation assertions failed.
+PR #33 is merged as `7eb9b27c0413e230dc62bffca1a8b991f4592df6`.
+Its exact head passed 1,001 default Python cases with two platform skips and all 25 real E2E cases.
+[PR #35](https://github.com/zpyc1oud/EmbodiedUE/pull/35) is merged as `b67cd6e2f60e57afd28ac8c6690b0fb0ab7b83c4`.
+It repairs installed-package provenance and rejects unsupported paired tracing before Worker launch.
+Its product source passed 1,005 default Python cases with two platform skips; final affected checks passed.
+Detached installed-Task training and finite play passed, with unsupported export and tracing rejected before launch.
+These are recorded results of those candidates, not new executions by this documentation PR.
 No existing PR inspected for this proposal covers all workstreams in #29.
 
 ## 2. Reference design decisions
@@ -74,7 +78,8 @@ Function counts, collected parameter cases, and executed cases are different mea
 3. Strengthen the export-binding claim in `test_ac_py_unit_obsmgr_003_plan_object_identity`.
    It inserts `manager.plan` into a local dictionary and checks the same reference.
    That check cannot detect the exporter choosing another plan.
-   Move the export claim to the real artifact/export boundary; retain an identity check only if it protects a documented identity contract.
+   The public-export identity test in `test_policy_export.py` already checks the real returned artifact.
+   Remove the redundant local-dictionary claim and strengthen the saved-artifact boundary with independent field order and values.
 4. Keep the hand-worked return and timeout-bootstrap values in `test_time_aware_ppo.py`.
    Review additional mixed termination and duration sequences before deciding that more cases are needed.
 5. Keep Session tests that use `_FakeBridge` through `bridge_factory` while executing the real Session.
@@ -263,7 +268,7 @@ Use focused PRs under #29, without child issues.
 |---|---|---|
 | A: inventory | Full tracked-file review record and confirmed findings | Every path accounted for; proposed edits identify a reachable failure |
 | B: CPU assertions | Unit/integration/export-binding improvements and regression demonstrations | Focused tests, default Python suite, Ruff and Mypy on the final candidate |
-| C: boundary tests | Protocol/parity/tooling gaps; integrate #33 after its evidence is complete | Independent fixtures, package evidence, and selected-host regression; native parity pending explicitly |
+| C: boundary tests | Protocol/parity/tooling gaps; reuse integrated #33 and #35 evidence | Independent fixtures, package evidence, and selected-host regression; native parity pending explicitly |
 | D: native behavior | Small UE fixtures and native parity gaps | Editor build and affected Automation names, physical assertions, reset and isolation evidence |
 | E: real workflows | Registered smoke matrix and affected acceptance flows | Final-candidate real E2E and owned-process shutdown; content-specific gates recorded separately |
 | F: documentation | Tested examples in `docs/how-to/write-tests.md` and `tests/README.md` | Links, examples, and evidence limits checked; final inventory reconciled |
@@ -309,5 +314,5 @@ Delete finished branches only after merge when no development still needs them.
 This proposal is based on the Issue, repository tree, contribution guides, and representative source inspection.
 It is not the completed file-by-file disposition required by workstream 0.
 This documentation change does not run Python behavior tests, build UE, execute E2E, or establish learning quality.
-PR #33 has its own outstanding Windows gates.
+The broader file-by-file audit and applicable native/real-workflow improvements remain pending under #29.
 Future vision inputs and independent first-use feature acceptance remain under their respective designs and Issues.
