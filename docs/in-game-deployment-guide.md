@@ -202,17 +202,14 @@ This is host gameplay, not a required plugin interface.
 
 ## Commands, diagnostics, and reset
 
-The operation `SetCommand` copies and latches each channel.
-Use `GetRequiredCommandChannels` for names and widths.
-The setting `CommandStalenessSeconds` controls stale-command diagnostics.
-Zero disables that diagnostic.
-Staleness does not cause a control tick or automatically change the action.
+`SetCommand` copies and latches each channel. Query names and widths with `GetRequiredCommandChannels`. The component checks width and finite values; it does not know task-specific units or ranges. For the documented PhantomX task, `velocity` is body-frame forward/lateral speed in m/s followed by yaw rate in rad/s. Use the saved Task's command distribution when deploying its policy; the default sampler uses 0.4–0.5 m/s linear speed, clamps yaw rate to ±1 rad/s, and includes zero-speed standing episodes. `CommandStalenessSeconds` controls stale-command diagnostics; zero disables that diagnostic. Staleness is not a control tick and does not automatically change the action.
 
 Connect these events to logs, HUD, or gameplay state:
 
 | Event | Meaning |
 |---|---|
 | `OnControlStepOverrun(GameSeconds, PhysicsSeconds, ObservationSeconds)` | Reports three distinct clocks; inspect each separately |
+| `OnControlStepCompleted(Frame)` | Optional post-physics snapshot aligns commands, raw state, network input, previous action, policy output, actuator targets, and solver/game clocks |
 | `OnCommandStale(Channel, StaleSeconds)` | A channel has not been refreshed |
 | `OnPolicyFault(Reason)` | Policy stops while the robot remains; handle the cause before resetting |
 | `OnPhysicsBaselineMismatch(Report)` | Startup physics validation failed |
@@ -220,17 +217,16 @@ Connect these events to logs, HUD, or gameplay state:
 Examine reset return values and `GetLastError`:
 
 ```text
-StopPolicy()                  // Stops inference; Chaos keeps simulating.
+StopPolicy()                  // Releases this controller's Robot resources; does not pause the World.
 SoftReset() -> bResetOK       // Clears history, contact/terrain caches, and solver accumulation.
 ResetToReferencePose() -> bPoseOK
                               // Restores the live robot pose without destroying its Actor.
 StartPolicy()                 // Explicitly restart after reset.
 ```
 
-After `StopPolicy`, the previous control step does not continue.
-Floating-base pose reset uses current ground and the Owner mounting transform.
-A fixed base keeps its mounting transform.
-Do not hide a reset failure by spawning another Actor.
+No old control step continues after `StopPolicy`. The runtime destroys a Robot Actor it spawned; for a claimed mesh it restores the attachment and physics settings captured at claim time. `OnPolicyFault` disables inference/ticks but leaves the host to choose a fallback. A claimed mesh may keep simulating its prior drive; restoring an originally non-simulating mesh stops that mesh. `StopPolicy` does not globally pause Chaos or provide a universal emergency stop. Resolve the fault, set every required command channel again, and call `StartPolicy` explicitly to restart. Floating-base pose reset uses current ground and the Owner mounting transform; a fixed base retains its mounting transform. Start-clearance and pose-reset traces ignore the policy component's Owner actor; other blocking `WorldStatic` surfaces below the probe origin remain eligible ground.
+
+For the phase-separated numerical, fixed-action, target-scene, and fault-recovery procedure, see [static-ground deployment validation](how-to/policy-deployment-validation.md).
 
 ## Multiple instances and timing
 
@@ -269,7 +265,6 @@ Automation also loads the project.
 ## Limitations
 
 These runtime and packaging instructions target the repository's UE 5.8 Windows setup.
-This documentation-only update adds no new execution evidence.
 Window-end contact samples cannot recover force peaks that ended earlier.
 The demo uses static ground and cached terrain queries.
 Moving ground, dynamic obstacles, and new command channels require Task/artifact design and validation.

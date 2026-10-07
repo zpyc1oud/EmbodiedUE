@@ -6,6 +6,7 @@ Complete [Getting started](../../README.md#getting-started) before you use a run
 |---|---|
 | [Reusable host profile](ue-host-profile.md) | Save host paths and do static CartPole checks |
 | [PhantomX training and evaluation](phantomx-robust-training.md) | Configure terrain, physical-time objectives, checkpoints, and evaluation |
+| [Static-ground policy deployment validation](policy-deployment-validation.md) | Separate numerical parity, fixed-action response, target-scene behavior, and fault recovery |
 | [Record video](record-video.md) | Record UE viewport inference and use keyboard commands |
 | [Optional Egypt demo](optional-egypt-demo.md) | Install authorized Fab content and restore the gameplay/Pursuit integration |
 | [External Tasks](external-tasks.md) | Install and enable a Task package with its resources |

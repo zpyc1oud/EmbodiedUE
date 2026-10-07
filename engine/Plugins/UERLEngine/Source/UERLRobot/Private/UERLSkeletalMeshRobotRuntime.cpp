@@ -71,6 +71,7 @@ public:
 	TUniquePtr<IUERLRobot> Robot;
 	TWeakObjectPtr<UWorld> World;
 	TWeakObjectPtr<USkeletalMeshComponent> ClaimedMesh;
+	TWeakObjectPtr<AActor> GroundQueryIgnoreActor;
 	FUERLResetBatch ReferenceReset;
 	bool bClaimAuthoredActor = false;
 	bool bFixedBase = false;
@@ -250,6 +251,7 @@ bool FUERLSkeletalMeshRobotRuntime::Initialize(
 	}
 	Impl->World = &World;
 	Impl->ClaimedMesh = Config.ClaimedMesh;
+	Impl->GroundQueryIgnoreActor = Config.GroundQueryIgnoreActor;
 	Impl->bClaimAuthoredActor = Config.bClaimAuthoredActor;
 	Impl->bFixedBase = Topology.bFixedBase;
 	Impl->ReferenceReset = ResetBatch;
@@ -398,9 +400,14 @@ bool FUERLSkeletalMeshRobotRuntime::ResetToReferencePose(FString& OutError)
 		const FVector TraceEnd = CurrentTransform.GetLocation() - FVector::UpVector * 10000.0;
 		FCollisionQueryParams QueryParams(FCollisionQueryParams::DefaultQueryParam);
 		QueryParams.bTraceComplex = false;
-		if (Impl->ClaimedMesh.IsValid())
+		AActor* GroundQueryIgnoreActor = Impl->GroundQueryIgnoreActor.Get();
+		if (!GroundQueryIgnoreActor && Impl->ClaimedMesh.IsValid())
 		{
-			QueryParams.AddIgnoredActor(Impl->ClaimedMesh->GetOwner());
+			GroundQueryIgnoreActor = Impl->ClaimedMesh->GetOwner();
+		}
+		if (GroundQueryIgnoreActor)
+		{
+			QueryParams.AddIgnoredActor(GroundQueryIgnoreActor);
 		}
 		FHitResult GroundHit;
 		if (!Impl->World->LineTraceSingleByObjectType(
