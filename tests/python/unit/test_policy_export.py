@@ -360,6 +360,7 @@ def test_ac_py_unit_export_002_takes_direct_task_objects_not_rebuild(tmp_path: P
         }
     )
     processed = PlanExecutor(restored.observation_plan).execute(inputs)["policy"]
+    # Absolute tolerance covers float32 scaling and representation of the -0.4 literal.
     torch.testing.assert_close(
         processed, torch.tensor([[4.0, 3.0, 2.0, 1.0], [-8.0, 7.0, -6.0, -0.4]]), rtol=0, atol=1e-7
     )
