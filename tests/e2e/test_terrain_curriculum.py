@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from tests.e2e.support.worker_runner import UE_CMD
+from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
 from uerl import (
     ObservationShapeTable,
     ResolvedRunConfig,
@@ -28,8 +28,6 @@ from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.phantomx import PHANTOMX_TERRAIN_TASK_ID
 from uerl.training import build_launch_overrides, build_run_config
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-UPROJECT = REPO_ROOT / "engine" / "UERLHost.uproject"
 TRAIN_MAP = "/Engine/Maps/Entry"
 
 
@@ -50,7 +48,7 @@ def _resolved_config(
 
     overrides = build_launch_overrides(
         ue_executable=Path(UE_CMD),
-        project=UPROJECT,
+        project=Path(UPROJECT),
         map_name=TRAIN_MAP,
         port=port,
     )

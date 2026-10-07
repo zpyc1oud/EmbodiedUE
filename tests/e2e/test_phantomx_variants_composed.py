@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
 from uerl.policy.artifact import PolicyArtifact
 from uerl.tasks.phantomx.config import (
     PHANTOMX_DISCRETE_TERRAIN_TASK_ID,
@@ -63,6 +64,10 @@ def test_phantomx_composed_variant_trains_one_iteration(task_id: str, tmp_path: 
             sys.executable,
             "-m",
             "uerl.cli.train",
+            "--ue-executable",
+            UE_CMD,
+            "--project",
+            UPROJECT,
             "--task",
             task_id,
             "--worker.slot_count",
@@ -96,6 +101,10 @@ def test_phantomx_walk_export_produces_valid_uerlpol2(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "uerl.cli.train",
+            "--ue-executable",
+            UE_CMD,
+            "--project",
+            UPROJECT,
             "--task",
             PHANTOMX_TASK_ID,
             "--worker.slot_count",
@@ -128,6 +137,10 @@ def test_phantomx_walk_export_produces_valid_uerlpol2(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "uerl.cli.export",
+            "--ue-executable",
+            UE_CMD,
+            "--project",
+            UPROJECT,
             "--task",
             PHANTOMX_TASK_ID,
             "--checkpoint",

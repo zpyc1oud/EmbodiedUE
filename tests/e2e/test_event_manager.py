@@ -7,7 +7,7 @@ from typing import cast
 
 import torch
 
-from tests.e2e.support.worker_runner import UE_CMD
+from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
 from uerl import PresentationMode, UERLDirectEnv, UERLSession, UERLSessionAdapter
 from uerl.core.config.robot import RobotSpec, RobotTopology
 from uerl.core.mdp.lib.events import randomize_initial_terrain_levels
@@ -19,7 +19,6 @@ from uerl.tasks.registry import create_default_registry
 from uerl.training import build_launch_overrides, build_run_config
 from uerl.training.runner import ENVIRONMENT_DEVICE
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 SLOT_COUNT = 64
 
 
@@ -49,7 +48,7 @@ def test_startup_terrain_level_event_reaches_session(tmp_path: Path) -> None:
         overrides={
             **build_launch_overrides(
                 ue_executable=Path(UE_CMD),
-                project=REPO_ROOT / "engine" / "UERLHost.uproject",
+                project=Path(UPROJECT),
                 map_name="/Engine/Maps/Entry",
                 presentation=PresentationMode.NONE,
             ),
