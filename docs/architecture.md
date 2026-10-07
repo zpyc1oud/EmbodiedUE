@@ -160,6 +160,8 @@ o_k -> a_k -> physics(step_decimation_k) -> o_(k+1)
 
 The returned observation interval belongs to the completed control frame.
 The first observation after Initialize or Reset uses `DtMin`.
+Deployment runs that reset-state decision once in PrePhysics, then reads each completed window in PostPhysics.
+The bootstrap has zero elapsed physics and no completed solver-step impulse denominator.
 PhantomX uses 5 ms physics steps and `[1,7]`, for 5–35 ms control intervals.
 CartPole uses `1/120 s` and `[2,2]`, for a `1/60 s` control interval.
 This is variable **decimation**.

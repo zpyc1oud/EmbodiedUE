@@ -40,6 +40,8 @@ struct FUERLSkeletalMeshRobotRuntimeConfig
 	FVector GroundOrigin = FVector::ZeroVector;
 	FVector GroundNormal = FVector::UpVector;
 	TArray<TWeakObjectPtr<AActor>> TerrainQueryActors;
+	/** Host actor excluded from deployment pose-reset probes. */
+	TWeakObjectPtr<AActor> GroundQueryIgnoreActor;
 	double InitialRootHeightMeters = 0.0;
 	bool bClaimAuthoredActor = true;
 };

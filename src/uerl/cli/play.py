@@ -94,12 +94,21 @@ def _parser() -> argparse.ArgumentParser:
         help="Encode frames captured from the UE renderer into this MP4 path.",
     )
     parser.add_argument(
+        "--trace",
+        type=Path,
+        help="Write per-policy-step Task input/transition evidence as YAML at this path.",
+    )
+    parser.add_argument(
         "--controller",
         default="task",
         help=(
-            "Play command publisher. 'task' keeps the task command; "
-            "'player' uses W to walk, S to stop, and A/D or Q/E to steer while walking."
+            "Play command publisher. 'task' keeps task sampling; 'player' reads keys; "
+            "'fixed' publishes the explicit --fixed-velocity on every step and reset."
         ),
+    )
+    parser.add_argument(
+        "--fixed-velocity",
+        help="Three comma-separated values for the fixed velocity controller, for example 0.45,0,0.",
     )
     parser.add_argument("--record-seconds", type=float, default=20.0, help="Maximum recorded duration.")
     parser.add_argument("--record-fps", type=int, default=30, help="Encoded video frame rate.")
@@ -142,6 +151,19 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.controller not in known_play_controllers():
         parser.error(f"unknown play controller {args.controller!r}")
+    fixed_velocity = None
+    if args.controller == "fixed":
+        if args.fixed_velocity is None:
+            parser.error("--controller fixed requires --fixed-velocity FORWARD,LATERAL,YAW_RATE")
+        try:
+            fixed_values = tuple(float(value.strip()) for value in args.fixed_velocity.split(","))
+        except ValueError:
+            parser.error("--fixed-velocity must contain three comma-separated numbers")
+        if len(fixed_values) != 3:
+            parser.error("--fixed-velocity must contain exactly three comma-separated numbers")
+        fixed_velocity = (fixed_values[0], fixed_values[1], fixed_values[2])
+    elif args.fixed_velocity is not None:
+        parser.error("--fixed-velocity requires --controller fixed")
     if args.map_name:
         direct_overrides["session.map_path"] = args.map_name
     validate_saved_run_overrides(parser, direct_overrides, operation="play")
@@ -212,6 +234,8 @@ def main(argv: list[str] | None = None) -> int:
             # Playback is one Slot; checkpoint curriculum state is per-Slot training state.
             restore_curriculum=False,
             play_controller=args.controller,
+            fixed_velocity=fixed_velocity,
+            trace_path=args.trace,
         )
     except BaseException:
         if recorder is not None:

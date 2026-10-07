@@ -1,2 +1,5 @@
 *.uasset filter=lfs diff=lfs merge=lfs -text
 *.umap filter=lfs diff=lfs merge=lfs -text
+
+# Keep the checked-in generated package byte-identical on Windows.
+examples/external-direct-cartpole/** text eol=lf

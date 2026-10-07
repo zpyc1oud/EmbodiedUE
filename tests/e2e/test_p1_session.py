@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import socket
 from pathlib import Path
 from typing import Any
@@ -20,6 +19,7 @@ from uerl import (
 )
 from uerl.core.codec import Layout, sha256_json
 from uerl.core.config.canonical import canonical_json, sha256_hex
+from uerl.core.config.yaml_loader import load_unique_yaml
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.cartpole import CARTPOLE_TASK_ID
 from uerl.training import build_launch_overrides, build_run_config
@@ -103,7 +103,8 @@ def _drive_formal_session(config: ResolvedRunConfig) -> tuple[dict[str, Any], di
         }
         manifest_path = config.logging.run_directory / "manifest.yaml"
         assert manifest_path.exists()
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = load_unique_yaml(manifest_path.read_text(encoding="utf-8"))
+        assert isinstance(manifest, dict)
         assert manifest["resolved_config"]["normalized_hash"] == config.normalized_hash
         assert manifest["run_seed"] == config.worker.run_seed
         assert manifest["effective_worker_config"] == result.response["effective_worker_config"]

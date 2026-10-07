@@ -220,6 +220,8 @@ bool FUERLPolicyController::InitializeFromBytes(
 	Action.Reset();
 	Targets.Reset();
 	PreviousAction.Reset();
+	LastPreviousActionInput.Reset();
+	LastStepCommands.Reset();
 	LastTiming = FUERLControlTiming();
 	OutError.Reset();
 
@@ -255,6 +257,7 @@ bool FUERLPolicyController::InitializeFromBytes(
 	RuntimeConfig.GroundOrigin = Config.GroundOrigin;
 	RuntimeConfig.GroundNormal = Config.GroundNormal;
 	RuntimeConfig.TerrainQueryActors = Config.TerrainQueryActors;
+	RuntimeConfig.GroundQueryIgnoreActor = Config.GroundQueryIgnoreActor;
 	RuntimeConfig.InitialRootHeightMeters = Config.InitialRootHeightMeters;
 	RuntimeConfig.bClaimAuthoredActor = Config.bClaimAuthoredActor;
 
@@ -370,24 +373,29 @@ bool FUERLPolicyController::InitializeFromBytes(
 bool FUERLPolicyController::Step(
 	const FUERLPolicyCommands& Commands,
 	const FUERLControlTiming& Timing,
-	FString& OutError)
+	FString& OutError,
+	bool bCaptureDiagnostics,
+	bool bBootstrap)
 {
 	OutError.Reset();
 	if (!bInitialized)
 	{
 		return ControllerFail(OutError, TEXT("policy controller is not initialized"));
 	}
-	if (!Timing.IsValid())
+	if (!Timing.IsValid(bBootstrap))
 	{
 		return ControllerFail(
 			OutError,
-			TEXT("policy control timing must contain positive finite observation and solver-step dt"));
+			TEXT("policy control timing requires positive observation dt and completed solver dt (zero at bootstrap)"));
 	}
 
-	// Step is called from the host's post-physics boundary.  Use the dt of the
+	// Completed windows use the dt of the
 	// solver result just completed; game/control elapsed time is not an impulse
 	// denominator.
-	Robot.SamplePhysicsContacts(Timing.LastSolverStepSeconds);
+	if (!bBootstrap)
+	{
+		Robot.SamplePhysicsContacts(Timing.LastSolverStepSeconds);
+	}
 	if (!Robot.CollectState(RawState, OutError))
 	{
 		return false;
@@ -414,6 +422,7 @@ bool FUERLPolicyController::Step(
 	ObsInputs.RawState = RawState;
 	ObsInputs.PreviousAction = PreviousAction;
 	ObsInputs.ControlFrameDtSeconds = static_cast<float>(Timing.ObservationDtSeconds);
+	TMap<FName, TArray<float>> StepCommands;
 	for (const FUERLPolicyCommandChannel& Channel : RequiredCommandChannels)
 	{
 		const TArray<float>* Values = Commands.Find(Channel.Name);
@@ -434,6 +443,10 @@ bool FUERLPolicyController::Step(
 					Channel.Width));
 		}
 		ObsInputs.Commands.Add(Channel.Name, *Values);
+		if (bCaptureDiagnostics)
+		{
+			StepCommands.Add(Channel.Name, *Values);
+		}
 	}
 
 	if (!ObservationRuntime.Execute(ObsInputs, Observation, OutError))
@@ -466,6 +479,16 @@ bool FUERLPolicyController::Step(
 		return false;
 	}
 
+	if (bCaptureDiagnostics)
+	{
+		LastPreviousActionInput = PreviousAction;
+		LastStepCommands = MoveTemp(StepCommands);
+	}
+	else
+	{
+		LastPreviousActionInput.Reset();
+		LastStepCommands.Reset();
+	}
 	PreviousAction = Action;
 	LastTiming = Timing;
 	OutError.Reset();
@@ -534,6 +557,8 @@ void FUERLPolicyController::Shutdown()
 	Action.Reset();
 	Targets.Reset();
 	PreviousAction.Reset();
+	LastPreviousActionInput.Reset();
+	LastStepCommands.Reset();
 	LastTiming = FUERLControlTiming();
 }
 

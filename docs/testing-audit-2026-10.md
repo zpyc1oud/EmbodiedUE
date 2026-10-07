@@ -54,7 +54,8 @@ The test guide separates mock evidence from Chaos and engine evidence.
    The full runner examines successful completion logs and minimum counts per filter.
    Explicit filters are useful, but count thresholds cannot prove complete coverage after a name or filter changes.
    Issue #13 has the closed reason `not_planned` and remains closed.
-   Issue #19 tracks this layered audit and later verification.
+   Issue #19 completed this layered audit and Windows follow-up verification on 2026-10-07.
+   See [Issue #19](https://github.com/zpyc1oud/EmbodiedUE/issues/19) for execution evidence and [Issue #29](https://github.com/zpyc1oud/EmbodiedUE/issues/29) for the remaining test-quality review.
 
 ## Isaac Lab comparison
 

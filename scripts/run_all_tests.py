@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess
+import argparse
 import sys
 from pathlib import Path
 
@@ -43,70 +43,40 @@ UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
 )
 
 
-def _run(command: list[str]) -> int:
-    return subprocess.run(command, cwd=REPO_ROOT, check=False).returncode
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 
-def _run_ue_automation() -> int:
-    """Run every Unit and Integration Automation group before external E2E."""
-    sys.path.insert(0, str(REPO_ROOT))
-    sys.path.insert(0, str(REPO_ROOT / "src"))
-    from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
 
-    missing = [path for path in (Path(UE_CMD), Path(UPROJECT)) if not path.is_file()]
-    if missing:
-        print("UE unit test prerequisites are missing:", file=sys.stderr)
-        for path in missing:
-            print(f"  {path}", file=sys.stderr)
+def main(argv: list[str] | None = None) -> int:
+    from scripts.run_e2e import pytest_command
+    from scripts.test_runner_support import TestRun, add_runner_flags
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    add_runner_flags(parser)
+    args = parser.parse_args(argv)
+    names = ["Python", *(name for name, _, _ in UE_AUTOMATION_GROUPS), "UE E2E"]
+    run = TestRun(args.output_dir, names, args.timeout)
+    status = run.run(0, [sys.executable, "-m", "pytest", "-q"])
+    if status:
+        return status
+    if not run.configure_host(args, 1):
         return 2
-
-    log_path = REPO_ROOT / "engine" / "Saved" / "Logs" / "UERLHost.log"
-    for group_name, filters, minimum_completed in UE_AUTOMATION_GROUPS:
-        print(f"Running UE Automation group: {group_name}", flush=True)
-        status = _run([
-            UE_CMD,
-            UPROJECT,
-            "/Engine/Maps/Entry",
-            f"-ExecCmds=Automation RunTests {filters};Quit",
-            "-unattended",
-            "-nullrhi",
-            "-nosound",
-            "-NoSplash",
-        ])
+    assert run.host is not None
+    for index, (_, filters, minimum) in enumerate(UE_AUTOMATION_GROUPS, start=1):
+        log = run.directory / f"{index + 1:02d}.ue.log"
+        command = [
+            str(run.host.ue_executable), str(run.host.project), "/Engine/Maps/Entry",
+            f"-ExecCmds=Automation RunTests {filters};Quit", f"-abslog={log}",
+            "-unattended", "-nullrhi", "-nosound", "-NoSplash",
+        ]
+        status = run.run(index, command)
         if status:
             return status
-
-        if not log_path.is_file():
-            print(f"UE Automation log is missing: {log_path}", file=sys.stderr)
-            return 2
-        log_text = log_path.read_text(encoding="utf-8", errors="replace")
-        if "**** TEST COMPLETE. EXIT CODE: 0 ****" not in log_text:
-            print(
-                f"UE Automation group '{group_name}' did not report a successful completion.",
-                file=sys.stderr,
-            )
-            return 1
-        completed = log_text.count("Test Completed. Result={")
-        if completed < minimum_completed:
-            print(
-                f"UE Automation group '{group_name}' selected only {completed} tests; "
-                f"expected at least {minimum_completed}.",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"UE Automation group '{group_name}': {completed} tests completed.", flush=True)
-    return 0
-
-
-def main() -> int:
-    """Run fast Python tests, UE unit tests, and all real E2E suites."""
-    fast_status = _run([sys.executable, "-m", "pytest", "-q"])
-    if fast_status:
-        return fast_status
-    ue_status = _run_ue_automation()
-    if ue_status:
-        return ue_status
-    return _run([sys.executable, str(REPO_ROOT / "scripts" / "run_e2e.py"), "--suite", "all"])
+        status = run.check_automation(index, log, minimum)
+        if status:
+            return status
+    return run.run(len(names) - 1, pytest_command("all"))
 
 
 if __name__ == "__main__":

@@ -27,10 +27,13 @@ Otherwise, use a normal reference and record remaining work.
 
 ## 2. Work on a short-lived branch
 
-Use `main` as the integration branch.
-Create a descriptively named branch from the current base, or use a fork when access requires one.
-Target `main` unless a dependent PR names another base.
-A permanent `develop` branch or a release branch requires an actual maintenance decision.
+Use `main` for accepted code.
+Create a descriptively named feature branch from the current base, or use a fork when access requires one.
+Target `main` for an independent change.
+For shared UE validation, use a short-lived `integration/<batch>` branch and a persistent validation worktree.
+Selected feature PRs target that integration branch; its batch PR targets `main`.
+Follow [batch validation](how-to/batch-validation.md) for preparation, evidence, and cleanup.
+A permanent `develop` branch or a release branch requires a separate maintenance decision.
 
 Keep commits understandable and changes reviewable.
 Keep a working path through the Python/UE runtime.
@@ -54,9 +57,12 @@ Include:
 Without Windows/UE, an author can supply documentation, Python changes, mocks, and static checks.
 Supply available results and request the applicable UE gate from the maintainer.
 A mock result does not establish real Chaos behavior.
-Draft feedback can start early, but required runtime evidence must exist before merge.
+Draft feedback can start early.
+Required runtime evidence must exist before merge into `main`.
+A reviewed feature can enter a declared integration batch after its applicable early checks pass.
+Its pending UE acceptance must remain explicit in the batch PR.
 
-Mark a PR ready when its implementation and applicable evidence are ready for inspection.
+Mark a PR ready when its implementation and the evidence required for its target branch are ready for inspection.
 Reviewers examine behavior, contracts, regression tests, documentation, and actual results.
 Separate blocking defects from optional improvements.
 Put unrelated suggestions in separate Issues.
@@ -71,7 +77,7 @@ Select applicable rows below.
 These are risk boundaries, not a requirement to run every layer for each PR.
 Identify the failure that each selected check can detect.
 
-| Change | Evidence expected before merge |
+| Change | Evidence expected before merge into `main` |
 |---|---|
 | Documentation only | Relative links/anchors and described commands, flags, Task IDs, and defaults checked against their authoritative source; no training run solely for prose edits |
 | Python logic, configuration, CLI, packaging | Relevant unit/integration/tooling tests and Ruff/Mypy checks; default Python suite for code changes; installed-package checks when packaging or resource lookup changes |
@@ -98,6 +104,9 @@ Ruff and Mypy use [pyproject.toml](../pyproject.toml) and the repository [hooks]
 The full runner includes Python, native, and E2E work.
 Use the separate E2E entry point for diagnosis or selected reruns.
 An unchanged successful run does not require automatic repetition.
+Run basic feature checks during development.
+Use a frozen integration batch to share expensive UE checks across reviewed features.
+The batch must retain each feature's required behavior and scene evidence.
 
 Use the test guide for narrower selections and UE path configuration.
 The [setup guide](../README.md#getting-started) defines the Editor build and prerequisites: Windows x64, UE 5.8, Python 3.11, Git LFS, and pinned dependencies.
@@ -141,7 +150,8 @@ Numerical parity does not establish complete scene behavior.
 
 [Issue #13](https://github.com/zpyc1oud/EmbodiedUE/issues/13) has the closed reason `not_planned`.
 Its proposed suite-selection and completion work is not the active plan.
-[Issue #19](https://github.com/zpyc1oud/EmbodiedUE/issues/19) tracks the current layered audit and later verification.
+[Issue #19](https://github.com/zpyc1oud/EmbodiedUE/issues/19) completed the layered audit and Windows follow-up verification on 2026-10-07.
+[Issue #29](https://github.com/zpyc1oud/EmbodiedUE/issues/29) tracks the remaining repository-wide test-quality review.
 Examine selected coverage and completion evidence.
 Aggregate success alone does not prove that every required case ran.
 
@@ -176,12 +186,13 @@ Reviewers identify concrete defects and assess whether evidence supports the cla
 The maintainer owns acceptance, arranges missing supported-host checks, and performs or authorizes merge.
 Write access and automation assistance do not replace that decision.
 
-Before merge:
+Before merge into `main`:
 
 1. Examine the final diff and applicable checks.
 2. Resolve blocking findings.
 3. Make sure that the PR targets the intended base.
-4. Select a merge method enabled by the repository.
+4. For a batch, compare the proposed merge result with the validated source tree.
+5. Select a merge method enabled by the repository.
 
 Keep each change easy to trace and revert.
 For dependent PRs, use the documented integration order.
