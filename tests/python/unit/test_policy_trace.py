@@ -595,6 +595,7 @@ def test_python_only_task_trace_rejects_before_worker_launch(
 
     from tests.python.unit.test_task_capabilities import _PythonTask
     from uerl.errors import ConfigError
+    from uerl.runtime.session import UERLSession
     from uerl.tasks.cartpole import CARTPOLE_TASK_ID
     from uerl.training import build_run_config
     from uerl.training import runner as runner_module
@@ -611,6 +612,6 @@ def test_python_only_task_trace_rejects_before_worker_launch(
     def unexpected_session(*args: object, **kwargs: object) -> None:
         pytest.fail("unsupported trace reached Worker Session launch")
 
-    monkeypatch.setattr(runner_module.UERLSession, "open", unexpected_session)
+    monkeypatch.setattr(UERLSession, "open", unexpected_session)
     with pytest.raises(ConfigError, match="Task export capability is unsupported"):
         runner_module.run_evaluation(config, checkpoint=checkpoint, steps=1, trace_path=tmp_path / "trace.yaml")
