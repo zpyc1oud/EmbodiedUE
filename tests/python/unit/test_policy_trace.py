@@ -542,3 +542,47 @@ def test_trace_recorder_does_not_overwrite_existing_evidence(tmp_path: Path) -> 
             clock={"physics_dt_s": 0.005},
             actor_observation_groups=("policy",),
         )
+
+
+@pytest.mark.parametrize("episode_step", [5, 9, 10, 15, 18, 20, 23, 27, 30, 1000])
+def test_clock_pairing_accepts_accumulated_float32_solver_dt(
+    tmp_path: Path, episode_step: int,
+) -> None:
+    # Chaos accumulates its binary32 solver dt in a double clock. At these
+    # boundaries, casting the elapsed total to binary32 differs from Task time.
+    solver_dt = 0.004999999888241291
+    task_path = tmp_path / "task.yaml"
+    ue_path = tmp_path / "ue.yaml"
+    task_row = _task_row(
+        episode_step=episode_step, phase="post_window_input", time_s=episode_step * 0.02,
+    )
+    cast(dict[str, Any], task_row["clocks"]).update({
+        "step_decimation": 4, "input_observation_dt_s": 0.02,
+        "transition_dt_s": 0.02,
+        "transition_episode_elapsed_s": (episode_step + 1) * 0.02,
+    })
+    _write_task_trace(task_path, task_row)
+    ue = _ue_trace(
+        episode_step=episode_step, phase="post_window_input", time_s=episode_step * 4 * solver_dt,
+        observation_dt_s=4 * solver_dt,
+    )
+    frames = cast(list[dict[str, Any]], ue["records"])
+    frames[0]["clocks"]["physics_elapsed_s"] = 4 * solver_dt
+    successor = deepcopy(frames[0])
+    successor["episode_step"] += 1
+    successor["sequence"] += 1
+    successor["clocks"]["episode_elapsed_s"] = (episode_step + 1) * 4 * solver_dt
+    frames.append(successor)
+    ue_path.write_text(yaml.safe_dump(ue), encoding="utf-8")
+
+    report = compare_policy_traces(task_path, ue_path)
+
+    pair = cast(list[dict[str, Any]], report["pairs"])[0]
+    assert pair["comparable"] is True, pair["reasons"]
+    assert pair["successor"]["status"] == "comparable"
+
+    # Losing one real solver step remains a pairing error, including at 20s.
+    frames[0]["clocks"]["episode_elapsed_s"] += solver_dt
+    ue_path.write_text(yaml.safe_dump(ue), encoding="utf-8")
+    mismatched = compare_policy_traces(task_path, ue_path)
+    assert cast(list[dict[str, Any]], mismatched["pairs"])[0]["comparable"] is False

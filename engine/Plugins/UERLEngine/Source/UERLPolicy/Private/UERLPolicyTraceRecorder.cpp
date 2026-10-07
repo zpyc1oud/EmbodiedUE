@@ -476,7 +476,7 @@ void UUERLPolicyTraceRecorder::OnCommandStale(FName Channel, float StaleSeconds)
 	Records.Add(MoveTemp(Record));
 }
 
-void UUERLPolicyTraceRecorder::OnPolicyFault(const FString& Reason)
+void UUERLPolicyTraceRecorder::OnPolicyFault(FString Reason)
 {
 	if (!bRecording)
 	{

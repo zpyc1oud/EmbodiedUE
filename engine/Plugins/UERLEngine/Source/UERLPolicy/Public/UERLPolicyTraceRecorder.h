@@ -53,7 +53,7 @@ private:
 	void OnCommandStale(FName Channel, float StaleSeconds);
 
 	UFUNCTION()
-	void OnPolicyFault(const FString& Reason);
+	void OnPolicyFault(FString Reason);
 
 	FString SerializeTrace() const;
 	FString TracePath;

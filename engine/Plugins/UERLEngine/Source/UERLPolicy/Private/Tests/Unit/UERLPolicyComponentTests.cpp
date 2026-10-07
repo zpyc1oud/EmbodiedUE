@@ -27,15 +27,15 @@
 
 namespace
 {
-	bool ResolveComponentArtifact(TArray<uint8>& OutBytes, FString& OutError)
+	bool ResolveComponentArtifact(TArray<uint8>& OutBytes, FString& OutError, const TCHAR* FileName)
 	{
 		const TArray<FString> Candidates = {
 			FPaths::ConvertRelativePathToFull(FPaths::Combine(
 				FPaths::ProjectDir(), TEXT(".."), TEXT("tests"), TEXT("parity"), TEXT("cases"), TEXT("controller"),
-				TEXT("cartpole_controller.uerlpol2"))),
+				FileName)),
 			FPaths::ConvertRelativePathToFull(FPaths::Combine(
 				FPaths::ProjectDir(), TEXT("tests"), TEXT("parity"), TEXT("cases"), TEXT("controller"),
-				TEXT("cartpole_controller.uerlpol2"))),
+				FileName)),
 		};
 		for (const FString& Candidate : Candidates)
 		{
@@ -48,10 +48,11 @@ namespace
 		return false;
 	}
 
-	UUERLPolicyArtifactAsset* MakeTransientAsset(FString& OutError)
+	UUERLPolicyArtifactAsset* MakeTransientAsset(
+		FString& OutError, const TCHAR* FileName = TEXT("cartpole_controller.uerlpol2"))
 	{
 		TArray<uint8> Bytes;
-		if (!ResolveComponentArtifact(Bytes, OutError))
+		if (!ResolveComponentArtifact(Bytes, OutError, FileName))
 		{
 			return nullptr;
 		}
@@ -1223,6 +1224,9 @@ bool FUERLPolicyComponentClaimedResetTest::RunTest(const FString& Parameters)
 	ClaimRoot->RegisterComponent();
 	AuthoredMesh->SetupAttachment(ClaimRoot);
 	AuthoredMesh->RegisterComponent();
+	ClaimHost->SetActorRotation(FRotator(0.0f, 37.0f, 0.0f));
+	AuthoredMesh->SetRelativeLocation(FVector(20.0, -10.0, 15.0));
+	const FTransform OwnerBeforeStart = ClaimHost->GetActorTransform();
 
 	// Measure the start clearance from the authored mesh location with the same
 	// WorldStatic query the component uses at Start.
@@ -1245,6 +1249,14 @@ bool FUERLPolicyComponentClaimedResetTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+
+	FTransform InitialPose;
+	TestTrue(TEXT("claimed robot transform is available immediately after Start"),
+		Rig.Component->GetRobotTransform(InitialPose));
+	TestTrue(TEXT("Start preserves authored mesh position without adding clearance twice"),
+		InitialPose.GetLocation().Equals(AuthoredMeshLocation, 1.0e-3));
+	TestTrue(TEXT("Start preserves the claimed owner transform"),
+		ClaimHost->GetActorTransform().Equals(OwnerBeforeStart, 1.0e-3));
 
 	TickPolicyWorld(Rig.World(), 0.010f);
 	FTransform StartPose;
@@ -2209,7 +2221,13 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("a finalized trace path is rejected on a later start"), ExistingTrace->StartTrace(FileName, 9));
 	TestTrue(TEXT("the retained file still belongs to the original writer"), Contents.Contains(TEXT("seed: 7")));
 	UUERLPolicyTraceRecorder* AbandonedTrace = NewObject<UUERLPolicyTraceRecorder>(Rig.Host);
+	Rig.Host->AddInstanceComponent(AbandonedTrace);
 	AbandonedTrace->PolicyComponent = Rig.Component;
+	AbandonedTrace->RegisterComponent();
+	if (!AbandonedTrace->HasBegunPlay())
+	{
+		AbandonedTrace->BeginPlay();
+	}
 	const FString AbandonedFile = FString::Printf(
 		TEXT("AC021_incomplete_%s.yaml"), *FGuid::NewGuid().ToString(EGuidFormats::Digits));
 	TestTrue(TEXT("a second trace can be staged for incomplete-stop coverage"),
@@ -2238,7 +2256,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FUERLPolicyTraceRecorderEmptyCommandsTest::RunTest(const FString& Parameters)
 {
 	FString Error;
-	UUERLPolicyArtifactAsset* Asset = MakeTransientAsset(Error);
+	UUERLPolicyArtifactAsset* Asset = MakeTransientAsset(Error, TEXT("cartpole_no_commands.uerlpol2"));
 	if (!Asset)
 	{
 		AddError(Error);

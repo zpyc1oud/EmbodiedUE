@@ -244,7 +244,25 @@ bool FUERLSkeletalMeshRobotRuntime::Initialize(
 	}
 	FUERLResetBatch ResetBatch;
 	ResetBatch.Rows.Add(MoveTemp(ResetRow));
-	if (!Impl->Robot->ResetSlots(ResetBatch, OutError))
+	FUERLResetBatch InitialResetBatch = ResetBatch;
+	if (!Topology.bFixedBase && Config.bClaimAuthoredActor && Config.ClaimedMesh)
+	{
+		// Claimed resets use the preserved Owner frame, not the ground frame.
+		// Keep ReferenceReset ground-relative for later pose resets, but express
+		// this initial world placement locally so clearance is not added twice.
+		const AActor* Owner = Config.ClaimedMesh->GetOwner();
+		const FQuat OwnerFrameRotation =
+			FRotator(0.0f, Owner->GetActorRotation().Yaw, 0.0f).Quaternion();
+		const FVector DesiredWorldLocation = Config.GroundOrigin
+			+ Config.GroundNormal * (Config.InitialRootHeightMeters * 100.0);
+		const FVector LocalPosition = OwnerFrameRotation.Inverse().RotateVector(
+			DesiredWorldLocation - Owner->GetActorLocation());
+		FUERLResetRow& InitialRow = InitialResetBatch.Rows[0];
+		InitialRow.Values[0] = LocalPosition.X / 100.0;
+		InitialRow.Values[1] = LocalPosition.Y / 100.0;
+		InitialRow.Values[2] = LocalPosition.Z / 100.0;
+	}
+	if (!Impl->Robot->ResetSlots(InitialResetBatch, OutError))
 	{
 		Reset();
 		return false;

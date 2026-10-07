@@ -788,9 +788,25 @@ def _same_number(left: object, right: object) -> bool:
 
 
 def _same_clock(left: object, right: object) -> bool:
-    """Accept exact timestamps or values with the same float32 solver representation."""
+    """Accept solver precision, including a double sum of binary32 step durations."""
 
-    return _same_number(left, right) or _same_float32(left, right)
+    if _same_number(left, right) or _same_float32(left, right):
+        return True
+    if not isinstance(left, (int, float, str)) or not isinstance(right, (int, float, str)):
+        return False
+    try:
+        left_number, right_number = float(left), float(right)
+    except (TypeError, ValueError):
+        return False
+    # Chaos quantizes each solver dt to binary32 before accumulating its double
+    # clock. The relative rounding bound is 2**-24; casting only the accumulated
+    # total can land on the other side of a binary32 rounding boundary. Retain
+    # raw timestamps and the stricter float32 comparison for command values.
+    return (
+        math.isfinite(left_number)
+        and math.isfinite(right_number)
+        and math.isclose(left_number, right_number, rel_tol=2**-24, abs_tol=0.0)
+    )
 
 
 def _same_float32(left: object, right: object) -> bool:
