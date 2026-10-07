@@ -38,9 +38,9 @@ class _ConstantModel(torch.nn.Module):
         return (torch.ones(self._batch_size, 1),)
 
 
-def _algorithm(*, value: float, steps: int) -> tuple[TimeAwarePPO, TensorDict]:
-    obs = TensorDict({"policy": torch.zeros(1, 1)}, batch_size=[1])
-    storage = RolloutStorage("rl", 1, steps, obs, [1], "cpu")
+def _algorithm(*, value: float, steps: int, slots: int = 1) -> tuple[TimeAwarePPO, TensorDict]:
+    obs = TensorDict({"policy": torch.zeros(slots, 1)}, batch_size=[slots])
+    storage = RolloutStorage("rl", slots, steps, obs, [1], "cpu")
     algorithm = TimeAwarePPO(
         _ConstantModel(0.0),
         _ConstantModel(value),
@@ -73,9 +73,7 @@ def test_ac_py_unit_timeppo_001_gae_uses_each_transition_duration(
         )
     algorithm.compute_returns(obs)
 
-    assert algorithm.storage.returns[:, 0, 0].tolist() == pytest.approx(
-        [expected_first_return, 3.0], abs=1e-5
-    )
+    assert algorithm.storage.returns[:, 0, 0].tolist() == pytest.approx([expected_first_return, 3.0], abs=1e-5)
 
 
 def test_ac_py_unit_timeppo_002_timeout_bootstrap_uses_current_duration() -> None:
@@ -91,3 +89,32 @@ def test_ac_py_unit_timeppo_002_timeout_bootstrap_uses_current_duration() -> Non
     )
 
     assert algorithm.storage.rewards[0, 0, 0].item() == pytest.approx(4.794733, abs=1e-5)
+
+
+def test_time_aware_ppo_mixed_terminal_timeout_and_continuing_slots() -> None:
+    """True termination cuts bootstrap; timeout uses its current physical duration."""
+
+    algorithm, obs = _algorithm(value=4.0, steps=2, slots=3)
+    for rewards, dones, timeouts, duration in (
+        ([2.0, 3.0, 4.0], [False, True, True], [False, False, True], 0.005),
+        ([5.0, 6.0, 7.0], [True, True, True], [True, False, False], 0.035),
+    ):
+        algorithm.act(obs)
+        algorithm.process_env_step(
+            obs,
+            torch.tensor(rewards),
+            torch.tensor(dones),
+            {"transition_dt": duration, "time_outs": torch.tensor(timeouts)},
+        )
+    algorithm.compute_returns(obs)
+
+    # gamma_short = sqrt(0.9); lambda_short = sqrt(0.8); gamma_long = 0.9**3.5.
+    # Final timeout return: 5 + gamma_long*4 = 7.7663605.
+    # Continuing return: 2 + gamma_short*4 + gamma_short*lambda_short*(7.7663605 - 4).
+    # A true terminal has reward 3 only; the short timeout has 4 + gamma_short*4.
+    torch.testing.assert_close(
+        algorithm.storage.returns[:, :, 0],
+        torch.tensor([[8.990596, 3.0, 7.794733], [7.7663605, 6.0, 7.0]]),
+        rtol=0,
+        atol=1e-5,  # Rounded independent examples and float32 recurrence.
+    )

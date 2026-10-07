@@ -185,6 +185,18 @@ Progress cases include turns, excessive speed, and no motion.
 Other cases cover highest-tier resampling, checkpoint continuation, and fixed-level resume.
 Old-objective resume fails before Worker startup, while CartPole retains fixed-step behavior.
 
+## Test-quality review
+
+The [review record](../docs/testing/README.md) accounts for tracked tests, helpers, fixtures and runner configuration.
+It distinguishes full-file review, focused historical evidence and unreviewed files.
+Passing collection or runtime counts do not complete the review.
+
+The CPU examples include distinct full/compact reward rows, clip-before-scale action commands,
+a saved policy artifact read through the real export boundary, and mixed terminal/timeout PPO returns.
+See [Write tests](../docs/how-to/write-tests.md#example-distinct-slots-and-saved-artifacts).
+Temporary faults must fail the intended assertion and be restored; setup errors are not regression evidence.
+These CPU cases do not establish C++ parity, Chaos response or learning quality.
+
 ## Import boundary
 
 Pytest imports product code from `src/uerl` through the paths in `pyproject.toml`.
