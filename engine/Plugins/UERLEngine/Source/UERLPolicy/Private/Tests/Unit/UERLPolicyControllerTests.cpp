@@ -273,6 +273,16 @@ bool FUERLPolicyControllerStepFiniteAndCommandsTest::RunTest(const FString& Para
 		TEXT("controller records the current observation and solver-step timing"),
 		FMath::IsNearlyEqual(Controller.LastControlTiming().ObservationDtSeconds, Timing.ObservationDtSeconds, 1.0e-9)
 			&& FMath::IsNearlyEqual(Controller.LastControlTiming().LastSolverStepSeconds, Timing.LastSolverStepSeconds, 1.0e-9));
+	TestEqual(TEXT("default control steps do not retain previous-action diagnostics"), Controller.LastPreviousAction().Num(), 0);
+	TestEqual(TEXT("default control steps do not retain command diagnostics"), Controller.LastCommands().Num(), 0);
+	TestTrue(TEXT("explicit diagnostic capture succeeds"), Controller.Step(Commands, Timing, Error, true));
+	TestTrue(TEXT("explicit capture retains the consumed previous-action vector"),
+		Controller.LastPreviousAction().Num() == Controller.LastAction().Num());
+	TestEqual(TEXT("explicit capture retains the required command channels"),
+		Controller.LastCommands().Num(), Required.Num());
+	TestTrue(TEXT("a later default step succeeds with diagnostics disabled"), Controller.Step(Commands, Timing, Error));
+	TestEqual(TEXT("disabling capture clears the prior action diagnostic"), Controller.LastPreviousAction().Num(), 0);
+	TestEqual(TEXT("disabling capture clears prior command diagnostics"), Controller.LastCommands().Num(), 0);
 
 	// Missing command channel must error (no silent zero-fill).
 	FUERLPolicyCommands EmptyCommands;

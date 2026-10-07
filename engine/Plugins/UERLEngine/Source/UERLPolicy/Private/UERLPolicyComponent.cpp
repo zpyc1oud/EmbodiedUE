@@ -214,6 +214,49 @@ void UUERLPolicyComponent::ResetCommandAges()
 	StaleChannels.Reset();
 }
 
+void UUERLPolicyComponent::BroadcastControlFrameSnapshot(
+	double GameSeconds,
+	double PhysicsSeconds,
+	int32 SolverFrame,
+	double SolverTimeSeconds)
+{
+	FUERLPolicyControlFrameSnapshot Snapshot;
+	Snapshot.bBootstrap = bBootstrapPending;
+	Snapshot.Sequence = ControlFrameSequence;
+	Snapshot.SolverFrame = SolverFrame;
+	Snapshot.SolverTimeSeconds = SolverTimeSeconds;
+	Snapshot.GameElapsedSeconds = GameSeconds;
+	Snapshot.PhysicsElapsedSeconds = PhysicsSeconds;
+	Snapshot.ObservationDtSeconds = Controller.LastControlTiming().ObservationDtSeconds;
+	Snapshot.LastSolverStepSeconds = Controller.LastControlTiming().LastSolverStepSeconds;
+	Snapshot.RawState = Controller.LastRawState();
+	Snapshot.Observation = Controller.LastObservation();
+	Snapshot.PreviousAction = Controller.LastPreviousAction();
+	Snapshot.Action = Controller.LastAction();
+	Snapshot.ActuatorTargets = Controller.LastActuatorTargets();
+
+	for (const FUERLFieldDescriptor& Field : Controller.GetSelectedStateFields())
+	{
+		FUERLPolicyStateFieldSample& StateField = Snapshot.RawStateFields.AddDefaulted_GetRef();
+		StateField.Name = Field.Name;
+		StateField.Width = Field.Width;
+	}
+	for (const FUERLPolicyCommandChannel& Channel : Controller.RequiredCommands())
+	{
+		const TArray<float>* Values = Controller.LastCommands().Find(Channel.Name);
+		if (!Values)
+		{
+			continue;
+		}
+		FUERLPolicyCommandSample& Command = Snapshot.Commands.AddDefaulted_GetRef();
+		Command.Channel = Channel.Name;
+		Command.Values = *Values;
+		Command.AgeSeconds = CommandAges.FindRef(Channel.Name);
+	}
+
+	OnControlStepCompleted.Broadcast(Snapshot);
+}
+
 void UUERLPolicyComponent::RearmPolicyLoop()
 {
 	++LifecycleGeneration;
@@ -274,6 +317,7 @@ bool UUERLPolicyComponent::StartPolicy()
 	Config.AssetPath = Artifact->RobotMesh->GetPathName();
 	Config.GroundOrigin = GetOwner() ? GetOwner()->GetActorLocation() : FVector::ZeroVector;
 	Config.GroundNormal = FVector::UpVector;
+	Config.GroundQueryIgnoreActor = GetOwner();
 	Config.bClaimAuthoredActor = bClaimOwnerMesh;
 	Config.ClaimedMesh = ClaimedMesh;
 	Config.PlacementTransform = GetOwner() ? GetOwner()->GetActorTransform() : FTransform::Identity;
@@ -560,7 +604,7 @@ void UUERLPolicyComponent::TickComponent(
 	ControlTiming.ObservationDtSeconds = ObservationSeconds;
 	ControlTiming.LastSolverStepSeconds = Clock.LastDt;
 	const uint64 StepGeneration = LifecycleGeneration;
-	if (!Controller.Step(Commands, ControlTiming, Error))
+	if (!Controller.Step(Commands, ControlTiming, Error, OnControlStepCompleted.IsBound()))
 	{
 		Fault(Error);
 		return;
@@ -573,6 +617,19 @@ void UUERLPolicyComponent::TickComponent(
 	if (StepGeneration != LifecycleGeneration || !bRunning || bFaulted)
 	{
 		return;
+	}
+	++ControlFrameSequence;
+	if (OnControlStepCompleted.IsBound())
+	{
+		BroadcastControlFrameSnapshot(
+			AccumulatedGameSeconds,
+			AccumulatedPhysicsSeconds,
+			Clock.Frame,
+			Clock.SolverTime);
+		if (StepGeneration != LifecycleGeneration || !bRunning || bFaulted || !Controller.IsInitialized())
+		{
+			return;
+		}
 	}
 	bBootstrapPending = false;
 	AccumulatedPhysicsSeconds = 0.0;

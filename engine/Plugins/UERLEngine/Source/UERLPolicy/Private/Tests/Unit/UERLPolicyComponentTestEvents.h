@@ -3,7 +3,16 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "UERLPolicyComponent.h"
+#include "UERLPolicyTraceRecorder.h"
 #include "UERLPolicyComponentTestEvents.generated.h"
+
+enum class EUERLPolicyTestFrameCallbackMode : uint8
+{
+	Stop,
+	SoftReset,
+	SoftResetAndMarkBoundary,
+	RecordOnly,
+};
 
 /** Records dynamic component events for the policy component integration tests. */
 UCLASS()
@@ -12,6 +21,53 @@ class UUERLPolicyComponentTestEventRecorder : public UObject
 	GENERATED_BODY()
 
 public:
+	int32 ControlFrameCount = 0;
+	FUERLPolicyControlFrameSnapshot LastControlFrame;
+	TArray<FUERLPolicyControlFrameSnapshot> ControlFrames;
+	EUERLPolicyTestFrameCallbackMode ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::RecordOnly;
+	TWeakObjectPtr<UUERLPolicyComponent> ControlFrameCallbackComponent;
+	TWeakObjectPtr<UUERLPolicyTraceRecorder> ControlFrameTraceRecorder;
+	int32 ControlFrameEpisodeIndex = 1;
+	FString ControlFrameBoundaryReason = TEXT("callback_soft_reset");
+	bool bControlFrameCallbackSucceeded = false;
+
+	UFUNCTION()
+	void OnControlFrameCompleted(const FUERLPolicyControlFrameSnapshot& Frame)
+	{
+		++ControlFrameCount;
+		LastControlFrame = Frame;
+		ControlFrames.Add(Frame);
+		if (UUERLPolicyComponent* Component = ControlFrameCallbackComponent.Get())
+		{
+			if (ControlFrameCallbackMode == EUERLPolicyTestFrameCallbackMode::Stop)
+			{
+				Component->StopPolicy();
+				bControlFrameCallbackSucceeded = !Component->IsRunning();
+			}
+			else if (ControlFrameCallbackMode == EUERLPolicyTestFrameCallbackMode::SoftReset)
+			{
+				bControlFrameCallbackSucceeded = Component->SoftReset();
+			}
+			else if (ControlFrameCallbackMode == EUERLPolicyTestFrameCallbackMode::SoftResetAndMarkBoundary)
+			{
+				bControlFrameCallbackSucceeded = Component->SoftReset();
+				if (bControlFrameCallbackSucceeded)
+				{
+					if (UUERLPolicyTraceRecorder* Trace = ControlFrameTraceRecorder.Get())
+					{
+						bControlFrameCallbackSucceeded = Trace->MarkEpisodeBoundary(
+							ControlFrameEpisodeIndex, ControlFrameBoundaryReason);
+					}
+					else
+					{
+						bControlFrameCallbackSucceeded = false;
+					}
+				}
+				ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::RecordOnly;
+			}
+		}
+	}
+
 	int32 OverrunCount = 0;
 	float LastGameSeconds = 0.0f;
 	float LastPhysicsSeconds = 0.0f;
@@ -38,12 +94,38 @@ public:
 		LastStaleSeconds = StaleSeconds;
 	}
 
+	TWeakObjectPtr<UUERLPolicyComponent> StaleFallbackComponent;
+
+	UFUNCTION()
+	void OnStaleStopPolicy(FName Channel, float StaleSeconds)
+	{
+		OnStale(Channel, StaleSeconds);
+		if (UUERLPolicyComponent* Component = StaleFallbackComponent.Get())
+		{
+			Component->StopPolicy();
+		}
+	}
+
 	int32 FaultCount = 0;
+	FString LastFaultReason;
 
 	UFUNCTION()
 	void OnFault(const FString& Reason)
 	{
 		++FaultCount;
+		LastFaultReason = Reason;
+	}
+
+	TWeakObjectPtr<UUERLPolicyComponent> FaultFallbackComponent;
+
+	UFUNCTION()
+	void OnFaultStopPolicy(const FString& Reason)
+	{
+		OnFault(Reason);
+		if (UUERLPolicyComponent* Component = FaultFallbackComponent.Get())
+		{
+			Component->StopPolicy();
+		}
 	}
 
 	int32 MismatchCount = 0;
