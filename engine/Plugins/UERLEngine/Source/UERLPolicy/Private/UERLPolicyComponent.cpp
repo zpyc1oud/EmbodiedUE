@@ -14,7 +14,33 @@ UUERLPolicyComponent::UUERLPolicyComponent()
 	PrimaryComponentTick.bStartWithTickEnabled = false;
 	PrimaryComponentTick.TickGroup = TG_PostPhysics;
 	PrimaryComponentTick.TickInterval = 0.0f;
+	BootstrapTickFunction.bCanEverTick = true;
+	BootstrapTickFunction.bStartWithTickEnabled = false;
+	BootstrapTickFunction.TickGroup = TG_PrePhysics;
 	SetComponentTickEnabled(false);
+}
+
+void UUERLPolicyComponent::RegisterComponentTickFunctions(bool bRegister)
+{
+	Super::RegisterComponentTickFunctions(bRegister);
+	if (bRegister)
+	{
+		if (SetupActorComponentTickFunction(&BootstrapTickFunction))
+		{
+			BootstrapTickFunction.Target = this;
+		}
+	}
+	else if (BootstrapTickFunction.IsTickFunctionRegistered())
+	{
+		BootstrapTickFunction.UnRegisterTickFunction();
+	}
+}
+
+void UUERLPolicyComponent::SetComponentTickEnabled(bool bEnabled)
+{
+	Super::SetComponentTickEnabled(bEnabled);
+	BootstrapTickFunction.SetTickFunctionEnable(bEnabled
+		&& (bBootstrapPending || (bAutoStart && !bRunning && !bFaulted)));
 }
 
 void UUERLPolicyComponent::BeginPlay()
@@ -481,6 +507,13 @@ void UUERLPolicyComponent::TickComponent(
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	// Enabling a tick from a post-physics callback can schedule it in the
+	// same frame's NewlySpawned group. Bootstrap must wait for real PrePhysics.
+	if (ThisTickFunction == &BootstrapTickFunction
+		&& ThisTickFunction->GetActualTickGroup() != TG_PrePhysics)
+	{
+		return;
+	}
 	if (bAutoStart && !bRunning && !bFaulted)
 	{
 		if (!StartPolicy())
@@ -490,6 +523,14 @@ void UUERLPolicyComponent::TickComponent(
 		}
 	}
 	if (!bRunning || bFaulted || !Controller.IsInitialized())
+	{
+		return;
+	}
+	// A one-shot pre-physics tick applies the reset-state action before any
+	// control window. The normal tick stays post-physics, including this frame.
+	const bool bBootstrapTick = ThisTickFunction == &BootstrapTickFunction
+		|| (ThisTickFunction == nullptr && bBootstrapPending);
+	if ((bBootstrapTick && !bBootstrapPending) || (!bBootstrapTick && bBootstrapPending))
 	{
 		return;
 	}
@@ -503,7 +544,8 @@ void UUERLPolicyComponent::TickComponent(
 	// Game time advances even when the solver is paused.  It ages commands and
 	// is retained for the next real solver window, but never creates a control
 	// frame by itself.
-	const double GameDeltaSeconds = FMath::Max(0.0, static_cast<double>(DeltaTime));
+	const double GameDeltaSeconds = bBootstrapTick
+		? 0.0 : FMath::Max(0.0, static_cast<double>(DeltaTime));
 	AccumulatedGameSeconds += GameDeltaSeconds;
 	TArray<TPair<FName, double>> NewlyStaleChannels;
 	for (TPair<FName, double>& Age : CommandAges)
@@ -535,26 +577,29 @@ void UUERLPolicyComponent::TickComponent(
 		Fault(Error);
 		return;
 	}
-	if (LastSolverFrame != INDEX_NONE && Clock.Frame <= LastSolverFrame)
+	if (!bBootstrapTick)
 	{
-		return;
+		if (LastSolverFrame != INDEX_NONE && Clock.Frame <= LastSolverFrame)
+		{
+			return;
+		}
+		const int32 PreviousFrame = LastSolverFrame;
+		const double PhysicsSeconds = PreviousFrame == INDEX_NONE
+			? Clock.LastDt
+			: Clock.SolverTime - LastSolverTime;
+		LastSolverFrame = Clock.Frame;
+		LastSolverTime = Clock.SolverTime;
+		if (!FMath::IsFinite(PhysicsSeconds) || PhysicsSeconds <= 0.0)
+		{
+			return;
+		}
+		if (!FMath::IsFinite(Clock.LastDt) || Clock.LastDt <= 0.0)
+		{
+			Fault(TEXT("completed solver clock has a non-positive last solver-step dt"));
+			return;
+		}
+		AccumulatedPhysicsSeconds += PhysicsSeconds;
 	}
-	const int32 PreviousFrame = LastSolverFrame;
-	const double PhysicsSeconds = PreviousFrame == INDEX_NONE
-		? Clock.LastDt
-		: Clock.SolverTime - LastSolverTime;
-	LastSolverFrame = Clock.Frame;
-	LastSolverTime = Clock.SolverTime;
-	if (!FMath::IsFinite(PhysicsSeconds) || PhysicsSeconds <= 0.0)
-	{
-		return;
-	}
-	if (!FMath::IsFinite(Clock.LastDt) || Clock.LastDt <= 0.0)
-	{
-		Fault(TEXT("completed solver clock has a non-positive last solver-step dt"));
-		return;
-	}
-	AccumulatedPhysicsSeconds += PhysicsSeconds;
 
 	if (!Artifact)
 	{
@@ -602,9 +647,9 @@ void UUERLPolicyComponent::TickComponent(
 	}
 	FUERLControlTiming ControlTiming;
 	ControlTiming.ObservationDtSeconds = ObservationSeconds;
-	ControlTiming.LastSolverStepSeconds = Clock.LastDt;
+	ControlTiming.LastSolverStepSeconds = bBootstrapTick ? 0.0 : Clock.LastDt;
 	const uint64 StepGeneration = LifecycleGeneration;
-	if (!Controller.Step(Commands, ControlTiming, Error, OnControlStepCompleted.IsBound()))
+	if (!Controller.Step(Commands, ControlTiming, Error, OnControlStepCompleted.IsBound(), bBootstrapTick))
 	{
 		Fault(Error);
 		return;
@@ -612,7 +657,7 @@ void UUERLPolicyComponent::TickComponent(
 	if (bBootstrapPending)
 	{
 		UE_LOG(LogUERLPolicy, Display, TEXT("[UERLPolicyComponent] first control step frame=%d observation_dt=%.6f solver_dt=%.6f"),
-			Clock.Frame, ObservationSeconds, Clock.LastDt);
+			Clock.Frame, ObservationSeconds, ControlTiming.LastSolverStepSeconds);
 	}
 	if (StepGeneration != LifecycleGeneration || !bRunning || bFaulted)
 	{
@@ -632,6 +677,7 @@ void UUERLPolicyComponent::TickComponent(
 		}
 	}
 	bBootstrapPending = false;
+	BootstrapTickFunction.SetTickFunctionEnable(false);
 	AccumulatedPhysicsSeconds = 0.0;
 	AccumulatedGameSeconds = 0.0;
 }

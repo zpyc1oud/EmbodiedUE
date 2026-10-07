@@ -374,24 +374,28 @@ bool FUERLPolicyController::Step(
 	const FUERLPolicyCommands& Commands,
 	const FUERLControlTiming& Timing,
 	FString& OutError,
-	bool bCaptureDiagnostics)
+	bool bCaptureDiagnostics,
+	bool bBootstrap)
 {
 	OutError.Reset();
 	if (!bInitialized)
 	{
 		return ControllerFail(OutError, TEXT("policy controller is not initialized"));
 	}
-	if (!Timing.IsValid())
+	if (!Timing.IsValid(bBootstrap))
 	{
 		return ControllerFail(
 			OutError,
-			TEXT("policy control timing must contain positive finite observation and solver-step dt"));
+			TEXT("policy control timing requires positive observation dt and completed solver dt (zero at bootstrap)"));
 	}
 
-	// Step is called from the host's post-physics boundary.  Use the dt of the
+	// Completed windows use the dt of the
 	// solver result just completed; game/control elapsed time is not an impulse
 	// denominator.
-	Robot.SamplePhysicsContacts(Timing.LastSolverStepSeconds);
+	if (!bBootstrap)
+	{
+		Robot.SamplePhysicsContacts(Timing.LastSolverStepSeconds);
+	}
 	if (!Robot.CollectState(RawState, OutError))
 	{
 		return false;

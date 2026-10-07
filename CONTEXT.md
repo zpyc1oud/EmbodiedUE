@@ -188,6 +188,7 @@ Here, d_k is that Step’s step_decimation.
 The sequence is o_k → a_k → physics(d_k) → o_(k+1).
 The returned observation interval belongs to the completed frame.
 The first observation after Initialize or Reset uses DtMin by convention.
+Game deployment consumes this reset input before its first physics window; completed-window inputs follow physics.
 _Avoid_: nominal control period, wall-clock latency
 
 **Slot fault**:

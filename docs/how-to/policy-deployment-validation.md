@@ -150,7 +150,9 @@ The PhantomX host channel is `velocity`, ordered as body-frame forward speed
 width and finite values; it does not enforce task-specific units or limits.
 
 Bind `OnControlStepCompleted` to the host's run recorder. Each event is one
-**policy-decision sample** emitted at the safe post-physics boundary: the raw
+**policy-decision sample**: the initial/reset input is consumed in PrePhysics,
+with zero elapsed physics and no completed solver-step dt. Subsequent samples
+are emitted at the safe post-physics boundary. The raw
 state, observation, previous action, and command values are the inputs consumed
 to produce that frame's action; actuator targets are that action's outputs.
 The event is broadcast after inference and before the next physics window runs.

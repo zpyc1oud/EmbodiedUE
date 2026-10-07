@@ -60,13 +60,14 @@ struct UERLPOLICY_API FUERLControlTiming
 {
 	/** Current completed-window duration, clamped only for policy observation. */
 	double ObservationDtSeconds = 0.0;
-	/** Actual dt of the latest completed solver sub-step, used for contact force conversion. */
+	/** Completed solver dt for contact forces; zero for a pre-physics bootstrap. */
 	double LastSolverStepSeconds = 0.0;
 
-	bool IsValid() const
+	bool IsValid(bool bBootstrap = false) const
 	{
 		return FMath::IsFinite(ObservationDtSeconds) && ObservationDtSeconds > 0.0
-			&& FMath::IsFinite(LastSolverStepSeconds) && LastSolverStepSeconds > 0.0;
+			&& FMath::IsFinite(LastSolverStepSeconds)
+			&& (bBootstrap ? LastSolverStepSeconds == 0.0 : LastSolverStepSeconds > 0.0);
 	}
 };
 
@@ -90,7 +91,8 @@ public:
 		const FUERLPolicyCommands& Commands,
 		const FUERLControlTiming& Timing,
 		FString& OutError,
-		bool bCaptureDiagnostics = false);
+		bool bCaptureDiagnostics = false,
+		bool bBootstrap = false);
 
 	/** Clear previous-action / working buffers; robot pose is left to the host. */
 	void Reset();
