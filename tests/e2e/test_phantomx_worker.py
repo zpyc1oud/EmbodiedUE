@@ -12,7 +12,7 @@ from typing import cast
 import pytest
 import torch
 
-from tests.e2e.support.worker_runner import UE_CMD
+from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
 from uerl import PresentationMode, UERLDirectEnv, UERLSession, UERLSessionAdapter
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.phantomx import PHANTOMX_TERRAIN_TASK_ID
@@ -34,6 +34,10 @@ def test_generic_phantomx_training_retains_position_targets(tmp_path: Path) -> N
             "uerl.cli.train",
             "--task",
             "UERL-PhantomX-Walk-v0",
+            "--ue-executable",
+            UE_CMD,
+            "--project",
+            UPROJECT,
             "--worker.slot_count",
             "64",
             "--worker.decimation",
@@ -76,7 +80,7 @@ def test_phantomx_contact_force_fields_round_trip_as_nonnegative_finite_values(t
         overrides={
             **build_launch_overrides(
                 ue_executable=Path(UE_CMD),
-                project=REPO_ROOT / "engine" / "UERLHost.uproject",
+                project=Path(UPROJECT),
                 map_name="/Engine/Maps/Entry",
                 presentation=PresentationMode.NONE,
             ),
@@ -145,7 +149,7 @@ def test_phantomx_default_pose_settles_without_spurious_reset(
         overrides={
             **build_launch_overrides(
                 ue_executable=Path(UE_CMD),
-                project=REPO_ROOT / "engine" / "UERLHost.uproject",
+                project=Path(UPROJECT),
                 map_name="/Engine/Maps/Entry",
                 presentation=PresentationMode.NONE,
             ),
