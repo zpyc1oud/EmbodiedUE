@@ -254,7 +254,9 @@ def test_ac_py_unit_rewmgr_006_sparse_valid_rows_accumulate_on_stable_slot_ids()
 
     manager = RewardManager(
         RewardCfg(terms={"track": RewTermCfg(func=_constant_term(1.0), weight=1.0)}),
-        _tiny_spec(), batch_size=3, device="cpu",
+        _tiny_spec(),
+        batch_size=3,
+        device="cpu",
     )
     compact = replace(_context(rows=2), slot_ids=torch.tensor([0, 2]))
     manager.compute(compact, _empty_terminations(2))
@@ -336,28 +338,38 @@ def test_phantomx_weight_conversion_equivalence() -> None:
     for name, value in term_values.items():
         old_weight, _new_weight = _PHANTOMX_WEIGHT_CONVERSION[name]
         # Penalties in PhantomX are subtracted (positive configured weight).
-        sign = -1.0 if name in {
-            "vertical_velocity",
-            "body_angular_velocity",
-            "upright",
-            "body_clearance",
-            "joint_velocity",
-            "fall",
-        } else 1.0
+        sign = (
+            -1.0
+            if name
+            in {
+                "vertical_velocity",
+                "body_angular_velocity",
+                "upright",
+                "body_clearance",
+                "joint_velocity",
+                "fall",
+            }
+            else 1.0
+        )
         legacy += sign * old_weight * value
 
     spec = _tiny_spec()
     terms: dict[str, RewTermCfg] = {}
     for name, value in term_values.items():
         _old, new_weight = _PHANTOMX_WEIGHT_CONVERSION[name]
-        sign = -1.0 if name in {
-            "vertical_velocity",
-            "body_angular_velocity",
-            "upright",
-            "body_clearance",
-            "joint_velocity",
-            "fall",
-        } else 1.0
+        sign = (
+            -1.0
+            if name
+            in {
+                "vertical_velocity",
+                "body_angular_velocity",
+                "upright",
+                "body_clearance",
+                "joint_velocity",
+                "fall",
+            }
+            else 1.0
+        )
         terms[name] = RewTermCfg(func=_constant_term(value), weight=sign * new_weight)
 
     manager = RewardManager(RewardCfg(terms=terms), spec, batch_size=1, device="cpu")
@@ -378,9 +390,7 @@ def test_reward_lib_track_lin_vel_xy() -> None:
             "command.lin_vel": torch.tensor([[0.5, 0.0, 0.0]]),
         },
     )
-    matched = reward_lib.track_lin_vel_xy(
-        ctx, entity=entity, command_channel="command.lin_vel", std=0.25
-    )
+    matched = reward_lib.track_lin_vel_xy(ctx, entity=entity, command_channel="command.lin_vel", std=0.25)
     assert float(matched.item()) == pytest.approx(1.0)
 
     ctx_miss = _context(
@@ -391,9 +401,7 @@ def test_reward_lib_track_lin_vel_xy() -> None:
             "command.lin_vel": torch.tensor([[0.5, 0.0, 0.0]]),
         },
     )
-    missed = reward_lib.track_lin_vel_xy(
-        ctx_miss, entity=entity, command_channel="command.lin_vel", std=0.25
-    )
+    missed = reward_lib.track_lin_vel_xy(ctx_miss, entity=entity, command_channel="command.lin_vel", std=0.25)
     expected = math.exp(-(0.5**2) / (0.25**2))
     assert float(missed.item()) == pytest.approx(expected)
 
@@ -434,11 +442,7 @@ def test_ac_py_unit_dtnorm_002_phantomx_exploration_noise_is_a_small_action_rate
     manager = RewardManager(
         RewardCfg(
             reference_dt_s=reference_dt,
-            terms={
-                "action_rate": RewTermCfg(
-                    func=reward_lib.action_rate_l2, weight=-weight, time_mode="rate"
-                )
-            },
+            terms={"action_rate": RewTermCfg(func=reward_lib.action_rate_l2, weight=-weight, time_mode="rate")},
         ),
         _tiny_spec(),
         batch_size=20_000,
@@ -469,10 +473,47 @@ def test_reward_lib_flat_orientation_l2() -> None:
     flat = reward_lib.flat_orientation_l2(
         _context(
             rows=1,
-            transition_state={
-                "robot.body.base.body_pose": torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]])
-            },
+            transition_state={"robot.body.base.body_pose": torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]])},
         ),
         entity=entity,
     )
     assert float(flat.item()) == pytest.approx(0.0)
+
+
+def test_reward_manager_distinct_rows_keep_weights_and_sparse_episode_sums() -> None:
+    """Different compact rows retain their values at stable Slots 0 and 2."""
+
+    manager = RewardManager(
+        RewardCfg(
+            terms={
+                "track": RewTermCfg(func=lambda ctx: ctx.transition_state["track"], weight=2.0),
+                "cost": RewTermCfg(func=lambda ctx: ctx.transition_state["cost"], weight=-0.5),
+            }
+        ),
+        _tiny_spec(),
+        batch_size=3,
+        device="cpu",
+    )
+    full = _context(
+        rows=3, transition_state={"track": torch.tensor([1.0, 3.0, -2.0]), "cost": torch.tensor([4.0, 1.0, 0.0])}
+    )
+    torch.testing.assert_close(manager.compute(full, _empty_terminations(3)), torch.tensor([0.0, 5.5, -4.0]))
+    compact = replace(
+        _context(rows=2, transition_state={"track": torch.tensor([2.0, -1.0]), "cost": torch.tensor([2.0, 6.0])}),
+        slot_ids=torch.tensor([0, 2]),
+    )
+    torch.testing.assert_close(manager.compute(compact, _empty_terminations(2)), torch.tensor([3.0, -5.0]))
+    # Slot 1 did not participate in the second step. Logs expose each Slot separately.
+    for slot, track, cost in ((0, 6.0, -3.0), (1, 6.0, -0.5), (2, -6.0, -3.0)):
+        log = manager.episode_log(torch.arange(3).eq(slot))
+        assert log["Episode_Reward/track"] == track
+        assert log["Episode_Reward/cost"] == cost
+    manager.reset(torch.tensor([True, False, True]))
+    assert manager.episode_log(torch.tensor([False, True, False])) == {
+        "Episode_Reward/track": 6.0,
+        "Episode_Reward/cost": -0.5,
+    }
+    assert manager.episode_log(torch.tensor([True, False, True])) == {
+        "Episode_Reward/track": 0.0,
+        "Episode_Reward/cost": 0.0,
+    }

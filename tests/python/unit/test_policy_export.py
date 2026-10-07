@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -15,7 +16,9 @@ from rsl_rl.models.mlp_model import MLPModel
 from tensordict import TensorDict
 
 from uerl.core.direct.task import DirectTask
+from uerl.core.mdp.executor import PlanExecutor, PlanInputs
 from uerl.core.mdp.plan import PLAN_VERSION, ActionPlan, ObservationPlan, PlanOp
+from uerl.core.mdp.terms import ObservationCfg
 from uerl.errors import ConfigError
 from uerl.policy.artifact import (
     ARTIFACT_FORMAT_VERSION,
@@ -55,10 +58,15 @@ def _make_rsl_deterministic_export(
 
     observation = np.asarray([[0.75, -1.25, 2.5, -0.25]], dtype=np.float32)
     observation_tensor = torch.from_numpy(observation)
-    reference = model(
-        TensorDict({"policy": observation_tensor}, batch_size=[1]),
-        stochastic_output=False,
-    ).detach().cpu().numpy()
+    reference = (
+        model(
+            TensorDict({"policy": observation_tensor}, batch_size=[1]),
+            stochastic_output=False,
+        )
+        .detach()
+        .cpu()
+        .numpy()
+    )
 
     # The model has a non-zero exploration std, but the export wrapper must use
     # the deterministic output transform and keep normalization inside the graph.
@@ -298,15 +306,30 @@ def test_ac_py_unit_export_001_artifact_read_validate_matches_plan_widths(tmp_pa
 
 
 def test_ac_py_unit_export_002_takes_direct_task_objects_not_rebuild(tmp_path: Path) -> None:
-    """AC_PY_UNIT_EXPORT_002: export keeps the exact plans held by a supported Task."""
+    """AC_PY_UNIT_EXPORT_002: returned and saved plans preserve the supported Task declaration."""
 
-    task = _bound_manager_task()
+    from tests.python.unit.test_cartpole_product_task import CARTPOLE_SHAPES, _robot_spec
+    from uerl.tasks.cartpole import CartPoleTaskConfig, build_cartpole_composed_cfg
+
+    # A supported Manager declaration deliberately differs from CartPole defaults.
+    spec = _robot_spec()
+    cfg = build_cartpole_composed_cfg(CartPoleTaskConfig(), spec)
+    policy = cfg.observations.groups["policy"]
+    policy = replace(
+        policy,
+        members=("cart_vel", "cart_pos", "pole_vel", "pole_pos"),
+        terms={**policy.terms, "pole_pos": replace(policy.terms["pole_pos"], scale=2.0, clip=(-1.0, 1.0))},
+    )
+    task = DirectTask(
+        replace(cfg, observations=ObservationCfg(groups={"policy": policy})),
+        robot_spec=spec,
+        batch_size=2,
+        observation_shapes=CARTPOLE_SHAPES,
+    )
     assert task.robot_spec is not None
     observation_plan = task.observation_plan
     action_plan = task.action_plan
-    runner = _FakeOnnxRunner(
-        _make_onnx(observation_plan.group_widths["policy"], action_plan.policy_width)
-    )
+    runner = _FakeOnnxRunner(_make_onnx(observation_plan.group_widths["policy"], action_plan.policy_width))
     output = tmp_path / "policy.uerlpol2"
 
     # Act
@@ -324,6 +347,22 @@ def test_ac_py_unit_export_002_takes_direct_task_objects_not_rebuild(tmp_path: P
     # Assert object identity excludes reconstruction from task config.
     assert artifact.observation_plan is observation_plan
     assert artifact.action_plan is action_plan
+
+    # Validate the shipped file, not only the object returned by the service.
+    restored = PolicyArtifact.read(output)
+    assert restored.observation_plan.groups["policy"] == ("cart_vel", "cart_pos", "pole_vel", "pole_pos")
+    inputs = PlanInputs(
+        raw_state={
+            "robot.joint.pole.joint_position": torch.tensor([[0.6], [-0.2]]),
+            "robot.joint.pole.joint_velocity": torch.tensor([[2.0], [-6.0]]),
+            "robot.joint.cart.joint_position": torch.tensor([[3.0], [7.0]]),
+            "robot.joint.cart.joint_velocity": torch.tensor([[4.0], [-8.0]]),
+        }
+    )
+    processed = PlanExecutor(restored.observation_plan).execute(inputs)["policy"]
+    torch.testing.assert_close(
+        processed, torch.tensor([[4.0, 3.0, 2.0, 1.0], [-8.0, 7.0, -6.0, -0.4]]), rtol=0, atol=1e-7
+    )
 
 
 def test_ac_py_unit_export_003_same_checkpoint_yields_identical_artifact_bytes(

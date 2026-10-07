@@ -1,4 +1,4 @@
-"""Verify ObservationManager compile (scale→clip) and plan object identity."""
+"""Verify ObservationManager scale-before-clip, group ordering, and compile errors."""
 
 from __future__ import annotations
 
@@ -247,49 +247,6 @@ def test_ac_py_unit_obsmgr_002_entity_expands_in_resolve_order() -> None:
     assert torch.allclose(out, torch.tensor([[0.2, 0.1]]))
 
 
-def test_ac_py_unit_obsmgr_003_plan_object_identity() -> None:
-    """AC_PY_UNIT_OBSMGR_003: manager.plan is the exported plan object (``is``)."""
-
-    spec = _two_joint_spec()
-    manager = ObservationManager(
-        ObservationCfg(
-            groups={
-                "policy": ObsGroupCfg(
-                    terms={
-                        "hip": ObsTermCfg(
-                            op="select",
-                            params={"field": "robot.joint.hip.joint_position"},
-                        )
-                    }
-                )
-            }
-        ),
-        spec,
-        policy_width=1,
-        observation_shapes=SCALAR_SHAPES,
-    )
-    # Stand-in for artifact/export binding: the shipped plan must be this object.
-    exported_artifact = {"observation_plan": manager.plan}
-    assert exported_artifact["observation_plan"] is manager.plan
-    assert manager.plan is not compile_observation_plan(
-        ObservationCfg(
-            groups={
-                "policy": ObsGroupCfg(
-                    terms={
-                        "hip": ObsTermCfg(
-                            op="select",
-                            params={"field": "robot.joint.hip.joint_position"},
-                        )
-                    }
-                )
-            }
-        ),
-        spec,
-        policy_width=1,
-        observation_shapes=SCALAR_SHAPES,
-    )
-
-
 def test_ac_py_unit_obsmgr_004_policy_and_critic_groups() -> None:
     """AC_PY_UNIT_OBSMGR_004: policy and critic coexist with independent widths."""
 
@@ -368,11 +325,7 @@ def test_ac_py_unit_obsmgr_005_reset_is_noop_without_history() -> None:
     [
         (
             lambda: ObservationCfg(
-                groups={
-                    "policy": ObsGroupCfg(
-                        terms={"x": ObsTermCfg(op="not_an_operator", params={})}
-                    )
-                }
+                groups={"policy": ObsGroupCfg(terms={"x": ObsTermCfg(op="not_an_operator", params={})})}
             ),
             "unknown observation operator",
         ),
@@ -411,13 +364,7 @@ def test_ac_py_unit_obsmgr_005_reset_is_noop_without_history() -> None:
             "unknown term",
         ),
         (
-            lambda: ObservationCfg(
-                groups={
-                    "policy": ObsGroupCfg(
-                        terms={"empty": ObsTermCfg(op="concat", inputs=())}
-                    )
-                }
-            ),
+            lambda: ObservationCfg(groups={"policy": ObsGroupCfg(terms={"empty": ObsTermCfg(op="concat", inputs=())})}),
             "width derivation failed",
         ),
     ],
@@ -431,9 +378,7 @@ def test_ac_py_unit_obsmgr_006_compile_errors(
     spec = _two_joint_spec()
     cfg_factory = cast(Callable[[], ObservationCfg], build_cfg)
     with pytest.raises(ConfigError, match=match):
-        compile_observation_plan(
-            cfg_factory(), spec, policy_width=1, observation_shapes=SCALAR_SHAPES
-        )
+        compile_observation_plan(cfg_factory(), spec, policy_width=1, observation_shapes=SCALAR_SHAPES)
 
 
 def _phantomx_observation_cfg() -> ObservationCfg:
@@ -506,9 +451,7 @@ def _phantomx_observation_cfg() -> ObservationCfg:
     )
     terms["joint_vel"] = ObsTermCfg(op="concat", inputs=tuple(joint_vel_slots))
     terms["prev_action"] = ObsTermCfg(op="previous_action", params={"width": 18})
-    terms["control_frame_dt"] = ObsTermCfg(
-        op="control_frame_dt", params={"scale": 100.0}
-    )
+    terms["control_frame_dt"] = ObsTermCfg(op="control_frame_dt", params={"scale": 100.0})
 
     members = (
         "lin_vel_b",

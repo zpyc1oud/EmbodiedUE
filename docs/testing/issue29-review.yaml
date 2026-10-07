@@ -1,0 +1,444 @@
+issue: 29
+baseline: b67cd6e2f60e57afd28ac8c6690b0fb0ab7b83c4
+review_date: '2026-10-08'
+scope:
+  roots:
+  - tests/
+  - examples/*/tests/
+  - engine/Plugins/UERLEngine/Source/**/Tests/
+  explicit_support_files:
+  - .github/workflows/static-checks.yml
+  - .pre-commit-config.yaml
+  - pyproject.toml
+  - scripts/check_docs.py
+  - scripts/compare_policy_traces.py
+  - scripts/run_all_tests.py
+  - scripts/run_e2e.py
+  - scripts/test_runner_support.py
+  includes: All tracked members, including manual checks, fixture corpora/generators, helpers, indexes and runner
+    configuration
+  excluded: Product implementation and deployment artifact generation belong to their feature reviews
+counts:
+  tracked_files: 236
+  full_file_reviews: 9
+  carried_focused_reviews: 7
+  not_reviewed: 220
+  remaining_full_file_reviews: 227
+limits:
+- Inventory presence is not assertion review or executed case count.
+- Focused historical evidence does not dispose of every assertion in that file.
+- confirmed-gap describes the original coverage gap; implementation_status records this slice repair.
+- Unknown contracts/oracles/dispositions are omitted on not-reviewed records.
+- No native or real UE acceptance is established by the CPU slice.
+files:
+  - path: .github/workflows/static-checks.yml
+    layer: runner/config
+    finding_status: reviewed-adequate
+    review_scope: full-file
+    contract: PR/main static CI only; pinned tools and bounded job
+    required_host: source review; existing GitHub/local hook environment
+    oracle: 'reviewed trigger/jobs: Ruff and Mypy, no Python/UE gate or hardware runner'
+    disposition: keep
+    reachable_failure: null
+    planned_assertion: null
+    owner: 'Issue #29 CPU review slice'
+    evidence: source review
+    implementation_status: retained
+  - path: .pre-commit-config.yaml
+    layer: runner/config
+    finding_status: reviewed-adequate
+    review_scope: full-file
+    contract: Existing local documentation/static/default/full runner hooks and file selectors
+    required_host: source review; existing GitHub/local hook environment
+    oracle: reviewed command, pass_filenames and stage declarations against documented commands
+    disposition: keep
+    reachable_failure: null
+    planned_assertion: null
+    owner: 'Issue #29 CPU review slice'
+    evidence: source review
+    implementation_status: retained
+  - {path: engine/Plugins/UERLEngine/Source/UERLInterface/Private/Tests/Unit/UERLInterfaceTypesTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLInterface/Private/Tests/Unit/UERLPlanTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyArtifactTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyComponentTestEvents.h, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyComponentTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyControllerTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyDeployParityTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyNetworkTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyParityTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyPhysicsGateTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyPlanRuntimeTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyVariableDtParityTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLActuatorLawTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLGenericRobotContactTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLGenericRobotContentTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLGenericRobotKinematicsTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLGenericRobotProviderTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLPhysicsClockTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLRobotObservationPlanTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLTopologyReflectorTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLTerrain/Private/Tests/Unit/UERLTerrainAtlasTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLTerrain/Private/Tests/Unit/UERLTerrainExtensibilityProbeTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLTerrain/Private/Tests/Unit/UERLTerrainGeneratorTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLTransport/Private/Tests/Unit/UERLTransportTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLAuthoredPursuitEnvironmentTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLEnvironmentPoolTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLIsolatedGridEnvironmentTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLSharedMapEnvironmentTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLSlotCollisionTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLTerrainOwnershipTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - {path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLWorkerTests.cpp, layer: native, finding_status: not-reviewed, review_scope: none}
+  - path: examples/external-direct-cartpole/tests/test_registration.py
+    layer: example-package
+    finding_status: reviewed-adequate
+    review_scope: full-file
+    contract: Example registration returns a Direct Task with declared public capability statuses
+    required_host: Python 3.11 CPU with existing dev dependencies
+    oracle: literal Task ID and supported train/evaluate versus unsupported export
+    disposition: keep
+    reachable_failure: null
+    planned_assertion: null
+    owner: 'Issue #29 CPU review slice'
+    evidence: external-registration
+    implementation_status: retained
+  - {path: pyproject.toml, layer: runner/config, finding_status: not-reviewed, review_scope: none}
+  - {path: scripts/check_docs.py, layer: runner/config, finding_status: not-reviewed, review_scope: none}
+  - {path: scripts/compare_policy_traces.py, layer: runner/config, finding_status: not-reviewed, review_scope: none}
+  - {path: scripts/run_all_tests.py, layer: runner/config, finding_status: not-reviewed, review_scope: none}
+  - {path: scripts/run_e2e.py, layer: runner/config, finding_status: not-reviewed, review_scope: none}
+  - {path: scripts/test_runner_support.py, layer: runner/config, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/README.md, layer: README.md, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/__init__.py, layer: __init__.py, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/e2e/support/__init__.py, layer: e2e, finding_status: not-reviewed, review_scope: none}
+  - path: tests/e2e/support/host.py
+    layer: e2e
+    finding_status: review-candidate
+    review_scope: focused-history
+    contract: Selected UE host propagation at Session/CLI construction
+    required_host: Recorded Python/Windows/UE host at its candidate
+    oracle: 'PR #33 actual Session/CLI launch regression'
+    disposition: keep
+    owner: 'PR #33'
+    evidence: Recorded merged PR checks; remaining full-file assertion review pending
+  - {path: tests/e2e/support/phase1.py, layer: e2e, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/e2e/support/socket_negative.py, layer: e2e, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/e2e/support/worker_runner.py, layer: e2e, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/e2e/test_cartpole_worker.py, layer: e2e, finding_status: not-reviewed, review_scope: none}
+  - path: tests/e2e/test_event_manager.py
+    layer: e2e
+    finding_status: review-candidate
+    review_scope: focused-history
+    contract: Selected UE host propagation at Session/CLI construction
+    required_host: Recorded Python/Windows/UE host at its candidate
+    oracle: 'PR #33 actual Session/CLI launch regression'
+    disposition: keep
+    owner: 'PR #33'
+    evidence: Recorded merged PR checks; remaining full-file assertion review pending
+  - {path: tests/e2e/test_p1_session.py, layer: e2e, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/e2e/test_p2_direct_env.py, layer: e2e, finding_status: not-reviewed, review_scope: none}
+  - path: tests/e2e/test_phantomx_variants_composed.py
+    layer: e2e
+    finding_status: review-candidate
+    review_scope: focused-history
+    contract: Selected UE host propagation at Session/CLI construction
+    required_host: Recorded Python/Windows/UE host at its candidate
+    oracle: 'PR #33 actual Session/CLI launch regression'
+    disposition: keep
+    owner: 'PR #33'
+    evidence: Recorded merged PR checks; remaining full-file assertion review pending
+  - path: tests/e2e/test_phantomx_worker.py
+    layer: e2e
+    finding_status: review-candidate
+    review_scope: focused-history
+    contract: Selected UE host propagation at Session/CLI construction
+    required_host: Recorded Python/Windows/UE host at its candidate
+    oracle: 'PR #33 actual Session/CLI launch regression'
+    disposition: keep
+    owner: 'PR #33'
+    evidence: Recorded merged PR checks; remaining full-file assertion review pending
+  - path: tests/e2e/test_terrain_curriculum.py
+    layer: e2e
+    finding_status: review-candidate
+    review_scope: focused-history
+    contract: Selected UE host propagation at Session/CLI construction
+    required_host: Recorded Python/Windows/UE host at its candidate
+    oracle: 'PR #33 actual Session/CLI launch regression'
+    disposition: keep
+    owner: 'PR #33'
+    evidence: Recorded merged PR checks; remaining full-file assertion review pending
+  - {path: tests/parity/cases/action_plan/full_chain.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/action_plan/out_of_range_clip.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/action_plan/width_mismatch.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/artifact/tiny_mlp.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/artifact/tiny_mlp.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/clip/bounds.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/clip/low_gt_high.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/command/missing_channel.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/command/multi_and_single_channel.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/command/width_mismatch.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/concat/pose_then_joint.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/dt_005_scale_100.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/dt_0173_scale_half.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/dt_035_scale_two.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/missing_dt.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/missing_scale.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/negative_dt.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/nonpositive_dt.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/control_frame_dt/zero_scale.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/controller/cartpole_controller.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/controller/cartpole_no_commands.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/controller/generate_no_commands_fixture.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/deploy/phantomx/multistep_walk.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/deploy_variable_dt/generate_fixture.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/deploy_variable_dt/phantomx_variable_dt.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/deploy_variable_dt/phantomx_variable_dt.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/joint_pos_rel/default_length_mismatch.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/joint_pos_rel/nonuniform_default.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/joint_pos_rel/single_joint.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/joint_pos_rel/zero_default.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/offset/scalar.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/offset/vector.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_115/recorded_airborne_03.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_115/recorded_contact_02.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_115/recorded_flat_01.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_115/recorded_moving_05.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_115/recorded_tilted_04.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_variants/continuous_terrain.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_variants/discrete_terrain.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_variants/pursuit_flat.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/phantomx_variants/walk_flat.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/generate_fixtures.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/mlp_2x64.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/mlp_2x64.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/mlp_5x256.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/mlp_5x256.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/mlp_norm_nontrivial.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/mlp_norm_nontrivial.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/phantomx_115.expected.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/policynet/phantomx_115.uerlpol2, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/previous_action/nonzero.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/projected_gravity/gravity_tilted.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/rotate_inverse/asymmetric_rotation.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/rotate_inverse/identity.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/rotate_inverse/yaw_180.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/scale/factor_length_mismatch.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/scale/negative_scalar.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/scale/scalar.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/scale/vector.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/select/basic_pose.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/slice/from_start.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/slice/quat_from_pose.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/slice/to_end.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/cases/structure/observation_select_concat.json, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/test_action_plan_parity.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/test_artifact_parity.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/test_deploy_parity.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/test_deploy_variable_dt.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/test_operator_parity.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/test_phantomx_115_plan.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/parity/test_plan_structure.py, layer: parity, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/__init__.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/integration/__init__.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/integration/test_socket_bridge_client.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/support/__init__.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/support/protocol.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/support/socket_client.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/unit/__init__.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/protocol/unit/test_bridge_codec.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/__init__.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/__init__.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_bridge_session.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_direct_task_entrypoint_equivalence.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_host_check_cli.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_host_launch_cli.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_resume_checkpoint.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_saved_run_cli_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_session.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_shape_agreement.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/integration/test_train_resume_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/run_config_files.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/__init__.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/robot_shape_fixtures.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_action_manager.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Raw action history, clip-before-scale/offset, and actuator order
+    required_host: Python 3.11 CPU with existing dev dependencies
+    oracle: literal two-joint commands [[0.2,-0.05],[-0.55,0.2]]; pre-existing effort/default-offset checks
+    disposition: add-cases
+    reachable_failure: Saturation bypass, wrong joint order, or shared row values can produce correct shapes
+    planned_assertion: Different Slot/joint values and saturated inputs, literal commands and unchanged raw action
+    owner: 'Issue #29 CPU review slice'
+    evidence: fault-action-without-clip
+    implementation_status: implemented
+  - {path: tests/python/unit/test_action_plan.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cartpole_product_task.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cartpole_registration.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cartpole_yaml_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_check.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_deploy.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_discovery.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_export.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_failures.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_flags.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_main.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_map_resolution.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_new.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_run_lifecycle.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_cli_runs.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_config_models.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_config_ownership.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_config_paths.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_config_resolver.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_config_snapshot.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_config_validation_parity.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_configspec.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_continuation.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_curriculum_manager.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_determinism.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_direct_env.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_direct_session_adapter.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_direct_task.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_direct_task_contract.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_event_manager.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_external_task_example.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_external_tasks.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_generalization_evaluator.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_generalization_events.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_host_diagnostics.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_host_profile.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_manifest.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_observation_manager.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Observation declaration compilation, scale-before-clip, entity/member/group order
+    required_host: Python 3.11 CPU with existing dev dependencies
+    oracle: literal 1.0 versus reversed 1.2; ordered [0.2,0.1]; reviewed PhantomX structural reference
+    disposition: remove
+    reachable_failure: The local dictionary reference assertion cannot observe an exporter or serialized artifact
+    planned_assertion: Remove redundant identity claim; retain real public-export identity in test_policy_export.py
+    owner: 'Issue #29 CPU review slice'
+    evidence: cpu-focused-green
+    implementation_status: implemented
+  - {path: tests/python/unit/test_observation_shape_table.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_phantomx_curriculum.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_phantomx_task.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_phantomx_training_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_phantomx_training_events.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_phantomx_variants.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_phantomx_yaml_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_plan_data_model.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_plan_executor.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_plan_operators.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_play_video.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_policy_artifact.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_policy_export.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Supported Task plan binding, saved UERLPOL2 contents, real ONNX deterministic output and cleanup
+    required_host: Python 3.11 CPU with existing dev dependencies
+    oracle: literal custom member order and two-Slot matrix [[4,3,2,1],[-8,7,-6,-0.4]]; fixed ONNX bytes; real RSL
+      reference
+    disposition: strengthen
+    reachable_failure: Returned object identity and widths can pass while saved member order or scale/clip is wrong
+    planned_assertion: Export a non-default supported declaration, read the actual file and execute the restored observation
+      plan
+    owner: 'Issue #29 CPU review slice'
+    evidence: fault-saved-plan-order
+    implementation_status: implemented
+  - {path: tests/python/unit/test_policy_trace.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_process_controller.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_record_play.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_registry.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_resume_state.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_reward_manager.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Weighted transition/rate rewards and stable Slot episode sums
+    required_host: Python 3.11 CPU with existing dev dependencies
+    oracle: literal totals 2.5/-2.5/0.5; exponential velocity formula; distinct row totals [0,5.5,-4] and [3,-5]
+    disposition: add-cases
+    reachable_failure: Identical rows conceal a first-row broadcast; compact rows can be accumulated to the wrong
+      Slot
+    planned_assertion: Distinct full and compact values, per-Slot logs, and unaffected Slot 1 after reset
+    owner: 'Issue #29 CPU review slice'
+    evidence: fault-reward-first-row
+    implementation_status: implemented
+  - {path: tests/python/unit/test_robot_action.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_robot_asset_library.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_robot_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_robot_entity_cfg.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_robot_observation.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_robot_topology_merge.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_rsl_rl_curriculum_checkpoint.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_rsl_rl_wrapper.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_run_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_run_migration.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_run_selector_and_runtime.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_task_capabilities.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_termination_manager.py
+    layer: python
+    finding_status: reviewed-adequate
+    review_scope: full-file
+    contract: Separate termination/timeout reasons and supported physical threshold boundaries
+    required_host: Python 3.11 CPU with existing dev dependencies
+    oracle: literal distinct masks; inclusive timeout; strict height/joint/orientation thresholds
+    disposition: keep
+    reachable_failure: null
+    planned_assertion: null
+    owner: 'Issue #29 CPU review slice'
+    evidence: cpu-focused-green
+    implementation_status: retained
+  - {path: tests/python/unit/test_termination_terms.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_terrain_curriculum.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_time_aware_ppo.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Physical-duration GAE and timeout bootstrap without true-terminal continuation
+    required_host: Python 3.11 CPU with existing dev dependencies
+    oracle: independently worked returns [[8.990596,3,7.794733],[7.7663605,6,7]]; existing short/long examples
+    disposition: add-cases
+    reachable_failure: Single-Slot cases do not expose mixed terminal/timeout masks or wrong current timeout duration
+      across a rollout
+    planned_assertion: Three distinct Slots over 5ms/35ms transitions; float32 rounded oracle tolerance 1e-5
+    owner: 'Issue #29 CPU review slice'
+    evidence: fault-ppo-terminal-bootstrap
+    implementation_status: implemented
+  - {path: tests/python/unit/test_training_runner.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/python/unit/test_training_runs.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/tooling/support/installed_direct_task_probe.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - path: tests/tooling/test_documentation_checks.py
+    layer: tooling
+    finding_status: review-candidate
+    review_scope: focused-history
+    contract: Documentation checker
+    required_host: Recorded Python/Windows/UE host at its candidate
+    oracle: 'PR #27 checker fixtures'
+    disposition: keep
+    owner: 'PR #27'
+    evidence: Recorded merged PR checks; remaining full-file assertion review pending
+  - {path: tests/tooling/test_external_task_package.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/tooling/test_generate_phantomx_deploy_artifact.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/tooling/test_install_into_project.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/tooling/test_module_dependency_boundaries.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/tooling/test_package_plugin.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/tooling/test_stage_profiler.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/tooling/test_test_runner_execution.py, layer: tooling, finding_status: not-reviewed, review_scope: none}
+  - path: tests/tooling/test_test_runner_paths.py
+    layer: tooling
+    finding_status: review-candidate
+    review_scope: focused-history
+    contract: Selected UE host propagation at Session/CLI construction
+    required_host: Recorded Python/Windows/UE host at its candidate
+    oracle: 'PR #33 actual Session/CLI launch regression'
+    disposition: keep
+    owner: 'PR #33'
+    evidence: Recorded merged PR checks; remaining full-file assertion review pending
+  - {path: tests/ue/__init__.py, layer: ue, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/ue/unit/README.md, layer: ue, finding_status: not-reviewed, review_scope: none}
+  - {path: tests/ue/unit/__init__.py, layer: ue, finding_status: not-reviewed, review_scope: none}

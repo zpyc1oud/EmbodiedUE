@@ -115,11 +115,7 @@ def test_ac_py_unit_actmgr_002_applied_does_not_reevaluate() -> None:
 
     spec = _two_joint_spec()
     manager = ActionManager(
-        ActionCfg(
-            terms={
-                "hip": ActionTermCfg(entity=RobotEntityCfg(joint_names="hip"), scale=1.0)
-            }
-        ),
+        ActionCfg(terms={"hip": ActionTermCfg(entity=RobotEntityCfg(joint_names="hip"), scale=1.0)}),
         spec,
     )
     execute_count = 0
@@ -238,3 +234,27 @@ def test_action_plan_has_no_offset_default_op() -> None:
     assert "offset" in op_names
     offset_ops = [op for op in manager.plan.ops if op.op == "offset"]
     assert offset_ops[0].params["bias"] == (0.15,)
+
+
+def test_action_manager_distinct_slots_clip_before_joint_scale_and_offset() -> None:
+    """Opposite saturated actions distinguish rows and hip/knee actuator order."""
+
+    manager = ActionManager(
+        ActionCfg(
+            terms={
+                "joints": ActionTermCfg(
+                    entity=RobotEntityCfg(joint_names=("knee", "hip"), preserve_order=True),
+                    clip=(-1.0, 1.0),
+                    scale=(0.5, 0.2),
+                    use_default_offset=True,
+                ),
+            }
+        ),
+        _two_joint_spec(),
+    )
+    raw = torch.tensor([[2.0, -3.0], [-0.5, 0.25]])
+    commands = manager.process(raw)
+    # knee: -0.3 + 0.5 * [1, -0.5]; hip: 0.15 + 0.2 * [-1, 0.25].
+    assert tuple(commands.values) == ("robot.actuator.joints",)
+    torch.testing.assert_close(commands["robot.actuator.joints"], torch.tensor([[0.2, -0.05], [-0.55, 0.2]]))
+    assert torch.equal(manager.previous_action, raw)

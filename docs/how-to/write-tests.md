@@ -88,6 +88,25 @@ Identical rows can hide an index error.
 For sparse operations, assert the stable Slot IDs and the unchanged Slots.
 Do not confuse a compact batch row with its original Slot ID.
 
+### Example: distinct Slots and saved artifacts
+
+The reward case `test_reward_manager_distinct_rows_keep_weights_and_sparse_episode_sums`
+uses terms [1, 3, -2] at weight 2 and costs [4, 1, 0] at weight -0.5.
+The independent totals are [0, 5.5, -4].
+A second compact batch updates stable Slots 0 and 2; per-Slot logs and reset preserve Slot 1.
+Identical rows would conceal a first-row broadcast.
+
+[test_policy_export.py](../../tests/python/unit/test_policy_export.py) exports a real supported Manager declaration.
+Its `test_ac_py_unit_export_002_takes_direct_task_objects_not_rebuild` checks returned plan identity,
+then reads the saved artifact and executes its restored plan.
+A custom member order, scale and clip produce literal two-Slot values.
+A local dictionary holding a plan cannot establish that the exporter or file preserves it.
+
+[test_time_aware_ppo.py](../../tests/python/unit/test_time_aware_ppo.py) combines continuing, terminal
+and timeout Slots over 5 ms and 35 ms transitions.
+The worked returns distinguish true-terminal cutoff from current-duration timeout bootstrap.
+Its absolute tolerance of 1e-5 covers rounded independent constants and float32 recurrence.
+
 ## Control fixtures and state
 
 A fixture supplies test data, objects, or resources with a defined lifetime.
