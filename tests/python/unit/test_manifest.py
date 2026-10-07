@@ -15,7 +15,7 @@ from uerl import (
     WorkerConfig,
 )
 from uerl.core.config import manifest as manifest_module
-from uerl.core.config.manifest import GitIdentityError, capture_git_identity
+from uerl.core.config.manifest import capture_git_identity
 from uerl.core.config.snapshot import resolved_config_from_yaml
 from uerl.core.config.yaml_loader import load_unique_yaml
 
@@ -123,8 +123,3 @@ def test_installed_framework_records_package_identity_without_using_enclosing_gi
     identity = capture_git_identity()
 
     assert identity == {"commit": "unavailable", "ref": "package:ue-rl-engine==1.0.0", "dirty": False}
-
-
-def test_explicit_source_repository_git_error_is_preserved(tmp_path: Path) -> None:
-    with pytest.raises(GitIdentityError, match="cannot capture Git identity"):
-        capture_git_identity(tmp_path)

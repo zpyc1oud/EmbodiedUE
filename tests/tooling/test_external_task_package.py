@@ -8,7 +8,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from uerl.cli import new
+from uerl.core.config.manifest import GitIdentityError, capture_git_identity
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -179,3 +182,8 @@ assert main(['check', 'task', 'Example-CartPole-v0']) == 1
                                env=env, text=True, capture_output=True, check=False)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "already registered" in completed.stdout
+
+
+def test_explicit_source_repository_git_error_is_preserved(tmp_path: Path) -> None:
+    with pytest.raises(GitIdentityError, match="cannot capture Git identity"):
+        capture_git_identity(tmp_path)
