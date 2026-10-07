@@ -163,7 +163,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Policy|Events")
 	FUERLPolicyControlStepOverrunSignature OnControlStepOverrun;
 
-	/** Fires after a successful post-physics policy step when a host is bound. */
+	/** Fires after a successful reset-input or completed-window policy decision when bound. */
 	UPROPERTY(BlueprintAssignable, Category = "Policy|Events")
 	FUERLPolicyControlFrameCompletedSignature OnControlStepCompleted;
 
@@ -176,7 +176,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Policy|Events")
 	FUERLPolicyPhysicsBaselineMismatchSignature OnPhysicsBaselineMismatch;
 
-	/** Load, validate, claim/spawn, and arm the first PostPhysics bootstrap. */
+	/** Load, validate, claim/spawn, and arm the first PrePhysics bootstrap. */
 	UFUNCTION(BlueprintCallable, Category = "UERL|Policy")
 	bool StartPolicy();
 
@@ -221,6 +221,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UERL|Policy")
 	bool ResetToReferencePose();
 
+	virtual void SetComponentTickEnabled(bool bEnabled) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(
@@ -228,7 +229,11 @@ public:
 		ELevelTick TickType,
 		FActorComponentTickFunction* ThisTickFunction) override;
 
+protected:
+	virtual void RegisterComponentTickFunctions(bool bRegister) override;
+
 private:
+	FActorComponentTickFunction BootstrapTickFunction;
 	bool ResolveOwnerMesh(USkeletalMeshComponent*& OutMesh, FString& OutError) const;
 	bool StartFailure(const FString& Error, bool bPhysicsMismatch = false);
 	void Fault(const FString& Error);

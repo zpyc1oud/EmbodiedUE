@@ -398,13 +398,18 @@ bool SpawnGenericRobotSlots(
 		ContactListener->RegisterComponent();
 		Slot.ContactListener = ContactListener;
 		const FTransform SlotFrame(Slot.GroundRotation, Slot.Origin);
+		// Floating root_pose is the mesh frame. A claimed mount belongs to its
+		// world placement, not to the intrinsic body reference used by reset
+		// and root observation recovery. Fixed bases retain the mounting frame.
+		const FTransform CanonicalFrame = !bOwnsActor && bFloatingRoot
+			? Component->GetComponentTransform() : SlotFrame;
 		Slot.CanonicalBodies.Reserve(Topology.BodyNames.Num());
 		for (const FName BodyName : Topology.BodyNames)
 		{
 			FBodyInstance* Body = Component->GetBodyInstance(BodyName);
 			checkf(Body, TEXT("generic Robot canonical body '%s' is missing"), *BodyName.ToString());
 			FUERLGenericRobotCanonicalBody& Canonical = Slot.CanonicalBodies.AddDefaulted_GetRef();
-			Canonical.SlotTransform = Body->GetUnrealWorldTransform().GetRelativeTransform(SlotFrame);
+			Canonical.SlotTransform = Body->GetUnrealWorldTransform().GetRelativeTransform(CanonicalFrame);
 			Canonical.SlotLinearVelocity = Slot.GroundRotation.Inverse().RotateVector(
 				Body->GetUnrealWorldVelocity());
 			Canonical.SlotAngularVelocity = Slot.GroundRotation.Inverse().RotateVector(

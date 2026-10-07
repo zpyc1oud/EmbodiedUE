@@ -180,6 +180,7 @@ There is no `SetCommandVelocity` node.
 
 The operation `GetRobotTransform` returns the claimed or spawned mesh transform, not the Owner transform.
 Claiming detaches the mesh from the Owner root.
+For a floating base, the physical body reference is local to the mesh. Its authored mounting offset sets the initial placement and is not added again during reset.
 Chaos moves the mesh while the Owner can remain at its original position.
 
 Ground queries start near the Robot and point down through WorldStatic, ignoring the Owner.
@@ -209,7 +210,7 @@ Connect these events to logs, HUD, or gameplay state:
 | Event | Meaning |
 |---|---|
 | `OnControlStepOverrun(GameSeconds, PhysicsSeconds, ObservationSeconds)` | Reports three distinct clocks; inspect each separately |
-| `OnControlStepCompleted(Frame)` | Optional post-physics snapshot aligns commands, raw state, network input, previous action, policy output, actuator targets, and solver/game clocks |
+| `OnControlStepCompleted(Frame)` | Optional reset-input or post-physics snapshot aligns commands, raw state, network input, previous action, policy output, actuator targets, and solver/game clocks |
 | `OnCommandStale(Channel, StaleSeconds)` | A channel has not been refreshed |
 | `OnPolicyFault(Reason)` | Policy stops while the robot remains; handle the cause before resetting |
 | `OnPhysicsBaselineMismatch(Report)` | Startup physics validation failed |
@@ -254,7 +255,7 @@ Expected startup messages have this form:
 
 ```text
 [UERLPolicyComponent] StartPolicy succeeded owner=BP_UERLPolicyRobot_C_1
-[UERLPolicyComponent] first control step frame=7 observation_dt=0.005000 solver_dt=0.005000
+[UERLPolicyComponent] first control step frame=7 observation_dt=0.005000 solver_dt=0.000000
 ```
 
 The host defaults to the empty `/Engine/Maps/Entry`.

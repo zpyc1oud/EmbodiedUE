@@ -12,6 +12,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "PhysicsEngine/PhysicsSettings.h"
+#include "PhysicsEngine/BodyInstance.h"
 #include "PreviewScene.h"
 #include "Components/StaticMeshComponent.h"
 #include "Containers/StringConv.h"
@@ -821,11 +822,11 @@ bool FUERLPolicyComponentShortFrameAccumulationTest::RunTest(const FString& Para
 		&& Rig.Component->GetLastControlTiming().LastSolverStepSeconds == Bootstrap.LastSolverStepSeconds);
 
 	TickPolicyWorld(Rig.World(), 0.002f);
-	TestTrue(TEXT("4ms below DtMin still does not infer"),
-		Rig.Component->GetLastControlTiming().ObservationDtSeconds == Bootstrap.ObservationDtSeconds);
+	TestTrue(TEXT("the first three 2ms windows infer once at the actual 6ms"),
+		FMath::Abs(Rig.Component->GetLastControlTiming().ObservationDtSeconds - 0.006) < Tolerance);
 
 	TickPolicyWorld(Rig.World(), 0.002f);
-	TestTrue(TEXT("2+2+2ms accumulated infers once with the actual 6ms of physics time"),
+	TestTrue(TEXT("the next 2ms window remains below DtMin"),
 		FMath::Abs(Rig.Component->GetLastControlTiming().ObservationDtSeconds - 0.006) < Tolerance);
 
 	const FUERLControlTiming BeforePause = Rig.Component->GetLastControlTiming();
@@ -1028,9 +1029,12 @@ bool FUERLPolicyComponentOverrunCallbackGuardTest::RunTest(const FString& Parame
 	TestTrue(TEXT("SoftReset inside the overrun callback keeps the policy running"), Component->IsRunning());
 	TestTrue(TEXT("the reset tick consumes no control step"),
 		Component->GetLastControlTiming().ObservationDtSeconds == 0.0);
-	TickPolicyWorld(Rig.World(), 0.010f);
+	Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	TestTrue(TEXT("the tick after a callback reset bootstraps at DtMin"),
 		FMath::Abs(Component->GetLastControlTiming().ObservationDtSeconds - 0.005) < Tolerance);
+	TickPolicyWorld(Rig.World(), 0.010f);
+	TestTrue(TEXT("the new action drives the complete next 10ms window"),
+		FMath::Abs(Component->GetLastControlTiming().ObservationDtSeconds - 0.010) < Tolerance);
 
 	Component->StopPolicy();
 	AddInfo(TEXT("[VERIFY] AC_UE_INT_COMPONENT_011: callbacks that Stop or Reset exit the old tick without inference or resource access"));
@@ -1080,9 +1084,10 @@ bool FUERLPolicyComponentResetSemanticsTest::RunTest(const FString& Parameters)
 		PoseAfterSoftReset.GetLocation().Equals(PoseBeforeSoftReset.GetLocation(), 0.5f));
 	TestTrue(TEXT("SoftReset clears the consumed timing"),
 		Rig.Component->GetLastControlTiming().ObservationDtSeconds == 0.0);
-	TickPolicyWorld(Rig.World(), 0.010f);
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	TestTrue(TEXT("SoftReset re-bootstraps at DtMin"),
 		FMath::Abs(Rig.Component->GetLastControlTiming().ObservationDtSeconds - 0.005) < Tolerance);
+	TickPolicyWorld(Rig.World(), 0.010f);
 
 	FTransform StartPose;
 	TestTrue(TEXT("robot transform is available before pose reset"),
@@ -1227,6 +1232,7 @@ bool FUERLPolicyComponentClaimedResetTest::RunTest(const FString& Parameters)
 	ClaimHost->SetActorRotation(FRotator(0.0f, 37.0f, 0.0f));
 	AuthoredMesh->SetRelativeLocation(FVector(20.0, -10.0, 15.0));
 	const FTransform OwnerBeforeStart = ClaimHost->GetActorTransform();
+	const FTransform RootInMesh = AuthoredMesh->GetSocketTransform(TEXT("base_link"), RTS_Component);
 
 	// Measure the start clearance from the authored mesh location with the same
 	// WorldStatic query the component uses at Start.
@@ -1250,11 +1256,19 @@ bool FUERLPolicyComponentClaimedResetTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
+	FBodyInstance* AuthoredRootBody = AuthoredMesh->GetBodyInstance(TEXT("base_link"));
+	TestNotNull(TEXT("claimed floating root physics body exists"), AuthoredRootBody);
+	if (!AuthoredRootBody)
+	{
+		return false;
+	}
 	FTransform InitialPose;
 	TestTrue(TEXT("claimed robot transform is available immediately after Start"),
 		Rig.Component->GetRobotTransform(InitialPose));
 	TestTrue(TEXT("Start preserves authored mesh position without adding clearance twice"),
 		InitialPose.GetLocation().Equals(AuthoredMeshLocation, 1.0e-3));
+	TestTrue(TEXT("Start places the physical root at the mesh reference offset, without adding its mount twice"),
+		AuthoredRootBody->GetUnrealWorldTransform().Equals(RootInMesh * InitialPose, 1.0e-3));
 	TestTrue(TEXT("Start preserves the claimed owner transform"),
 		ClaimHost->GetActorTransform().Equals(OwnerBeforeStart, 1.0e-3));
 
@@ -1284,6 +1298,8 @@ bool FUERLPolicyComponentClaimedResetTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("reset ground query hits WorldStatic ground"), bResetGround);
 	TestTrue(TEXT("claimed floating root snaps to the current ground plus the start clearance"),
 		FMath::Abs(ResetPose.GetLocation().Z - (ResetGroundHit.ImpactPoint.Z + StartClearanceCm)) < 2.0);
+	TestTrue(TEXT("pose reset places the physical root in the reported mesh frame"),
+		AuthoredRootBody->GetUnrealWorldTransform().Equals(RootInMesh * ResetPose, 1.0e-3));
 	TestTrue(TEXT("the claimed owner transform is not rewritten"),
 		ClaimHost->GetActorTransform().Equals(OwnerTransform, 1.0e-3));
 	TestTrue(TEXT("pose reset zeroes the root velocity"),
@@ -1655,9 +1671,9 @@ bool FUERLPolicyComponentControlFrameDiagnosticsTest::RunTest(const FString& Par
 		Rig.Component->OnControlStepCompleted,
 		Recorder,
 		GET_FUNCTION_NAME_CHECKED(UUERLPolicyComponentTestEventRecorder, OnControlFrameCompleted));
-	TickPolicyWorld(Rig.World(), 0.005f);
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 
-	TestEqual(TEXT("first completed physics control step emits one diagnostic frame"), Recorder->ControlFrameCount, 1);
+	TestEqual(TEXT("reset-input decision emits one diagnostic frame"), Recorder->ControlFrameCount, 1);
 	if (!Recorder->ControlFrames.IsValidIndex(0))
 	{
 		AddError(TEXT("the first control-frame callback did not provide a snapshot"));
@@ -1788,17 +1804,17 @@ bool FUERLPolicyComponentControlFrameDiagnosticsTest::RunTest(const FString& Par
 		return false;
 	}
 	TestEqual(TEXT("first diagnostic frame has sequence one"), FirstFrame.Sequence, int64(1));
-	TestTrue(TEXT("diagnostic frame identifies a completed solver frame"), FirstFrame.SolverFrame >= 0);
-	TestTrue(TEXT("diagnostic frame includes the completed solver time"),
-		FMath::IsFinite(FirstFrame.SolverTimeSeconds) && FirstFrame.SolverTimeSeconds > 0.0);
-	TestTrue(TEXT("game time is aligned with the completed control frame"),
-		FMath::IsFinite(FirstFrame.GameElapsedSeconds) && FirstFrame.GameElapsedSeconds > 0.0);
-	TestTrue(TEXT("physics time is aligned with the completed control frame"),
-		FMath::IsFinite(FirstFrame.PhysicsElapsedSeconds) && FirstFrame.PhysicsElapsedSeconds > 0.0);
+	TestTrue(TEXT("diagnostic frame identifies the current reset solver frame"), FirstFrame.SolverFrame >= 0);
+	TestTrue(TEXT("diagnostic frame includes the current reset solver time"),
+		FMath::IsFinite(FirstFrame.SolverTimeSeconds) && FirstFrame.SolverTimeSeconds >= 0.0);
+	TestTrue(TEXT("bootstrap consumes no game-time window"),
+		FMath::IsFinite(FirstFrame.GameElapsedSeconds) && FirstFrame.GameElapsedSeconds == 0.0);
+	TestTrue(TEXT("bootstrap consumes no physics-time window"),
+		FMath::IsFinite(FirstFrame.PhysicsElapsedSeconds) && FirstFrame.PhysicsElapsedSeconds == 0.0);
 	TestTrue(TEXT("bootstrap observation uses the artifact DtMin"),
 		FMath::Abs(FirstFrame.ObservationDtSeconds - 0.005) < 2.0e-3);
-	TestTrue(TEXT("solver denominator reports the completed substep dt"),
-		FMath::Abs(FirstFrame.LastSolverStepSeconds - 0.005) < 1.0e-3);
+	TestTrue(TEXT("bootstrap has no completed solver denominator"),
+		FirstFrame.LastSolverStepSeconds == 0.0);
 	TestTrue(TEXT("first frame begins with cleared previous-action history"),
 		!FirstFrame.PreviousAction.ContainsByPredicate([](float Value) { return FMath::Abs(Value) > 1.0e-6f; }));
 	const FUERLPolicyCommandSample* FirstVelocity = FirstFrame.Commands.FindByPredicate(
@@ -1951,6 +1967,8 @@ bool FUERLPolicyComponentControlFrameCallbackLifecycleTest::RunTest(const FStrin
 		return false;
 	}
 
+	// Prime reset input so Stop/SoftReset callbacks below exercise completed physics.
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	UUERLPolicyComponentTestEventRecorder* Recorder = NewObject<UUERLPolicyComponentTestEventRecorder>();
 	Recorder->ControlFrameCallbackComponent = Rig.Component;
 	Recorder->ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::Stop;
@@ -1972,14 +1990,14 @@ bool FUERLPolicyComponentControlFrameCallbackLifecycleTest::RunTest(const FStrin
 		TestTrue(TEXT("restart re-latches each required command channel"), Rig.Component->SetCommand(Channel.Name, Zeros));
 	}
 	TestTrue(TEXT("explicit restart succeeds after callback stop"), Rig.Component->StartPolicy());
-	TickPolicyWorld(Rig.World(), 0.005f);
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	TestEqual(TEXT("restarted run emits its own first completed frame"), Recorder->ControlFrameCount, 2);
 	if (!Recorder->ControlFrames.IsValidIndex(1))
 	{
 		AddError(TEXT("the restarted control-frame callback did not provide a snapshot"));
 		return false;
 	}
-	TestEqual(TEXT("component sequence remains monotonic across restart"), Recorder->ControlFrames[1].Sequence, int64(2));
+	TestEqual(TEXT("component sequence remains monotonic across restart"), Recorder->ControlFrames[1].Sequence, int64(3));
 	TestTrue(TEXT("explicit restart is marked as a bootstrap boundary"), Recorder->ControlFrames[1].bBootstrap);
 	TestTrue(TEXT("restart starts with an artifact bootstrap-sized observation window"),
 		FMath::Abs(Recorder->ControlFrames[1].ObservationDtSeconds - 0.005) < 2.0e-3);
@@ -1993,7 +2011,7 @@ bool FUERLPolicyComponentControlFrameCallbackLifecycleTest::RunTest(const FStrin
 		Rig.Component->GetLastControlTiming().ObservationDtSeconds, 0.0);
 
 	Recorder->ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::RecordOnly;
-	TickPolicyWorld(Rig.World(), 0.005f);
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	TestEqual(TEXT("post-reset control starts only a new completed frame"), Recorder->ControlFrameCount, 4);
 	if (!Recorder->ControlFrames.IsValidIndex(3))
 	{
@@ -2001,7 +2019,7 @@ bool FUERLPolicyComponentControlFrameCallbackLifecycleTest::RunTest(const FStrin
 		return false;
 	}
 	const FUERLPolicyControlFrameSnapshot& ResetFrame = Recorder->ControlFrames[3];
-	TestEqual(TEXT("post-reset frame keeps its monotonic component sequence"), ResetFrame.Sequence, int64(4));
+	TestEqual(TEXT("post-reset frame keeps its monotonic component sequence"), ResetFrame.Sequence, int64(5));
 	TestTrue(TEXT("SoftReset is marked as a new bootstrap boundary"), ResetFrame.bBootstrap);
 	TestTrue(TEXT("post-reset frame uses a fresh bootstrap-sized dt"),
 		FMath::Abs(ResetFrame.ObservationDtSeconds - 0.005) < 2.0e-3);
@@ -2057,14 +2075,16 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	TickPolicyWorld(Rig.World(), 0.005f);
 	TestTrue(TEXT("host reset clears the policy and arms a new bootstrap"), Rig.Component->SoftReset());
 	TestTrue(TEXT("host records the matching episode boundary"), Trace->MarkEpisodeBoundary(1, TEXT("主机软重置")));
 	Rig.Component->OnControlStepOverrun.Broadcast(0.04f, 0.04f, 0.035f);
 	Rig.Component->OnCommandStale.Broadcast(FName(TEXT("velocity")), 0.04f);
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	TickPolicyWorld(Rig.World(), 0.005f);
 	TestTrue(TEXT("unannounced host restart arms a bootstrap frame"), Rig.Component->SoftReset());
-	TickPolicyWorld(Rig.World(), 0.005f);
+	Rig.Component->TickComponent(0.0f, ELevelTick::LEVELTICK_All, nullptr);
 	TestTrue(TEXT("trace stops and flushes successfully"), Trace->StopTrace());
 	TestFalse(TEXT("the concurrent writer cannot replace the completed trace"), ConcurrentTrace->StopTrace());
 	TestFalse(TEXT("a failed finalization does not later report success"), ConcurrentTrace->StopTrace());
@@ -2111,7 +2131,7 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 		&& Contents.Contains(TEXT("episode_step: 1"))
 		&& Contents.Contains(TEXT("sequence: 2")));
 	TestTrue(TEXT("unmarked restart event is linked to its exact bootstrap decision"),
-		Contents.Contains(TEXT("event: unmarked_bootstrap_boundary\n    sequence: 3\n    episode_index: 1\n    episode_step: 1")));
+		Contents.Contains(TEXT("event: unmarked_bootstrap_boundary\n    sequence: 5\n    episode_index: 1\n    episode_step: 2")));
 	TestTrue(TEXT("trace contains aligned clock and policy input/output fields"),
 		Contents.Contains(TEXT("solver_time_s:"))
 		&& Contents.Contains(TEXT("observation_dt_s:"))
@@ -2135,8 +2155,8 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("continuation trace output exists"),
 		FFileHelper::LoadFileToString(ContinuationContents, *ContinuationPath));
 	TestTrue(TEXT("event sequence inherits the component's monotonic sequence baseline"),
-		ContinuationContents.Contains(TEXT("event: control_step_overrun\n    sequence: 4"))
-		&& ContinuationContents.Contains(TEXT("kind: frame\n    sequence: 4")));
+		ContinuationContents.Contains(TEXT("event: control_step_overrun\n    sequence: 6"))
+		&& ContinuationContents.Contains(TEXT("kind: frame\n    sequence: 6")));
 	auto VerifyCallbackBoundaryOrdering = [this, &Rig](bool bTraceFirst, const FString& Label)
 	{
 		UUERLPolicyTraceRecorder* OrderedTrace = NewObject<UUERLPolicyTraceRecorder>(Rig.Host);
@@ -2300,6 +2320,58 @@ bool FUERLPolicyTraceRecorderEmptyCommandsTest::RunTest(const FString& Parameter
 	Rig.Component->StopPolicy();
 	AddInfo(TEXT(
 		"[VERIFY] AC_UE_INT_COMPONENT_022: CartPole trace with no command channels writes commands: []"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLPolicyBootstrapBeforePhysicsTest,
+	"UERL.Integration.Policy.Component.AC_UE_INT_COMPONENT_031.BootstrapObservesResetBeforePhysics",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPolicyBootstrapBeforePhysicsTest::RunTest(const FString& Parameters)
+{
+	UUERLPolicyArtifactAsset* Asset = RequirePhantomXAsset(*this);
+	if (!Asset) { return false; }
+	FComponentTestRig Rig;
+	if (!Rig.Build(*this, Asset)) { return false; }
+	FDeployPhysicsSettingsGuard Guard(0.005f, 10);
+	UUERLPolicyComponentTestEventRecorder* Recorder = NewObject<UUERLPolicyComponentTestEventRecorder>();
+	BindRecorderEvent(Rig.Component->OnControlStepCompleted, Recorder,
+		GET_FUNCTION_NAME_CHECKED(UUERLPolicyComponentTestEventRecorder, OnControlFrameCompleted));
+	if (!StartWithZeroCommand(*this, Rig.Component)) { return false; }
+	FUERLSolverClockSnapshot InitialClock;
+	FString Error;
+	TestTrue(TEXT("initial solver clock is readable"), ReadUERLSolverClock(*Rig.World(), InitialClock, Error));
+	TestEqual(TEXT("Start does not infer synchronously inside caller callbacks"), Recorder->ControlFrameCount, 0);
+	TickPolicyWorld(Rig.World(), 0.020f);
+	TestEqual(TEXT("first world tick infers once before physics and once after its completed window"), Recorder->ControlFrameCount, 2);
+	if (Recorder->ControlFrames.Num() < 2) { return false; }
+	const FUERLPolicyControlFrameSnapshot& Bootstrap = Recorder->ControlFrames[0];
+	const FUERLPolicyControlFrameSnapshot& Completed = Recorder->ControlFrames[1];
+	TestTrue(TEXT("first decision is explicitly bootstrap"), Bootstrap.bBootstrap);
+	TestEqual(TEXT("bootstrap consumes reset state before a new solver frame"), Bootstrap.SolverFrame, InitialClock.Frame);
+	TestTrue(TEXT("bootstrap has no fabricated completed physics window"), Bootstrap.PhysicsElapsedSeconds == 0.0);
+	TestTrue(TEXT("bootstrap has no fabricated impulse denominator"), Bootstrap.LastSolverStepSeconds == 0.0);
+	TestFalse(TEXT("second decision is a completed-window input"), Completed.bBootstrap);
+	TestTrue(TEXT("initial action drives the first full physics window"), Completed.SolverFrame > Bootstrap.SolverFrame);
+	TestTrue(TEXT("first completed window retains all 20ms"), FMath::Abs(Completed.PhysicsElapsedSeconds - 0.020) < 1.e-6);
+	TestTrue(TEXT("first completed window reads the actual last solver dt"), FMath::Abs(Completed.LastSolverStepSeconds - 0.005) < 1.e-6);
+	Recorder->ControlFrameCallbackComponent = Rig.Component;
+	Recorder->ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::SoftReset;
+	TickPolicyWorld(Rig.World(), 0.020f);
+	TestEqual(TEXT("post-physics callback reset does not infer again in the same tick"), Recorder->ControlFrameCount, 3);
+	TestTrue(TEXT("callback reset arms a future pre-physics bootstrap"), Rig.Component->IsBootstrapPending());
+	TestEqual(TEXT("callback reset leaves no consumed control timing"), Rig.Component->GetLastControlTiming().ObservationDtSeconds, 0.0);
+	Recorder->ControlFrameCallbackMode = EUERLPolicyTestFrameCallbackMode::RecordOnly;
+	TickPolicyWorld(Rig.World(), 0.020f);
+	TestEqual(TEXT("next world tick emits a reset input and its completed successor"), Recorder->ControlFrameCount, 5);
+	if (Recorder->ControlFrames.Num() >= 5)
+	{
+		TestTrue(TEXT("new bootstrap clears previous action history"), Recorder->ControlFrames[3].bBootstrap
+			&& !Recorder->ControlFrames[3].PreviousAction.ContainsByPredicate([](float V) { return V != 0.0f; }));
+		TestFalse(TEXT("new successor is a completed window"), Recorder->ControlFrames[4].bBootstrap);
+	}
+	Rig.Component->StopPolicy();
 	return true;
 }
 
