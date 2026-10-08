@@ -15,16 +15,17 @@ scope:
   - scripts/run_all_tests.py
   - scripts/run_e2e.py
   - scripts/test_runner_support.py
+  - engine/Plugins/UERLEngine/Source/UERLPolicyEditor/Private/UERLPolicyEditorTests.cpp
   includes: All tracked members, including manual checks, fixture corpora/generators, helpers, indexes and runner
     configuration
   excluded: Product implementation and deployment artifact generation belong to their feature reviews
 counts:
-  tracked_files: 236
-  full_file_reviews: 236
+  tracked_files: 237
+  full_file_reviews: 237
   carried_focused_reviews: 0
   not_reviewed: 0
   remaining_full_file_reviews: 0
-  new_full_file_reviews_this_round: 220
+  new_full_file_reviews_this_round: 221
 limits:
 - File review counts are not executed test counts.
 - confirmed-gap records the original coverage gap; implementation_status records its repair.
@@ -252,6 +253,27 @@ files:
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
   implementation_status: retained
+  owner: 'Issue #29 complete repository review'
+- path: engine/Plugins/UERLEngine/Source/UERLPolicyEditor/Private/UERLPolicyEditorTests.cpp
+  layer: native
+  review_scope: full-file
+  contract: Editor raw policy import/reimport, packaging readiness, asset validation and deployment physics diagnostics
+  required_host: UE5.8 Editor Automation, real cartpole_controller corpus and shipped PhantomXContinuousTerrain116
+    asset
+  oracle: 'Five named cases: .uerlpol2 accepted/.json rejected, imported bytes nonempty and reimport bitwise-stable
+    with source path; game module OR prebuilt binaries accepted and neither rejected with remedies; missing bytes/mesh
+    invalid, shipped artifact valid; no shipped artifact issues; synchronous 5ms/7 substeps accepted and disabled
+    substepping yields concrete ini remedies. Scoped guard restores all five mutated physics settings.'
+  disposition: strengthen
+  finding_status: confirmed-gap
+  reachable_failure: FactoryAndReimport indexes ReimportPaths[0] after nonfatal CanReimport and Num()==1 assertions.
+    A real handler regression returning no paths aborts Automation instead of a bounded test failure.
+  planned_assertion: Return false after failed CanReimport or incorrect path count before indexing; retain exact
+    source-path and byte equality assertions.
+  implementation_status: implemented prerequisite guard; exact-source Editor rebuild and five-case Automation pending
+  evidence: Complete file source read; all five registered cases and fixture/physics lifetimes inspected. Tracked
+    filename and actual Automation/Python test-definition scans find this as the only additional source omitted
+    from the 236-entry inventory.
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLActuatorLawTests.cpp
   layer: native
@@ -793,9 +815,9 @@ files:
   review_scope: full-file
   contract: Real raw Session Describe/Commit/Ready/Step/sparseReset and persisted contract
   required_host: Windows UE5.8 Worker + CartPole content
-  oracle: Two real Slots receive distinct physical targets; selected cart velocity is nonzero before reset; reset
-    Slot0 state is zero within 1e-5 and every untouched Slot1 raw state field is unchanged. Repeated manifest contract
-    matches.
+  oracle: Distinct physical actions and selected reset-to-zero; exact response mask/episode increments and unselected
+    wire zero padding. Subsequent Step Slot1 values match a separate identical two-Step run without Reset within
+    float32 absolute 1e-6, while motion exceeds 1e-4.
   disposition: strengthen
   reachable_failure: Zeroed reset selects Slot0 but only response length checked; incorrect sparse reset or unchanged
     state can pass shape checks. VERIFY claims in_flight_max1 without measuring it.
@@ -860,9 +882,9 @@ files:
   review_scope: full-file
   contract: Real terrain primitive negotiation and per-Slot curriculum Reset seam
   required_host: Windows UE5.8 Worker + PhantomX/procedural plane/heightfield/boxes
-  oracle: Real negotiated terrain/hash/layout and persisted manifest match; plane scans are flat, heightfield and
-    boxes scans vary; selected levels change observations while all unselected Slot state fields stay identical;
-    invalid tier rejected.
+  oracle: Actual plane scans flat and heightfield/boxes non-flat. Sparse RESET supplies a deliberately different
+    unused plane tier; the next Step proves the unselected Slot retains its heightfield. Literal episode vectors
+    [2,3] then [3,3] and response masks prove only selected episodes advance. Invalid tier rejected.
   disposition: strengthen
   owner: 'Issue #29 complete repository review'
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence

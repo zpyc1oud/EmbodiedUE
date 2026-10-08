@@ -1,10 +1,12 @@
 # Test-quality review
 
 [Issue #29](https://github.com/zpyc1oud/EmbodiedUE/issues/29) owns the repository-wide assertion review.
-[The YAML record](issue29-review.yaml) accounts for 236 tracked test and support files at its recorded baseline.
+[The YAML record](issue29-review.yaml) accounts for 237 tracked test and support files at its recorded baseline.
 It includes the external example test and tooling/CI configuration missing from the earlier 231-file inventory.
 
-All 236 files now have full-file review decisions: the previous 16 plus 220 completed in this round.
+All 237 files now have full-file review decisions: the previous 16, all 220 requested remaining files,
+and one newly found Editor test source outside the Tests directories.
+A scan of tracked test names and executable test definitions reconciles that extra source.
 The record covers assertions, helpers, runners and complete fixture contents, including binary policy plans and tensors.
 The retained source-review archive contains detailed numerical checks; the tracked record summarizes each oracle and consumer.
 Runtime acceptance is recorded separately from file-review completion.
@@ -42,8 +44,9 @@ Runner completion checks reject failed or duplicate Automation identities and re
 142 core cases plus 13 terrain/Robot cases. PIEAttach is the separate E2E case.
 A real Windows trainer/child timeout test checks owned-tree cleanup; controlled failure
 cases verify that cleanup errors do not replace the primary error or prevent other cleanup.
-Real E2E now checks sparse reset state, plane/heightfield/boxes observations and unchanged
-Slots. The startup event case verifies the actual RESET payload sent through Session.
+Real E2E now compares the untouched CartPole Slot against a no-reset physical control run.
+Terrain cases verify plane/heightfield/boxes observations, retained unselected tiers and episode counters.
+Raw RESET payloads zero-fill unselected rows; these are protocol padding, not physical snapshots. The startup event case verifies the actual RESET payload sent through Session.
 
 ## Real workflow matrix
 

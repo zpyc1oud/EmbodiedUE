@@ -284,6 +284,8 @@ def test_worker_cleanup_attempts_all_resources_and_preserves_primary(
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows owned process tree cleanup")
 def test_training_timeout_reclaims_real_windows_descendant(tmp_path: Path) -> None:
+    if sys.platform != "win32":
+        pytest.skip("Windows owned process tree cleanup")
     import ctypes
     import time
 

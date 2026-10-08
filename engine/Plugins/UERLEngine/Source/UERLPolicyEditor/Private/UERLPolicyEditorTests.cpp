@@ -78,8 +78,11 @@ bool FUERLPolicyEditorFactoryTest::RunTest(const FString& Parameters)
 #endif
 	FUERLPolicyArtifactReimportHandler Handler;
 	TArray<FString> ReimportPaths;
-	TestTrue(TEXT("reimport handler recognizes imported asset"), Handler.CanReimport(Asset, ReimportPaths));
-	TestEqual(TEXT("reimport path count"), ReimportPaths.Num(), 1);
+	if (!TestTrue(TEXT("reimport handler recognizes imported asset"), Handler.CanReimport(Asset, ReimportPaths))
+		|| !TestEqual(TEXT("reimport path count"), ReimportPaths.Num(), 1))
+	{
+		return false;
+	}
 	TestEqual(TEXT("reimport keeps source path"), ReimportPaths[0], SourcePath);
 	TestEqual(TEXT("reimport succeeds"), Handler.Reimport(Asset), EReimportResult::Succeeded);
 	TestTrue(TEXT("reimport keeps bytes bitwise"), Asset->ArtifactBytes == Before);

@@ -372,5 +372,7 @@ Native `UERLTerrainGeneratorTests.cpp` checks the requested plane footprint, the
 9-by-9 heightfield vertex count and the 4-by-4 box raster. Failed size/parse preconditions
 return before indexing the failed output, preserving a diagnostic failure instead of a crash.
 `test_terrain_curriculum.py` decodes actual UE terrain observations after distinct level resets
-and checks the unaffected Slot. Its plane/non-plane oracle complements the exact native
+and checks the unaffected Slot tier and episode count after a real Step. Raw RESET responses
+zero-fill unselected rows; use subsequent physical observations instead of treating padding
+as an unchanged-state snapshot. Its plane/non-plane oracle complements the exact native
 geometry checks; neither proves learned locomotion quality.
