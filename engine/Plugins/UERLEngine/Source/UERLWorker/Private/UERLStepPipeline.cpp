@@ -293,6 +293,7 @@ void UUERLStepPipeline::OnPrePhysics()
 	{
 		return;
 	}
+	Runtime.AdvanceEnvironmentPhysicsFrame();
 	Runtime.BeginPhysicsFrameTiming();
 }
 

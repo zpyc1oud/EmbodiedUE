@@ -114,6 +114,11 @@ bool FUERLEnvironmentPool::Create(
 		return false;
 	}
 
+	if (!Environment->BindRobot(*Robot, OutError))
+	{
+		Destroy();
+		return false;
+	}
 	Episodes.SetNumZeroed(NumSlots);
 	bCreated = true;
 	return true;
@@ -121,6 +126,7 @@ bool FUERLEnvironmentPool::Create(
 
 void FUERLEnvironmentPool::Destroy()
 {
+	EndControlWindow();
 	for (const auto& Entry : OriginalGroundMaterials)
 	{
 		if (UPrimitiveComponent* Ground = Entry.Key.Get())
@@ -164,6 +170,21 @@ bool FUERLEnvironmentPool::ApplyCommands(const FUERLNamedActionReader& Reader, F
 bool FUERLEnvironmentPool::RequiresCommandsEveryPhysicsFrame() const
 {
 	return Robot->RequiresCommandsEveryPhysicsFrame();
+}
+
+void FUERLEnvironmentPool::BeginControlWindow()
+{
+	if (bCreated && Environment) { Environment->BeginControlWindow(); }
+}
+
+void FUERLEnvironmentPool::AdvancePhysicsFrame(double PhysicsDt)
+{
+	if (bCreated && Environment) { Environment->AdvancePhysicsFrame(PhysicsDt); }
+}
+
+void FUERLEnvironmentPool::EndControlWindow()
+{
+	if (Environment) { Environment->EndControlWindow(); }
 }
 
 void FUERLEnvironmentPool::SamplePhysicsContacts(double SolverStepSeconds)

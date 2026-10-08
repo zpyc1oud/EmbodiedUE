@@ -366,6 +366,11 @@ namespace
 			return bReset;
 		}
 
+		virtual AActor* GetSlotActor(int32 SlotId) const override
+		{
+			return Slots.IsValidIndex(SlotId) ? Slots[SlotId].Owner.Get() : nullptr;
+		}
+
 		virtual bool GetPrimaryActorTransform(FTransform& OutTransform, FString& OutError) const override
 		{
 			if (Slots.IsEmpty() || !Slots[0].Component.IsValid())

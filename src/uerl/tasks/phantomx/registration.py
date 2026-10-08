@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
+from dataclasses import fields, replace
 from math import ceil, hypot
 from pathlib import Path
 from typing import cast
@@ -20,6 +20,8 @@ from ...core.mdp.managers.event import EventManager
 from ...core.mdp.terms import EventCfg, EventTermCfg
 from ..registry.models import TaskRegistration
 from ..registry.tasks import TaskRegistry
+from .catch import PhantomXCatchTaskConfig, create_phantomx_catch_direct_task
+from .catch_evaluation import CatchEvaluator, format_catch_evaluation
 from .config import (
     PHANTOMX_DISCRETE_TERRAIN_CONFIG_PATH,
     PHANTOMX_DISCRETE_TERRAIN_ENVIRONMENT_ID,
@@ -455,8 +457,51 @@ def create_phantomx_discrete_terrain_registration() -> TaskRegistration:
     )
 
 
+def create_phantomx_catch_registration() -> TaskRegistration:
+    """Register the single-Robot procedural Catch arena and contact objective."""
+
+    def config_factory() -> PhantomXCatchTaskConfig:
+        base = create_phantomx_task_config()
+        return PhantomXCatchTaskConfig(**{item.name: getattr(base, item.name) for item in fields(base)})
+
+    def worker_factory() -> WorkerConfig:
+        return replace(
+            create_phantomx_worker_config(), slot_count=1,
+            environment_id="uerl.environment.catch",
+            environment_config={
+                "environment.target_x_m": 1.5,
+                "environment.target_y_m": 0.0,
+                "environment.target_speed_mps": 0.15,
+                "environment.target_path_radius_m": 0.5,
+                "environment.use_player_target": 0.0,
+            },
+        )
+
+    def task_factory(
+        config: DirectTaskConfig, *, robot_spec: RobotSpec | None = None,
+        observation_shapes: ObservationShapeTable | None = None,
+    ) -> PhantomXTask:
+        training = load_phantomx_training_config()
+        return create_phantomx_catch_direct_task(
+            config, robot_spec=robot_spec, observation_shapes=observation_shapes,
+            control_dt=training.worker.physics_dt * training.worker.decimation[0],
+            batch_size=1, device="cpu",
+        )
+
+    return TaskRegistration(
+        task_id="UERL-PhantomX-Catch-v0", task_version=PHANTOMX_TASK_VERSION,
+        environment_id="uerl.environment.catch", robot_id=PHANTOMX_ROBOT_ID,
+        task_factory=task_factory, worker_config_factory=worker_factory,
+        task_config_factory=config_factory, runner_config_factory=create_phantomx_runner_config,
+        session_config=SessionConfig(map_path="/Engine/Maps/Entry"), logging_config=LoggingConfig(),
+        evaluation_factory=CatchEvaluator, evaluation_formatter=format_catch_evaluation,
+        event_manager_factory=create_phantomx_event_manager,
+    )
+
+
 def register_phantomx(registry: TaskRegistry) -> None:
     registry.register(create_phantomx_registration())
+    registry.register(create_phantomx_catch_registration())
     registry.register(create_phantomx_pursuit_registration())
     registry.register(create_phantomx_terrain_registration())
     registry.register(create_phantomx_discrete_terrain_registration())

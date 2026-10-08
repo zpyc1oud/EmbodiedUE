@@ -132,6 +132,8 @@ enum class EUERLSlotFaultCode : uint8
 	TerrainBoundary = 5,
 };
 
+class IUERLRobot;
+
 class UERLPROVIDER_API IUERLEnvironment
 {
 public:
@@ -152,6 +154,14 @@ public:
 		const FUERLTerrainConfig& TerrainConfig,
 		TArray<FUERLSlotContext>& OutSlots,
 		FString& OutError) = 0;
+	/** Bind interaction targets after the Robot has spawned into stable Slots. */
+	virtual bool BindRobot(IUERLRobot& Robot, FString& OutError) { return true; }
+	/** Arm Environment interactions only for the Worker-owned control window. */
+	virtual void BeginControlWindow() {}
+	/** Advance Environment-owned kinematic objects by one fixed physics interval. */
+	virtual void AdvancePhysicsFrame(double PhysicsDt) {}
+	/** Disarm interactions before control returns to the caller. */
+	virtual void EndControlWindow() {}
 	/** Resolve the cached Ground frame for one Slot and terrain level. */
 	virtual bool ResolveGroundFrame(
 		int32 SlotId,
@@ -202,6 +212,8 @@ public:
 	}
 	/** Apply indexed reset values to the selected Robot Slots. */
 	virtual bool ResetSlots(const FUERLResetBatch& Reset, FString& OutError) = 0;
+	/** Return a Slot actor for explicit Environment interaction binding. */
+	virtual AActor* GetSlotActor(int32 SlotId) const { return nullptr; }
 	/** Read the owned Slot actor transform for direct-runtime pose resets. */
 	virtual bool GetPrimaryActorTransform(FTransform& OutTransform, FString& OutError) const
 	{

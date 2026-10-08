@@ -56,6 +56,10 @@ public:
 	bool InitializeSlots(const TArray<uint16>& TerrainLevels, FString& OutError);
 	/** Return the active Robot's physical command retention requirement. */
 	bool RequiresCommandsEveryPhysicsFrame() const;
+	/** Delegate the Worker-owned interaction window and fixed-step target movement. */
+	void BeginControlWindow();
+	void AdvancePhysicsFrame(double PhysicsDt);
+	void EndControlWindow();
 	/** Sample the active Robot's terminal support and latest solver-step force. */
 	void SamplePhysicsContacts(double SolverStepSeconds);
 	/** Apply one validated scene/physics event to selected Slots. */

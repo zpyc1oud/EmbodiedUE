@@ -49,6 +49,8 @@ class _FakeDirectEnv:
             torch.tensor([False, True]),
             {
                 "episode_metrics": {"/cartpole/alive": torch.ones(2)},
+                "terminal_observation_valid": torch.tensor([False, True]),
+                "slot_fault_code": torch.tensor([2, 0]),
                 "terminal_episode_length": torch.tensor([3, 4]),
                 "transition_dt": torch.tensor([0.02, 0.02]),
             },
@@ -83,6 +85,8 @@ def test_wrapper_maps_observations_done_and_timeout_without_resetting() -> None:
     assert torch.equal(extras["time_outs"], torch.tensor([False, True]))
     assert torch.equal(extras["terminal_episode_length"], torch.tensor([3, 4]))
     assert torch.equal(extras["transition_dt"], torch.tensor([0.02, 0.02]))
+    assert extras["state_valid"].tolist() == [False, True]
+    assert extras["slot_fault_code"].tolist() == [2, 0]
     assert fake.reset_seeds == []
     assert torch.equal(fake.step_actions[0], torch.tensor([[0.25], [-0.5]]))
 

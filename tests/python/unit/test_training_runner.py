@@ -491,6 +491,8 @@ def test_run_evaluation_loads_checkpoint_and_aggregates_completed_episodes(
             torch.tensor([True, True]),
             {
                 "terminal_episode_length": torch.tensor([10, 1]),
+                "state_valid": torch.ones(2, dtype=torch.bool),
+                "slot_fault_code": torch.zeros(2, dtype=torch.long),
                 "transition_dt": 0.005,
                 "log": {
                     "phantomx/forward_velocity": torch.tensor([0.2, 0.4]),
@@ -519,6 +521,8 @@ def test_run_evaluation_loads_checkpoint_and_aggregates_completed_episodes(
             torch.tensor([False, True]),
             {
                 "terminal_episode_length": torch.tensor([1, 20]),
+                "state_valid": torch.ones(2, dtype=torch.bool),
+                "slot_fault_code": torch.zeros(2, dtype=torch.long),
                 "transition_dt": 0.035,
                 "log": {
                     "phantomx/forward_velocity": torch.tensor([0.4, 0.6]),

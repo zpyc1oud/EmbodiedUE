@@ -103,12 +103,12 @@ from uerl.core.direct.task import DirectTask
 from uerl.core.direct.capabilities import CapabilityStatus
 assert repository_config_root().is_relative_to(Path(sys.argv[1]))
 registry = create_default_registry(external_tasks=())
-assert len(registry.list()) == 5
+assert len(registry.list()) == 6
 for entry in registry.list():
     build_run_config(entry.task_id)
 os.environ['UERL_TASK_PLUGINS'] = 'example-cartpole,balance-demo,example-direct-cartpole,direct-balance-demo'
 registry = create_default_registry()
-assert len(registry.list()) == 9
+assert len(registry.list()) == 10
 example_config = registry.create_task_config('Example-CartPole-v0')
 generated_config = registry.create_task_config('UERL-BalanceDemo-v0')
 direct_config = registry.create_task_config('UERL-DirectCartPole-v0')

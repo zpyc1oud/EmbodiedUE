@@ -700,3 +700,19 @@ def test_default_moving_commands_include_low_speed_samples() -> None:
     assert torch.any(velocity[:, 0] < 0.1)
     assert torch.any(velocity[:, 0] > 0.4)
     assert torch.equal(velocity[:, 1:], torch.zeros(128, 2))
+
+
+def test_catch_requires_contact_and_failure_takes_precedence() -> None:
+    from uerl.tasks.phantomx.catch import TARGET_CAPTURE_FIELD, create_phantomx_catch_direct_task
+
+    task = create_phantomx_catch_direct_task(
+        PhantomXTaskConfig(), robot_spec=_robot_spec(), observation_shapes=SHAPES,
+        control_dt=0.02, batch_size=3, device="cpu",
+    )
+    state = _state(task, num_envs=3, pursuit_target=torch.tensor([[0.001, 0.0, 0.0]] * 3))
+    state[TARGET_CAPTURE_FIELD] = torch.tensor([0.0, 1.0, 1.0])
+    state["robot.body.base_link.contact_force"] = torch.tensor([0.0, 0.0, 2.0])
+    result = task.compute_terminations(_context(task, state))
+    # Nearness alone cannot capture. A fallen robot cannot claim capture success.
+    assert torch.equal(result.reason["capture"], torch.tensor([False, True, False]))
+    assert torch.equal(result.terminated, torch.tensor([False, True, True]))

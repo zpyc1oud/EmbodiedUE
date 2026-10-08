@@ -113,6 +113,8 @@ public:
 	/** Apply the active command batch before the next physics frame. */
 	bool ApplyActiveCommands();
 	bool ShouldApplyActiveCommands() const;
+	/** Advance Environment-owned targets once before the next solver frame. */
+	void AdvanceEnvironmentPhysicsFrame();
 	/** Start timing the Engine/Chaos portion of the current physics frame. */
 	void BeginPhysicsFrameTiming();
 	/** Finish timing the Engine/Chaos portion of the current physics frame. */

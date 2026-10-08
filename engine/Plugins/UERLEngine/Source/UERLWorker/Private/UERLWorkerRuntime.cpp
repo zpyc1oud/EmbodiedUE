@@ -91,6 +91,7 @@ void FUERLWorkerRuntime::Deactivate()
 		return;
 	}
 
+	if (Pool) { Pool->EndControlWindow(); }
 	Phase.Store(EUERLWorkerPhase::ShuttingDown);
 	bBridgeDisconnected.Store(true);
 	CloseFrameGate();
@@ -660,6 +661,7 @@ void FUERLWorkerRuntime::BeginStep(FUERLBridgeRequest& Request)
 	ActiveStepDecimation = Request.StepDecimation;
 	RemainingFrames = ActiveStepDecimation;
 	Phase.Store(EUERLWorkerPhase::ActiveStep);
+	Pool->BeginControlWindow();
 	Request.Succeed();
 }
 
@@ -693,6 +695,14 @@ bool FUERLWorkerRuntime::ShouldApplyActiveCommands() const
 	}
 #endif
 	return RemainingFrames == GetActiveStepDecimation() || Pool->RequiresCommandsEveryPhysicsFrame();
+}
+
+void FUERLWorkerRuntime::AdvanceEnvironmentPhysicsFrame()
+{
+	if (Pool && Phase.Load() == EUERLWorkerPhase::ActiveStep)
+	{
+		Pool->AdvancePhysicsFrame(ActiveProjection.PhysicsDt);
+	}
 }
 
 void FUERLWorkerRuntime::BeginPhysicsFrameTiming()
@@ -733,6 +743,7 @@ void FUERLWorkerRuntime::FinishActiveStep()
 	{
 		return;
 	}
+	Pool->EndControlWindow();
 	const double StateStartSeconds = FPlatformTime::Seconds();
 	const double ContactStartSeconds = FPlatformTime::Seconds();
 	Pool->SamplePhysicsContacts(ActiveProjection.PhysicsDt);
@@ -845,6 +856,7 @@ void FUERLWorkerRuntime::ExecuteReset(FUERLBridgeRequest& Request)
 
 void FUERLWorkerRuntime::ExecuteShutdown(FUERLBridgeRequest& Request)
 {
+	if (Pool) { Pool->EndControlWindow(); }
 	Phase.Store(EUERLWorkerPhase::ShuttingDown);
 	CloseFrameGate();
 	if (Pool) { Request.EpisodeIndices = Pool->EpisodeIndices(); }
@@ -889,6 +901,7 @@ void FUERLWorkerRuntime::FailWorker(
 	FUERLBridgeRequest* Request,
 	int32 ErrorCode)
 {
+	if (Pool) { Pool->EndControlWindow(); }
 	UE_LOG(LogUERLWorker, Error, TEXT("[VERIFY] Worker Session-fatal: %s"), *Message);
 	Phase.Store(EUERLWorkerPhase::Failed);
 	RemainingFrames = 0;

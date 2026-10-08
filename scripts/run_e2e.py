@@ -14,6 +14,7 @@ PYTEST_TARGETS = {
     "ue": (
         "tests/e2e/test_cartpole_worker.py",
         "tests/e2e/test_phantomx_worker.py",
+        "tests/e2e/test_catch_worker.py",
         "tests/e2e/test_event_manager.py",
     ),
 }

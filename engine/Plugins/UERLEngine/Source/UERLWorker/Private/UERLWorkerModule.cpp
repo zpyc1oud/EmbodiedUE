@@ -1,5 +1,6 @@
 #include "Modules/ModuleManager.h"
 #include "UERLAuthoredPursuitEnvironment.h"
+#include "UERLCatchEnvironment.h"
 #include "UERLIsolatedGridEnvironment.h"
 #include "UERLRegistry.h"
 #include "UERLSharedMapEnvironment.h"
@@ -13,6 +14,12 @@ public:
 	virtual void StartupModule() override
 	{
 		FString Error;
+		bCatchRegistered = FUERLEnvironmentRegistry::Get().RegisterFactory(UERLCatch::MakeFactory(), Error);
+		if (!bCatchRegistered)
+		{
+			UE_LOG(LogUERLWorker, Error, TEXT("Catch Environment registration failed: %s"), *Error);
+		}
+		Error.Reset();
 		bAuthoredPursuitRegistered = FUERLEnvironmentRegistry::Get().RegisterFactory(
 			UERLAuthoredPursuit::MakeFactory(), Error);
 		if (!bAuthoredPursuitRegistered)
@@ -38,6 +45,11 @@ public:
 
 	virtual void ShutdownModule() override
 	{
+		if (bCatchRegistered)
+		{
+			FUERLEnvironmentRegistry::Get().UnregisterFactory(UERLCatch::EnvironmentId);
+			bCatchRegistered = false;
+		}
 		if (bIsolatedGridRegistered)
 		{
 			FUERLEnvironmentRegistry::Get().UnregisterFactory(UERLIsolatedGrid::EnvironmentId);
@@ -57,6 +69,7 @@ public:
 	}
 
 private:
+	bool bCatchRegistered = false;
 	bool bAuthoredPursuitRegistered = false;
 	bool bSharedMapRegistered = false;
 	bool bIsolatedGridRegistered = false;

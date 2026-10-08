@@ -544,7 +544,11 @@ def run_evaluation(
                 previous_observations = observations
                 observations, rewards, dones, extras = vec_env.step(actions.to(vec_env.device))
                 observations = observations.to(config.runner.device)
-                metrics = {**extras["log"], "transition_dt_s": extras["transition_dt"]}
+                metrics = {
+                    **extras["log"], "transition_dt_s": extras["transition_dt"],
+                    "runtime/state_valid": extras["state_valid"],
+                    "runtime/slot_fault_code": extras["slot_fault_code"],
+                }
                 if evaluator is not None:
                     evaluator.observe(
                         observations=previous_observations.to(vec_env.device),

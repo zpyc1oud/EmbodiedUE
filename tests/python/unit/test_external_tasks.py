@@ -14,7 +14,7 @@ def test_only_enabled_entry_point_is_loaded(monkeypatch: pytest.MonkeyPatch) -> 
         EntryPoint(name="unused", value="missing_package:factory", group="uerl.tasks"),
     ])
     monkeypatch.setattr("importlib.metadata.entry_points", lambda **kwargs: points)
-    assert len(create_default_registry(external_tasks=()).list()) == 5
+    assert len(create_default_registry(external_tasks=()).list()) == 6
     # Loading the real factory proves discovery reaches existing duplicate validation.
     from uerl.errors import RegistryError
     with pytest.raises(RegistryError, match="cartpole.*already registered") as error:
@@ -66,4 +66,4 @@ def test_cli_reports_duplicate_without_recursive_suggestions(
     monkeypatch.setenv("UERL_TASK_PLUGINS", " duplicate ")
     assert main(["tasks"]) == 1
     assert "already registered" in capsys.readouterr().out
-    assert len(create_default_registry(external_tasks=()).list()) == 5
+    assert len(create_default_registry(external_tasks=()).list()) == 6

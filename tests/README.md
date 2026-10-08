@@ -134,7 +134,7 @@ The command `scripts/run_e2e.py --suite all` includes `PIEAttach` and supplies i
 
 ```powershell
 $automationGroups = @(
-  'UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component',
+  'UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Worker.Catch+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component',
   'UERL.Integration.Robot.GenericDrive+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+UERL.Integration.Robot.TopologyReflector+UERL.Integration.Worker.EnvironmentPool+UERL.Integration.Worker.Terrain'
 )
 foreach ($group in $automationGroups) {
@@ -215,3 +215,11 @@ distinct action rows, independent native network/terrain values and sparse E2E r
 Runner tests include unsuccessful/duplicate Automation completions and actual Windows
 owned-descendant timeout cleanup. Test-support sockets and packaging commands have bounded waits.
 See the [review matrix](../docs/testing/README.md#real-workflow-matrix) for retained task smoke scope.
+
+## Catch interaction gates
+
+`test_catch_worker.py` checks target movement, actual contact capture and reset through
+a real Worker. The native `UERL.Unit.Worker.Catch.ContactOwnership` case checks the
+event binding and active-window rules. `UERL.Integration.Worker.Catch.BlockingContact`
+uses completed Chaos frames; a manually broadcast hit is not its physical oracle.
+Both native gates are included in the core Automation group.

@@ -97,6 +97,8 @@ class UERLVecEnvWrapper(VecEnv):  # type: ignore[misc]
             "time_outs": truncated & ~terminated,
             "transition_dt": info["transition_dt"],
             "terminal_episode_length": info["terminal_episode_length"],
+            "state_valid": info["terminal_observation_valid"],
+            "slot_fault_code": info["slot_fault_code"],
             "log": dict(episode_metrics) if isinstance(episode_metrics, Mapping) else {},
         }
         return self._to_tensor_dict(observations), rewards, terminated | truncated, extras

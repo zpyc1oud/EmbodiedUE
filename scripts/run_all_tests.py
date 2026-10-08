@@ -19,13 +19,14 @@ UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
         "UERL.Unit+"
         "UERL.Integration.Worker.SlotCollision+"
         "UERL.Integration.Worker.SharedWorldCollision+"
+        "UERL.Integration.Worker.Catch+"
         "UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+"
         "UERL.Integration.Policy.Contact+"
         "UERL.Integration.Policy.Ground+"
         "UERL.Integration.Policy.Clock+"
         "UERL.Integration.Policy.Controller+"
         "UERL.Integration.Policy.Component",
-        142,
+        145,
     ),
     (
         "additional robot, environment-pool, and terrain integration",
