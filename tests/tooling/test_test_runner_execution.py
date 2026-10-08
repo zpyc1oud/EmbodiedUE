@@ -179,6 +179,25 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
     assert commands[-1] == [sys.executable, "-m", "pytest", "-v", "-s", "tests/e2e"]
 
 
+def _linux_process_exited(state_file: Path) -> bool:
+    # The kernel can reap the child between exists() and read_text(). Read once.
+    try:
+        state = state_file.read_text().split(") ", 1)[1].split()[0]
+    except FileNotFoundError:
+        return True
+    return state == "Z"  # Exited and awaiting reaping by the container's init.
+
+
+@pytest.mark.parametrize("content,exited", [(None, True), ("12 (python) Z 1", True), ("12 (python) S 1", False)])
+def test_owned_process_exit_probe_accepts_reaping_but_rejects_a_live_child(
+    tmp_path: Path, content: str | None, exited: bool,
+) -> None:
+    state_file = tmp_path / "stat"
+    if content is not None:
+        state_file.write_text(content)
+    assert _linux_process_exited(state_file) is exited
+
+
 @pytest.mark.skipif(sys.platform != "linux", reason="Inspect the owned descendant through Linux /proc")
 def test_timeout_stops_descendant_that_ignores_termination(tmp_path: Path) -> None:
     import time
@@ -194,11 +213,9 @@ def test_timeout_stops_descendant_that_ignores_termination(tmp_path: Path) -> No
     child_pid = int(Path(str(run.stages[0].log)).read_text().strip())
     state_file = Path(f"/proc/{child_pid}/stat")
     deadline = time.monotonic() + 2
-    while state_file.exists() and time.monotonic() < deadline:
-        if state_file.read_text().split(") ", 1)[1].split()[0] == "Z":
-            break  # Exited and awaiting reaping by the container's init process.
+    while not _linux_process_exited(state_file) and time.monotonic() < deadline:
         time.sleep(0.02)
-    assert not state_file.exists() or state_file.read_text().split(") ", 1)[1].split()[0] == "Z"
+    assert _linux_process_exited(state_file)
 
 
 def test_report_write_failure_after_spawn_still_cleans_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

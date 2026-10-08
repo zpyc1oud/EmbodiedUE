@@ -41,6 +41,7 @@ The last column records this review's decisions, not an upstream requirement.
 | Commands | Planar/yaw ranges, standing and timed resampling | Forward range 0.4–0.5 m/s, zero lateral command, standing mixture and turn progression | Record limited coverage. Defer new ranges until the physical baseline is established. |
 | Timing | 5 ms physics and decimation 4 | 5 ms physics, decimation 1–7 and an actor dt input | Keep the accepted completed-window contract. Use fixed decimation for a matched runtime measurement. |
 | Rewards | Positive exponential tracking and configured motion costs | Reference-subtracted tracking, progress terms and additional costs | This is a training-design difference, not a proven physics defect. Defer objective tuning. |
+| Curriculum | Terrain-level progression | Task-specific command stages and terrain progression; command success averages linear error per transition | Record this difference under variable intervals. This phase does not change promotion rules. |
 | Events | Base pushes at 10–15 s; Go1 disables them | Three-axis velocity increments at 1–1.5 s plus material events | Document operation, axes and interval. Do not infer causation from source differences. |
 | Sensing | Height rays and contact history | Negotiated terrain/clearance fields and final-solver-step geometric contact | Preserve the documented semantics. These contact values are not interchangeable sensor histories. |
 | Reset | Asset and environment reset terms | Resolved reference pose plus sampled offsets, with sparse Slot reset | Verify the effective references and unaffected Slots. |
@@ -98,6 +99,29 @@ field name and shape do not prove matching ground filters or sample timing.
 Use independent input/action replay and real static-ground cases to check these
 boundaries. The existing artifact format and closed operator set remain intact.
 This review does not add a vision sensor or claim arbitrary moving-ground support.
+
+## Current transition order
+
+The Direct environment uses this sequence:
+
+1. Read the previous State and preprocess the policy action.
+2. Copy the current velocity command and request the selected physics frames.
+3. Receive the completed State. Score valid rows with the copied command.
+   Invalid or faulted rows receive the fixed fault handling.
+4. Record terminal observations before any reset and update the curriculum.
+5. Reset selected Slots only. Clear their history and restore the bootstrap dt.
+6. Refresh the next command and apply queued interval events.
+7. Build the next observation from the completed or post-reset State.
+
+Thus, command resampling does not rewrite the command used to score the completed
+transition. Interval event acknowledgements do not replace the completed State
+snapshot. Their physical effects become visible through a later State sample.
+Keep this sampling boundary explicit when comparing event behavior with another
+simulator. Do not alter event or command timing as part of a performance repair.
+
+The existing PhantomX `success_rate` report measures survival, not command-qualified
+locomotion. It is not a learned-quality acceptance metric. Formal behavior criteria
+remain part of the later training phase.
 
 ## Runtime measurements
 

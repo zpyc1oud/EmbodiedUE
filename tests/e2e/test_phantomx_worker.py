@@ -236,7 +236,10 @@ def test_custom_reference_pose_matches_reset_observations_and_serialized_plan(tm
         ),
     ))
     config = RunConfigResolver(registry).resolve(base.task_id, {
-        **build_launch_overrides(ue_executable=Path(UE_CMD), project=Path(UPROJECT), map_name="/Engine/Maps/Entry"),
+        # The shared-world Task requires its registered authored floor.
+        **build_launch_overrides(
+            ue_executable=Path(UE_CMD), project=Path(UPROJECT), map_name=base.session_config.map_path,
+        ),
         "worker.slot_count": "1", "worker.decimation": "[4,4]",
         "logging.run_directory": str(tmp_path / "custom-reference"),
     })

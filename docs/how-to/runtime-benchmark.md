@@ -32,7 +32,8 @@ formats in the Run directory.
 - `initialization_seconds` covers Task construction and Session initialization.
 - `warmup_steps` are excluded from measured latency and physical time.
 - `wall_seconds` covers the measured loop, including its validity/accounting work.
-- `step_latency_s` gives mean, median and linearly interpolated p95 call latency.
+- `step_latency_s` gives mean, median and linearly interpolated p95 latency for
+  each step and its output-validity checks.
 - `control_steps_per_wall_second` counts synchronized control windows.
 - `slot_transitions_per_wall_second` multiplies control windows by the Slot count.
 - `physical_seconds_per_slot` sums actual completed intervals.
