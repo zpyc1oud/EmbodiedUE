@@ -56,7 +56,7 @@ def test_generic_phantomx_training_retains_position_targets(tmp_path: Path) -> N
     assert completed.returncode == 0, output[-4000:]
     assert (run_directory / "model_final.pt").is_file()
     checkpoint = torch.load(run_directory / "model_final.pt", map_location="cpu", weights_only=False)
-    assert checkpoint["infos"]["uerl_training_objective"] == "phantomx_physical_time_v1"
+    assert checkpoint["infos"]["uerl_training_objective"] == "phantomx_tracking_time_v2"
     rows = [
         json.loads(line)
         for line in (run_directory / "worker_stage_latency.jsonl").read_text(encoding="utf-8").splitlines()

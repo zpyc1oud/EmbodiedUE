@@ -20,20 +20,25 @@ task:
   turn_start_distance: 0.5
   turn_completion_tolerance: 0.1
   command:
-    initial_speed_min: 0.4
+    initial_speed_min: 0.05
     initial_speed_max: 0.5
-    post_turn_speed_min: 0.4
+    post_turn_speed_min: 0.05
     post_turn_speed_max: 0.5
     heading_delta_min: -3.141592653589793
     heading_delta_max: 3.141592653589793
     resampling_time_min_s: 5.0
     resampling_time_max_s: 10.0
     standing_probability: 0.1
+    # Fraction of non-standing commands that turn without translation after promotion.
+    turn_in_place_probability: 0.2
   curriculum:
     window_episodes: 512
     minimum_episodes: 128
     promotion_success_rate: 0.6
     velocity_error_threshold: 0.20
+    yaw_rate_error_threshold: 0.25
+    relative_velocity_error_threshold: 0.5
+    standing_velocity_error_threshold: 0.03
   observation_noise:
     lin_vel_b: 0.05
     ang_vel_b: 0.1

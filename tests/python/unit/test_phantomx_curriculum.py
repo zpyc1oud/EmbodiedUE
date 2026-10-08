@@ -72,7 +72,7 @@ def _completed_step(*, success: tuple[bool, bool]) -> CurriculumStep:
         truncated=torch.tensor([success[0], success[1]]),
         episode_lengths=torch.full((2,), 500),
         transition_dt=0.02,
-        command_velocity=torch.zeros(2, 2),
+        command_velocity=torch.tensor([[0.4, 0.0], [0.4, 0.0]]),
     )
 
 
@@ -232,7 +232,7 @@ def test_command_curriculum_does_not_promote_when_timeout_overlaps_failure() -> 
             truncated=torch.tensor([True, False]),
             episode_lengths=torch.full((2,), 500),
             transition_dt=0.02,
-            command_velocity=torch.zeros(2, 2),
+            command_velocity=torch.tensor([[0.4, 0.0], [0.4, 0.0]]),
         )
     )
 
@@ -320,3 +320,136 @@ def test_command_channel_matches_recorded_injection_sequence() -> None:
         promote.update(_completed_step(success=(True, True)))
     expected_turn = expected_commands(episode_counts=(1, 1), turn=True)
     assert_matches(_sample(promote, promote_command, reset_mask, _state()), expected_turn)
+
+
+def test_command_curriculum_weights_tracking_error_by_completed_physical_time() -> None:
+    """Five and 35 ms samples must contribute in proportion to elapsed time."""
+    term = PhantomXCommandCurriculum(
+        PhantomXCurriculumConfig(
+            window_episodes=2,
+            minimum_episodes=2,
+            promotion_success_rate=0.5,
+            velocity_error_threshold=0.2,
+        ),
+        PhantomXCommandConfig(),
+        num_envs=2,
+        device="cpu",
+        run_seed=0,
+    )
+    term.reset(torch.ones(2, dtype=torch.bool), _state())
+    for dt, errors, complete in (
+        (0.005, [0.8, 0.0], False),
+        (0.035, [0.0, 0.8], True),
+    ):
+        result = term.update(
+            CurriculumStep(
+                transition_state=_state(),
+                metrics={"phantomx/linear_velocity_error": torch.tensor(errors)},
+                state_valid=torch.ones(2, dtype=torch.bool),
+                terminated=torch.zeros(2, dtype=torch.bool),
+                truncated=torch.full((2,), complete),
+                episode_lengths=torch.full((2,), 2),
+                transition_dt=dt,
+                command_velocity=torch.tensor([[0.4, 0.0], [0.4, 0.0]]),
+            )
+        )
+    # Independent integrals: Slot 0 has 0.1 m/s error; Slot 1 has 0.7 m/s.
+    # One of two completed episodes qualifies, so new episodes can turn.
+    assert term.state_dict()["straight_history"] == [True, False]
+    assert result["stage"] == 1.0
+    assert result["turn_slot_fraction"] == 1.0
+
+
+def test_command_curriculum_sparse_reset_preserves_other_slot_time_integral() -> None:
+    term = PhantomXCommandCurriculum(
+        PhantomXCurriculumConfig(
+            window_episodes=4, minimum_episodes=4,
+            promotion_success_rate=1.0, velocity_error_threshold=0.2,
+        ),
+        PhantomXCommandConfig(), num_envs=2, device="cpu", run_seed=0,
+    )
+    state = _state()
+    term.reset(torch.ones(2, dtype=torch.bool), state)
+
+    def advance(errors: list[float], dt: float, done: list[bool]) -> None:
+        term.update(CurriculumStep(
+            transition_state=state,
+            metrics={"phantomx/linear_velocity_error": torch.tensor(errors)},
+            state_valid=torch.ones(2, dtype=torch.bool),
+            terminated=torch.zeros(2, dtype=torch.bool),
+            truncated=torch.tensor(done),
+            episode_lengths=torch.ones(2, dtype=torch.long),
+            transition_dt=dt,
+            command_velocity=torch.tensor([[0.4, 0.0], [0.4, 0.0]]),
+        ))
+
+    advance([0.0, 0.8], 0.035, [True, False])
+    term.reset(torch.tensor([True, False]), state)
+    advance([0.8, 0.0], 0.005, [True, True])
+    # Slot 0's new episode has 0.8 error. Slot 1 retains its earlier 35 ms
+    # and has 0.7 error. Neither may inherit the completed Slot 0 success.
+    assert term.state_dict()["straight_history"] == [True, False, False]
+
+
+def test_command_curriculum_cannot_promote_without_valid_elapsed_time() -> None:
+    term = PhantomXCommandCurriculum(
+        PhantomXCurriculumConfig(
+            window_episodes=1, minimum_episodes=1, promotion_success_rate=1.0,
+        ),
+        PhantomXCommandConfig(), num_envs=1, device="cpu", run_seed=0,
+    )
+    result = term.update(CurriculumStep(
+        transition_state=_state(1), metrics={},
+        state_valid=torch.tensor([False]),
+        terminated=torch.tensor([False]), truncated=torch.tensor([True]),
+        episode_lengths=torch.tensor([1]), transition_dt=0.02,
+        command_velocity=torch.zeros(1, 2),
+    ))
+    assert result["stage"] == 0.0
+    assert term.state_dict()["straight_history"] == [False]
+
+
+def test_turning_curriculum_rejects_good_linear_tracking_with_wrong_yaw() -> None:
+    term = PhantomXCommandCurriculum(
+        PhantomXCurriculumConfig(window_episodes=2, minimum_episodes=2),
+        PhantomXCommandConfig(), num_envs=2, device="cpu", run_seed=0,
+    )
+    term.load_state_dict({"stage": 1, "straight_history": [True, True], "turn_history": []})
+    term.reset(torch.ones(2, dtype=torch.bool), _state())
+    for dt, yaw_errors, done in (
+        (0.005, [0.8, 0.0], False),
+        (0.035, [0.0, 0.8], True),
+    ):
+        result = term.update(CurriculumStep(
+            transition_state=_state(),
+            metrics={
+                "phantomx/linear_velocity_error": torch.tensor([0.02, 0.02]),
+                "phantomx/yaw_rate_error": torch.tensor(yaw_errors),
+            },
+            state_valid=torch.ones(2, dtype=torch.bool),
+            terminated=torch.zeros(2, dtype=torch.bool),
+            truncated=torch.full((2,), done),
+            episode_lengths=torch.full((2,), 2), transition_dt=dt,
+            command_velocity=torch.tensor([[0.1, 0.0], [0.1, 0.0]]),
+        ))
+    # Integrated yaw errors are 0.1 and 0.7 rad/s; the default limit is 0.25.
+    assert term.state_dict()["turn_history"] == [True, False]
+    assert result["success_rate"] == 0.5
+
+
+def test_low_speed_curriculum_does_not_promote_a_stationary_robot() -> None:
+    term = PhantomXCommandCurriculum(
+        PhantomXCurriculumConfig(window_episodes=2, minimum_episodes=2),
+        PhantomXCommandConfig(), num_envs=2, device="cpu", run_seed=0,
+    )
+    result = term.update(CurriculumStep(
+        transition_state=_state(),
+        metrics={"phantomx/linear_velocity_error": torch.tensor([0.1, 0.02])},
+        state_valid=torch.ones(2, dtype=torch.bool),
+        terminated=torch.zeros(2, dtype=torch.bool), truncated=torch.ones(2, dtype=torch.bool),
+        episode_lengths=torch.ones(2, dtype=torch.long), transition_dt=0.02,
+        command_velocity=torch.tensor([[0.1, 0.0], [0.1, 0.0]]),
+    ))
+    # Standing under 0.1 m/s is not tracking; 0.02 m/s error is acceptable.
+    assert term.state_dict()["straight_history"] == [False, True]
+    assert result["stage"] == 0.0

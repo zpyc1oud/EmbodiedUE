@@ -71,7 +71,7 @@ def lin_vel_tracking(
     velocity, command = _body_planar(ctx, entity=entity, command_channel=command_channel)
     return torch.exp(
         -(velocity[:, :2] - command[:, :2]).pow(2).sum(dim=1) / std**2
-    ) - torch.exp(-torch.linalg.vector_norm(command[:, :2], dim=1).pow(2) / std**2)
+    )
 
 
 def lin_vel_progress(
@@ -104,9 +104,7 @@ def yaw_rate_tracking(
     std: float,
 ) -> torch.Tensor:
     _, angular_velocity, command = _body_rates(ctx, entity=entity, command_channel=command_channel)
-    return torch.exp(-(angular_velocity[:, 2] - command[:, 2]).pow(2) / std**2) - torch.exp(
-        -command[:, 2].pow(2) / std**2
-    )
+    return torch.exp(-(angular_velocity[:, 2] - command[:, 2]).pow(2) / std**2)
 
 
 def yaw_rate_progress(

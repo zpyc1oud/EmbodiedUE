@@ -61,7 +61,7 @@ def test_phantomx_yaml_rejection_paths(replacement: str, path: str, code: str) -
         "rollout_length: 0": "rollout_length: 40",
         "init_std: 0": "init_std: 0.5",
         "device: ''": "device: cuda:0",
-        "initial_speed_min: -0.1": "initial_speed_min: 0.4",
+        "initial_speed_min: -0.1": "initial_speed_min: 0.05",
         "promotion_success_rate: 1.5": "promotion_success_rate: 0.6",
         "action_clip: 0": "action_clip: 1.0",
         "spacing_x_m: 0": "environment.spacing_x_m: 1.5",
@@ -89,7 +89,7 @@ def test_phantomx_yaml_rejection_paths(replacement: str, path: str, code: str) -
 
 def test_phantomx_yaml_rejects_inverted_command_range() -> None:
     document = DEFAULT_PHANTOMX_TRAINING_CONFIG.read_text(encoding="utf-8").replace(
-        "initial_speed_min: 0.4",
+        "initial_speed_min: 0.05",
         "initial_speed_min: 0.9",
     ).replace(
         "initial_speed_max: 0.5",
@@ -184,3 +184,18 @@ def test_phantomx_discrete_terrain_rejects_inverted_grid_height_range(tmp_path: 
         load_phantomx_discrete_terrain_config(path)
     assert raised.value.code == "CONFIG_OUT_OF_RANGE"
     assert raised.value.path == "tiers[0].params.grid_height_range"
+
+
+@pytest.mark.parametrize(("old", "new", "path"), [
+    ("turn_in_place_probability: 0.2", "turn_in_place_probability: 1.1", "task.command.turn_in_place_probability"),
+    ("yaw_rate_error_threshold: 0.25", "yaw_rate_error_threshold: 0", "task.curriculum.yaw_rate_error_threshold"),
+    ("standing_velocity_error_threshold: 0.03", "standing_velocity_error_threshold: 0.3",
+     "task.curriculum.standing_velocity_error_threshold"),
+])
+def test_learning_quality_thresholds_reject_invalid_configuration(old: str, new: str, path: str) -> None:
+    text = DEFAULT_PHANTOMX_TRAINING_CONFIG.read_text(encoding="utf-8")
+    assert old in text
+    with pytest.raises(ConfigError) as raised:
+        parse_phantomx_training_config(text.replace(old, new))
+    assert raised.value.code == "CONFIG_OUT_OF_RANGE"
+    assert raised.value.path == path

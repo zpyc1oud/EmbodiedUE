@@ -31,8 +31,10 @@ class PhantomXCommandCurriculum(CurriculumTerm):
         self.run_seed = run_seed
         self._stage = 0
         self._turn_enabled = torch.zeros(num_envs, dtype=torch.bool, device=self.device)
-        self._error_sum = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
-        self._valid_steps = torch.zeros(num_envs, dtype=torch.long, device=self.device)
+        self._error_integral = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
+        self._error_budget_integral = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
+        self._yaw_error_integral = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
+        self._valid_duration_s = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
         self._straight_history: deque[bool] = deque(maxlen=curriculum.window_episodes)
         self._turn_history: deque[bool] = deque(maxlen=curriculum.window_episodes)
 
@@ -50,18 +52,40 @@ class PhantomXCommandCurriculum(CurriculumTerm):
             error = step.metrics["phantomx/linear_velocity_error"]
             if not isinstance(error, torch.Tensor):
                 raise TypeError("phantomx linear velocity error metric must be a tensor")
-            self._error_sum[valid] += error[valid].to(device=self.device, dtype=torch.float32)
-            self._valid_steps[valid] += 1
+            self._error_integral[valid] += (
+                error[valid].to(device=self.device, dtype=torch.float32) * step.transition_dt
+            )
+            speeds = torch.linalg.vector_norm(step.command_velocity[valid], dim=1).to(self.device)
+            tolerance = (speeds * self.config.relative_velocity_error_threshold).clamp(
+                min=self.config.standing_velocity_error_threshold,
+                max=self.config.velocity_error_threshold,
+            )
+            self._error_budget_integral[valid] += tolerance * step.transition_dt
+            self._valid_duration_s[valid] += step.transition_dt
+            turning = valid & self._turn_enabled
+            if bool(turning.any()):
+                yaw_error = step.metrics["phantomx/yaw_rate_error"]
+                if not isinstance(yaw_error, torch.Tensor):
+                    raise TypeError("phantomx yaw rate error metric must be a tensor")
+                self._yaw_error_integral[turning] += (
+                    yaw_error[turning].to(device=self.device, dtype=torch.float32) * step.transition_dt
+                )
 
         completed = step.terminated | step.truncated
         for slot_id in torch.nonzero(completed, as_tuple=False).flatten().tolist():
-            mean_error = self._error_sum[slot_id] / self._valid_steps[slot_id].clamp_min(1)
+            duration = self._valid_duration_s[slot_id]
+            mean_yaw_error = self._yaw_error_integral[slot_id] / duration.clamp_min(torch.finfo(torch.float32).tiny)
             # Only a pure timeout is a successful curriculum episode; a
             # physical failure must not be upgraded by an overlapping timeout.
             succeeded = (
                 bool(step.truncated[slot_id])
                 and not bool(step.terminated[slot_id])
-                and bool(mean_error < self.config.velocity_error_threshold)
+                and bool(self._valid_duration_s[slot_id] > 0.0)
+                and bool(self._error_integral[slot_id] < self._error_budget_integral[slot_id])
+                and (
+                    not bool(self._turn_enabled[slot_id])
+                    or bool(mean_yaw_error < self.config.yaw_rate_error_threshold)
+                )
             )
             history = self._turn_history if bool(self._turn_enabled[slot_id]) else self._straight_history
             history.append(succeeded)
@@ -92,8 +116,10 @@ class PhantomXCommandCurriculum(CurriculumTerm):
 
         del post_reset_state
         self._turn_enabled[reset_mask] = self._stage == 1
-        self._error_sum[reset_mask] = 0.0
-        self._valid_steps[reset_mask] = 0
+        self._error_integral[reset_mask] = 0.0
+        self._yaw_error_integral[reset_mask] = 0.0
+        self._error_budget_integral[reset_mask] = 0.0
+        self._valid_duration_s[reset_mask] = 0.0
 
     def state_dict(self) -> Mapping[str, object]:
         """Persist global stage and rolling promotion evidence."""
@@ -124,8 +150,10 @@ class PhantomXCommandCurriculum(CurriculumTerm):
         self._straight_history = deque(straight_history, maxlen=self.config.window_episodes)
         self._turn_history = deque(turn_history, maxlen=self.config.window_episodes)
         self._turn_enabled.fill_(self._stage == 1)
-        self._error_sum.zero_()
-        self._valid_steps.zero_()
+        self._error_integral.zero_()
+        self._yaw_error_integral.zero_()
+        self._error_budget_integral.zero_()
+        self._valid_duration_s.zero_()
 
 
 def create_phantomx_curriculum(

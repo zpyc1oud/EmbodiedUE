@@ -56,6 +56,27 @@ CartPole retains fixed-step PPO, reward, and timeout behavior.
 The design uses Isaac Lab's time-integrated reward and terrain resampling concepts without an Isaac Lab runtime dependency.
 Equal objective timing does not establish equal Chaos and PhysX trajectories.
 
+## Command curriculum measurement
+
+The command curriculum integrates linear velocity error over completed physical time.
+A 35 ms transition contributes seven times as much as a 5 ms transition.
+Only valid observations contribute. A completed episode without valid elapsed time
+cannot qualify for promotion. Reset clears the selected Slots' integrals only.
+
+The linear error limit is half the commanded speed, bounded by 0.03 and 0.20 m/s.
+The curriculum integrates this limit over the same physical intervals as the error.
+Thus, standing under a 0.1 m/s command does not count as successful tracking.
+Turning episodes also require mean yaw-rate error below 0.25 rad/s.
+Only timeout episodes without a physical failure can qualify.
+
+Moving commands cover 0.05–0.5 m/s. Ten percent of sampled commands request standing.
+After turn promotion, twenty percent of the remaining commands request turning
+without translation. The other moving commands keep forward translation.
+
+Linear and yaw tracking use positive exponential rewards. Exact tracking has a
+unit peak before weighting, including a stationary command. Drift reduces that
+reward. Existing progress terms remain separately weighted.
+
 ## Start and resume a Run
 
 Run:
@@ -79,7 +100,9 @@ A Run selects `model_final.pt` when that file exists.
 Otherwise, it selects the highest-numbered `rsl_rl/model_<iteration>.pt`.
 The value `latest` selects by time, not objective compatibility.
 
-Earlier checkpoints without `phantomx_physical_time_v1` cannot resume under the physical-time objective.
+New training uses `phantomx_tracking_time_v2`. Earlier objectives, including
+`phantomx_physical_time_v1`, cannot resume into the changed reward objective.
+Start a fresh Run and preserve the previous checkpoint for historical evaluation.
 The rejection occurs before UE startup.
 Terrain checkpoints from before command-direction progress also lack the required adaptive terrain state.
 Some earlier terrain checkpoints lack the curriculum random stream.

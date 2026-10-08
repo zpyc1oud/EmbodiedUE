@@ -650,3 +650,53 @@ def test_clean_phantomx_actor_matches_export_plan_and_noise_keeps_export_unknown
     task.enable_observation_corruption(torch.Generator().manual_seed(1))
     noisy_report = task.capabilities
     assert noisy_report.export.status is CapabilityStatus.UNKNOWN
+
+
+def test_turn_in_place_command_keeps_yaw_target_and_zero_translation() -> None:
+    command = replace(
+        PhantomXCommandConfig(), standing_probability=0.0,
+        turn_in_place_probability=1.0,
+        initial_speed_min=0.3, initial_speed_max=0.3,
+        heading_delta_min=1.0, heading_delta_max=1.0,
+    )
+    task = _command_task(command, batch_size=2)
+    source = task.command_source
+    assert isinstance(source, PhantomXVelocityCommandSource)
+    source.bind_curriculum_term(type("Turning", (), {
+        "turn_enabled": torch.ones(2, dtype=torch.bool),
+        "command_config": command, "run_seed": 3,
+    })())
+    state = _state(task, num_envs=2)
+    task.on_reset(torch.ones(2, dtype=torch.bool), state)
+    velocity = task.published_velocity()
+    assert velocity is not None
+    assert torch.allclose(velocity, torch.tensor([[0.0, 0.0, 0.5], [0.0, 0.0, 0.5]]))
+
+
+def test_stationary_tracking_reward_has_positive_peak_and_penalizes_drift() -> None:
+    task = PhantomXTask(
+        replace(PhantomXTaskConfig(), linear_velocity_progress_weight=0.0, yaw_rate_progress_weight=0.0),
+        robot_spec=_robot_spec(), observation_shapes=SHAPES, batch_size=2,
+    )
+    state = _state(
+        task, num_envs=2,
+        linear_velocity=torch.tensor([[0.0, 0.0, 0.0], [0.2, 0.0, 0.0]]),
+        initial_command=torch.zeros(2, 2),
+    )
+    context = _context(task, state)
+    terminated = task.compute_terminations(context)
+    rewards = task.compute_rewards(context, terminated)
+    # Weights 1.5 and 0.75. Drift of one linear std gives exp(-1).
+    assert torch.allclose(rewards, torch.tensor([2.25, 1.30181916]), atol=1e-6, rtol=0.0)
+
+
+def test_default_moving_commands_include_low_speed_samples() -> None:
+    command = replace(PhantomXCommandConfig(), standing_probability=0.0)
+    task = _command_task(command, batch_size=128)
+    task.on_reset(torch.ones(128, dtype=torch.bool), _state(task, num_envs=128))
+    velocity = task.published_velocity()
+    assert velocity is not None
+    assert torch.all((velocity[:, 0] >= 0.05) & (velocity[:, 0] <= 0.5))
+    assert torch.any(velocity[:, 0] < 0.1)
+    assert torch.any(velocity[:, 0] > 0.4)
+    assert torch.equal(velocity[:, 1:], torch.zeros(128, 2))

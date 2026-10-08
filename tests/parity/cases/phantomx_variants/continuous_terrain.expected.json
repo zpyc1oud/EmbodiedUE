@@ -373,17 +373,17 @@
       -0.30000001192092896
     ],
     "reward": [
-      2.256646156311035
+      3.0341195942202135
     ],
     "reward_terms": {
       "lin_vel_tracking": [
-        1.3816460371017456
+        1.4091195942202135
       ],
       "lin_vel_progress": [
-        0.8749998807907104
+        0.8749999999999999
       ],
       "yaw_rate_tracking": [
-        0.0
+        0.75
       ],
       "yaw_rate_progress": [
         0.0
@@ -444,6 +444,6 @@
       "phantomx/yaw_rate_progress"
     ]
   },
-  "notes": "walk/terrain: policy/action/termination/reward terms from manager-owned DirectTask",
+  "notes": "Tracking-time v2: independent scalar reward calculation documented in README.md; observation, action and termination values are unchanged.",
   "control_frame_dt": 0.02
 }

@@ -84,6 +84,7 @@ class PhantomXVelocityCommandSource:
     _published_heading: torch.Tensor = field(init=False, repr=False)
     _published_post_turn: torch.Tensor = field(init=False, repr=False)
     _standing: torch.Tensor = field(init=False, repr=False)
+    _turn_in_place: torch.Tensor = field(init=False, repr=False)
     _time_left: torch.Tensor = field(init=False, repr=False)
     _resample_counts: torch.Tensor = field(init=False, repr=False)
     _pending_dt: float | None = field(init=False, repr=False, default=None)
@@ -99,6 +100,7 @@ class PhantomXVelocityCommandSource:
         self._published_heading = torch.zeros((self.batch_size, 1), dtype=torch.float32, device=self.device)
         self._published_post_turn = torch.zeros((self.batch_size, 2), dtype=torch.float32, device=self.device)
         self._standing = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device)
+        self._turn_in_place = torch.zeros_like(self._standing)
         self._time_left = torch.zeros(self.batch_size, dtype=torch.float32, device=self.device)
         self._resample_counts = torch.zeros(self.batch_size, dtype=torch.long, device=self.device)
         self._pending_dt = None
@@ -218,6 +220,7 @@ class PhantomXVelocityCommandSource:
             ranges.resampling_time_min_s <= 0.0
             or ranges.resampling_time_min_s > ranges.resampling_time_max_s
             or not 0.0 <= ranges.standing_probability <= 1.0
+            or not 0.0 <= ranges.turn_in_place_probability <= 1.0
         ):
             raise ConfigError(
                 "command resampling range or standing probability is invalid",
@@ -256,6 +259,11 @@ class PhantomXVelocityCommandSource:
                 ranges.resampling_time_min_s, ranges.resampling_time_max_s
             )
             self._standing[slot_id] = generator.random() < ranges.standing_probability
+            self._turn_in_place[slot_id] = (
+                bool(self._turn_enabled[slot_id])
+                and not bool(self._standing[slot_id])
+                and generator.random() < ranges.turn_in_place_probability
+            )
 
     def _velocity_from_own_samples(self, pose: torch.Tensor) -> torch.Tensor:
         current_heading = _quat_heading(pose[:, 3:7])
@@ -272,7 +280,7 @@ class PhantomXVelocityCommandSource:
         active_turn = self._turn_enabled & ~self._standing
         yaw = torch.where(active_turn, yaw, torch.zeros_like(yaw))
         speed = torch.where(
-            self._standing,
+            self._standing | self._turn_in_place,
             torch.zeros_like(self._initial_linear[:, 0]),
             self._initial_linear[:, 0],
         )

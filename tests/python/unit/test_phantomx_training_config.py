@@ -80,13 +80,13 @@ def test_phantomx_observation_contract_removes_base_contact_but_keeps_terrain_in
     assert {("terrain_height", "base_link"), ("ground_clearance", "base_link")} <= observations
 
 
-def test_phantomx_command_speeds_do_not_exceed_the_flat_ground_target() -> None:
-    """Cap random route speeds at the validated 0.5 m/s flat-ground target."""
+def test_phantomx_command_speeds_cover_low_speed_without_exceeding_the_target() -> None:
+    """Cover 0.05–0.5 m/s while keeping the existing maximum target."""
 
     command = load_phantomx_training_config().task.command
 
-    assert (command.initial_speed_min, command.initial_speed_max) == pytest.approx((0.4, 0.5))
-    assert (command.post_turn_speed_min, command.post_turn_speed_max) == pytest.approx((0.4, 0.5))
+    assert (command.initial_speed_min, command.initial_speed_max) == pytest.approx((0.05, 0.5))
+    assert (command.post_turn_speed_min, command.post_turn_speed_max) == pytest.approx((0.05, 0.5))
 
 
 def test_phantomx_direct_task_defaults_to_the_20_second_horizon() -> None:
@@ -106,11 +106,14 @@ def test_ac_py_unit_phantomx_002_training_uses_physical_time_ppo_objective() -> 
     assert "reference_dt_s" not in cartpole["algorithm"]
 
 
-def test_ac_py_unit_phantomx_003_old_objective_checkpoint_rejected_before_worker(tmp_path: Path) -> None:
+@pytest.mark.parametrize("objective", [None, "phantomx_physical_time_v1"])
+def test_ac_py_unit_phantomx_003_old_objective_checkpoint_rejected_before_worker(
+    tmp_path: Path, objective: str | None,
+) -> None:
     """Old robust models cannot silently resume into the physical-time objective."""
 
     old_checkpoint = tmp_path / "old.pt"
-    torch.save({"infos": {"uerl_curriculum": {}}}, old_checkpoint)
+    torch.save({"infos": {"uerl_curriculum": {}, "uerl_training_objective": objective}}, old_checkpoint)
     config = build_run_config(PHANTOMX_TERRAIN_TASK_ID)
     config = replace(config, runner=replace(config.runner, checkpoint=old_checkpoint))
 

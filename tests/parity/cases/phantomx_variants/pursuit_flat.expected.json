@@ -378,17 +378,17 @@
       -0.30000001192092896
     ],
     "reward": [
-      1.9364845752716064
+      2.695978952384885
     ],
     "reward_terms": {
       "lin_vel_tracking": [
-        1.1587066650390625
+        1.1682011746071073
       ],
       "lin_vel_progress": [
-        0.7777778506278992
+        0.7777777777777777
       ],
       "yaw_rate_tracking": [
-        0.0
+        0.75
       ],
       "yaw_rate_progress": [
         0.0
@@ -449,6 +449,6 @@
       "phantomx/yaw_rate_progress"
     ]
   },
-  "notes": "pursuit: manager-owned DirectTask freeze; reward terms from the same DirectTask",
+  "notes": "Tracking-time v2: independent scalar reward calculation documented in README.md; observation, action and termination values are unchanged.",
   "control_frame_dt": 0.02
 }

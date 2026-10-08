@@ -65,21 +65,25 @@ class PhantomXCurriculumConfig:
     minimum_episodes: int = 128
     promotion_success_rate: float = 0.6
     velocity_error_threshold: float = 0.20
+    yaw_rate_error_threshold: float = 0.25
+    relative_velocity_error_threshold: float = 0.5
+    standing_velocity_error_threshold: float = 0.03
 
 
 @dataclass(frozen=True, slots=True)
 class PhantomXCommandConfig:
     """Configure episode-boundary command sampling owned by Python."""
 
-    initial_speed_min: float = 0.4
+    initial_speed_min: float = 0.05
     initial_speed_max: float = 0.5
-    post_turn_speed_min: float = 0.4
+    post_turn_speed_min: float = 0.05
     post_turn_speed_max: float = 0.5
     heading_delta_min: float = -math.pi
     heading_delta_max: float = math.pi
     resampling_time_min_s: float = 5.0
     resampling_time_max_s: float = 10.0
     standing_probability: float = 0.1
+    turn_in_place_probability: float = 0.2
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +215,7 @@ class PhantomXCommandCfg:
     resampling_time_min_s: float = spec_field(MISSING, gt=0.0, finite=True)
     resampling_time_max_s: float = spec_field(MISSING, gt=0.0, finite=True)
     standing_probability: float = spec_field(MISSING, ge=0.0, le=1.0, finite=True)
+    turn_in_place_probability: float = spec_field(MISSING, ge=0.0, le=1.0, finite=True)
 
 
 @configspec
@@ -221,6 +226,9 @@ class PhantomXCurriculumCfg:
     minimum_episodes: int = spec_field(MISSING, gt=0, integral=True)
     promotion_success_rate: float = spec_field(MISSING, ge=0.0, le=1.0, finite=True)
     velocity_error_threshold: float = spec_field(MISSING, gt=0.0, finite=True)
+    yaw_rate_error_threshold: float = spec_field(MISSING, gt=0.0, finite=True)
+    relative_velocity_error_threshold: float = spec_field(MISSING, gt=0.0, lt=1.0, finite=True)
+    standing_velocity_error_threshold: float = spec_field(MISSING, gt=0.0, finite=True)
 
 
 @configspec
@@ -498,12 +506,16 @@ def _assemble_phantomx_training_config(cfg: PhantomXTrainingCfg) -> PhantomXTrai
             resampling_time_min_s=task_cfg.command.resampling_time_min_s,
             resampling_time_max_s=task_cfg.command.resampling_time_max_s,
             standing_probability=task_cfg.command.standing_probability,
+            turn_in_place_probability=task_cfg.command.turn_in_place_probability,
         ),
         curriculum=PhantomXCurriculumConfig(
             window_episodes=task_cfg.curriculum.window_episodes,
             minimum_episodes=task_cfg.curriculum.minimum_episodes,
             promotion_success_rate=task_cfg.curriculum.promotion_success_rate,
             velocity_error_threshold=task_cfg.curriculum.velocity_error_threshold,
+            yaw_rate_error_threshold=task_cfg.curriculum.yaw_rate_error_threshold,
+            relative_velocity_error_threshold=task_cfg.curriculum.relative_velocity_error_threshold,
+            standing_velocity_error_threshold=task_cfg.curriculum.standing_velocity_error_threshold,
         ),
         moving_command_threshold=task_cfg.moving_command_threshold,
         body_clearance_penalty_threshold=task_cfg.body_clearance_penalty_threshold,
@@ -594,6 +606,12 @@ def _validate_phantomx_invariants(cfg: PhantomXTrainingCfg) -> None:
             path="task.events",
         )
     curriculum = cfg.task.curriculum
+    if curriculum.standing_velocity_error_threshold > curriculum.velocity_error_threshold:
+        raise ConfigError(
+            "standing tolerance must not exceed the absolute velocity tolerance",
+            code="CONFIG_OUT_OF_RANGE",
+            path="task.curriculum.standing_velocity_error_threshold",
+        )
     if curriculum.minimum_episodes > curriculum.window_episodes:
         raise ConfigError(
             "minimum_episodes must not exceed window_episodes",

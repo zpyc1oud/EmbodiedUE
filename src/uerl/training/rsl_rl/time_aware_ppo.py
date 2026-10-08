@@ -9,7 +9,7 @@ import torch
 from rsl_rl.algorithms import PPO
 from tensordict import TensorDict
 
-PHANTOMX_PHYSICAL_TIME_OBJECTIVE = "phantomx_physical_time_v1"
+PHANTOMX_PHYSICAL_TIME_OBJECTIVE = "phantomx_tracking_time_v2"
 
 
 class TimeAwarePPO(PPO):  # type: ignore[misc]
