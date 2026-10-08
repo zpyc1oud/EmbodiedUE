@@ -208,3 +208,10 @@ Pytest imports product code from `src/uerl` through the paths in `pyproject.toml
 The directory `tests/protocol/support/` contains an independent test-only oracle.
 Product code must not import it.
 It is not a training entry point.
+
+
+The completed Issue #29 review adds real-file rewrite and no-overwrite assertions,
+distinct action rows, independent native network/terrain values and sparse E2E reset checks.
+Runner tests include unsuccessful/duplicate Automation completions and actual Windows
+owned-descendant timeout cleanup. Test-support sockets and packaging commands have bounded waits.
+See the [review matrix](../docs/testing/README.md#real-workflow-matrix) for retained task smoke scope.
