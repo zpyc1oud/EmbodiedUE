@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 from typing import Any
 from uuid import UUID
 
@@ -28,6 +29,8 @@ from uerl.core.codec import (
     canonical_json,
     sha256_json,
 )
+
+from uerl.core.codec.transport import SocketTransport, connect_socket_with_deadline
 
 SESSION_ID = UUID("00112233-4455-4677-8899-aabbccddeeff")
 
@@ -454,3 +457,79 @@ def test_out_of_range_joint_body_index_fails_initialize() -> None:
 
     assert raised.value.code == "DTO_INVALID"
 
+
+
+def test_startup_connect_allows_os_handshake_until_shared_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A slow successful handshake must survive until the startup deadline."""
+
+    now = [100.0]
+    attempts: list[float] = []
+    socket_options: list[tuple[int, int, int]] = []
+    request_timeouts: list[float] = []
+
+    class ConnectedSocket:
+        def setsockopt(self, level: int, option: int, value: int) -> None:
+            socket_options.append((level, option, value))
+
+        def settimeout(self, timeout: float) -> None:
+            request_timeouts.append(timeout)
+
+    def connect(address: tuple[str, int], timeout: float) -> ConnectedSocket:
+        assert address == ("127.0.0.1", 12345)
+        attempts.append(timeout)
+        if len(attempts) == 1:
+            now[0] += 0.25
+            raise ConnectionRefusedError("Worker has not started listening")
+        # Windows may finish a pending handshake after the old one-second cap.
+        if timeout < 2.0:
+            now[0] += timeout
+            raise TimeoutError("client abandoned handshake before listener accepted it")
+        now[0] += 2.0
+        return ConnectedSocket()
+
+    def sleep(duration: float) -> None:
+        now[0] += duration
+
+    monkeypatch.setattr("uerl.core.codec.transport.time.monotonic", lambda: now[0])
+    monkeypatch.setattr("uerl.core.codec.transport.time.sleep", sleep)
+    monkeypatch.setattr("uerl.core.codec.transport.socket.create_connection", connect)
+
+    transport = connect_socket_with_deadline("127.0.0.1", 12345, 10.0, 7.0)
+
+    assert isinstance(transport, SocketTransport)
+    assert attempts == pytest.approx([10.0, 9.7])
+    assert socket_options == [(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)]
+    assert request_timeouts == [7.0]
+    assert now[0] == pytest.approx(102.3)
+
+
+def test_startup_connect_stops_at_deadline_after_os_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An exhausted OS connect consumes the budget without another attempt."""
+
+    now = [100.0]
+    attempts: list[float] = []
+    failure = TimeoutError("OS connection deadline")
+
+    def connect(address: tuple[str, int], timeout: float) -> None:
+        assert address == ("127.0.0.1", 12345)
+        attempts.append(timeout)
+        now[0] += timeout
+        raise failure
+
+    def sleep(duration: float) -> None:
+        now[0] += duration
+
+    monkeypatch.setattr("uerl.core.codec.transport.time.monotonic", lambda: now[0])
+    monkeypatch.setattr("uerl.core.codec.transport.time.sleep", sleep)
+    monkeypatch.setattr("uerl.core.codec.transport.socket.create_connection", connect)
+
+    with pytest.raises(TimeoutError) as caught:
+        connect_socket_with_deadline("127.0.0.1", 12345, 3.0, 7.0)
+
+    assert caught.value is failure
+    assert attempts == [3.0]
+    assert now[0] == 103.0

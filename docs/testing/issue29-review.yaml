@@ -254,13 +254,15 @@ files:
     contract: Controlled fragmented transport reaches real Bridge lifecycle, envelope validation and failure closeout
       without resend
     required_host: Python CPU; controlled external boundaries
-    oracle: exact handshake/state, one in-flight request, closed transport and outbound count on disconnect
-    disposition: keep assertions; remove unsupported real-process print claim
-    reachable_failure: scripted transport printed launch-nonzero and attached-host-alive claims without starting a
-      real Worker
+    oracle: exact handshake/state, one in-flight request, closed transport, outbound count on disconnect and bounded
+      OS connection establishment
+    disposition: keep assertions; remove unsupported print claim; repair premature startup handshake timeout
+    reachable_failure: scripted transport printed unsupported process claims; one-second OS attempt timeout
+      abandons a connection accepted by a Windows listener, causing Worker exit and later startup timeout
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
+    evidence: 'Stateful slice source review, focused cases and two startup-deadline red/green regressions; Windows
+      delayed-listener reproduction and full real E2E results recorded in Issue #29'
     implementation_status: repaired
   - path: tests/python/integration/test_direct_task_entrypoint_equivalence.py
     layer: python
