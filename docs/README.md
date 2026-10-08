@@ -31,6 +31,8 @@ Those files are not included as experiment evidence.
 
 ## Development planning
 
+- [Task and runtime stabilization](design/task-runtime-stabilization.md): Isaac Lab comparison, configured input references, and bounded runtime verification.
+
 - [Repository-wide test quality design](design/test-quality-implementation.md): proposed per-layer changes, independent oracles, implementation slices, and acceptance for Issue #29.
 - [Next release roadmap](roadmap/next-release.md): proposed goals, scope, stages, and release conditions.
 - [RFC 0001: Developer workflow](rfcs/0001-developer-workflow.md): user operations, architecture, design choices, migration, and validation. Status: Accepted.

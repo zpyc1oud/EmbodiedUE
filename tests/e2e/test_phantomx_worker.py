@@ -213,3 +213,69 @@ def test_phantomx_default_pose_settles_without_spurious_reset(
             env.close("test_complete")
         else:
             raw_session.close("test_complete")
+
+
+def test_custom_reference_pose_matches_reset_observations_and_serialized_plan(tmp_path: Path) -> None:
+    """A supported RobotAssetCfg reference pose must survive the real UE boundary."""
+    from dataclasses import replace
+
+    from uerl.assets.robots.phantomx import PHANTOMX_CFG, PHANTOMX_JOINTS
+    from uerl.core.config.resolver import RunConfigResolver
+    from uerl.core.mdp.executor import PlanExecutor, PlanInputs
+    from uerl.core.mdp.plan import ObservationPlan
+    from uerl.tasks.registry import TaskRegistry
+
+    asset = replace(PHANTOMX_CFG, init_state=replace(
+        PHANTOMX_CFG.init_state, joint_pos={"c1_.*": 0.03, "thigh_.*": 0.20, "tibia_.*": -0.35},
+    ))
+    base = create_default_registry().resolve("UERL-PhantomX-Walk-v0")
+    registry = TaskRegistry()
+    registry.register(replace(
+        base, worker_config_factory=lambda: replace(
+            base.worker_config_factory(), robot_semantics=asset.to_robot_config(),
+        ),
+    ))
+    config = RunConfigResolver(registry).resolve(base.task_id, {
+        **build_launch_overrides(ue_executable=Path(UE_CMD), project=Path(UPROJECT), map_name="/Engine/Maps/Entry"),
+        "worker.slot_count": "1", "worker.decimation": "[4,4]",
+        "logging.run_directory": str(tmp_path / "custom-reference"),
+    })
+    task = registry.create_task(config.task_id, config.task)
+    raw = UERLSession.open(config, process_controller=WorkerProcessController())
+    env = None
+    try:
+        env = UERLDirectEnv(UERLSessionAdapter(raw), task, resolved_config=config)
+        plan = ObservationPlan.from_json(task.observation_plan.to_json())
+        widths = {op.output: op.width for op in plan.ops}
+        members = plan.groups["policy"]
+        joint_start = sum(widths[name] for name in members[:members.index("joint_pos_rel")])
+        defaults = torch.tensor([[0.03, 0.20, -0.35] * 6])
+        reset_observations, _ = env.reset()
+        assert torch.allclose(reset_observations["policy"][:, joint_start:joint_start + 18],
+                              torch.zeros(1, 18), atol=2e-5, rtol=0.0)
+        executor = PlanExecutor(plan, command_channels=task.command_source.channels())
+        actions = torch.zeros(1, 18)
+        for _ in range(5):
+            _, _, _, _, info = env.step(actions)
+            assert info["terminal_observation_valid"].tolist() == [True]
+            assert info["slot_fault_code"].tolist() == [0]
+            state = info["terminal_raw_state"]
+            measured = torch.stack([state[f"robot.joint.{joint}.joint_position"].reshape(-1)
+                                    for joint in PHANTOMX_JOINTS], dim=1)
+            expected = measured - defaults
+            terminal = info["terminal_observation"]["policy"]
+            assert torch.allclose(terminal[:, joint_start:joint_start + 18], expected, atol=2e-5, rtol=0.0)
+            exported = executor.execute(PlanInputs(
+                raw_state=state, commands={"velocity": terminal[:, 9:12]}, previous_action=actions,
+                control_frame_dt=torch.tensor([[info["transition_dt"]]]),
+            ))
+            assert torch.allclose(exported["policy"][:, joint_start:joint_start + 18], expected,
+                                  atol=2e-5, rtol=0.0)
+        reset_observations, _ = env.reset()
+        assert torch.allclose(reset_observations["policy"][:, joint_start:joint_start + 18],
+                              torch.zeros(1, 18), atol=2e-5, rtol=0.0)
+    finally:
+        if env is not None:
+            env.close("custom_reference_complete")
+        else:
+            raw.close("custom_reference_setup_failed")

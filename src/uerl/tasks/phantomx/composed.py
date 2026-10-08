@@ -32,12 +32,13 @@ from uerl.tasks.phantomx.config import (
     PhantomXTaskConfig,
 )
 from uerl.tasks.phantomx.curriculum import PhantomXCommandCurriculum
-from uerl.tasks.phantomx.observation_plan import PHANTOMX_JOINT_DEFAULTS
 
 
 def build_phantomx_observation_cfg(robot_spec: RobotSpec) -> ObservationCfg:
     """Declarative observation terms matching ticket 11 / ``build_phantomx_observation_plan``."""
 
+    defaults_by_joint = {joint.name: joint.default_position for joint in robot_spec.topology.joints}
+    defaults_by_joint.update({actuator.joint: actuator.default_pos for actuator in robot_spec.actuators})
     terms: dict[str, ObsTermCfg] = {
         "pose": ObsTermCfg(
             op="select",
@@ -101,7 +102,7 @@ def build_phantomx_observation_cfg(robot_spec: RobotSpec) -> ObservationCfg:
     terms["joint_pos_rel"] = ObsTermCfg(
         op="joint_pos_rel",
         inputs=("joint_pos",),
-        params={"default": PHANTOMX_JOINT_DEFAULTS},
+        params={"default": tuple(defaults_by_joint[joint] for joint in PHANTOMX_JOINTS)},
     )
     terms["joint_vel"] = ObsTermCfg(op="concat", inputs=tuple(joint_vel_slots))
     terms["prev_action"] = ObsTermCfg(
