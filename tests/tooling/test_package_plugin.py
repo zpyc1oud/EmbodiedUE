@@ -45,6 +45,7 @@ def test_dry_run_prints_uat_command_without_running_it(tmp_path: Path) -> None:
         check=False,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     assert completed.returncode == 0

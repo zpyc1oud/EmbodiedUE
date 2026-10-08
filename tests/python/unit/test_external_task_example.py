@@ -14,12 +14,14 @@ from uerl.tasks.cartpole.registration import create_cartpole_task_config
 def test_external_cartpole_example_loads_its_yaml_reward(monkeypatch: pytest.MonkeyPatch) -> None:
     package_root = Path(__file__).resolve().parents[3] / "examples" / "external-cartpole" / "src"
     monkeypatch.syspath_prepend(str(package_root))
-    sys.modules.pop("example_cartpole", None)
+    previous = sys.modules.pop("example_cartpole", None)
     try:
         external = importlib.import_module("example_cartpole")
         config = external.create_task_config()
     finally:
         sys.modules.pop("example_cartpole", None)
+        if previous is not None:
+            sys.modules["example_cartpole"] = previous
 
     defaults = create_cartpole_task_config()
     assert config.rew_scale_pole_pos == -2.0

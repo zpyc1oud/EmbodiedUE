@@ -358,3 +358,21 @@ uv run python scripts/check_docs.py
 ```
 
 See [the documentation check](../../CONTRIBUTING.md#check-documentation) for supported syntax and manual review requirements.
+
+
+### Examples from the complete assertion review
+
+`test_action_plan.py` uses two asymmetric action rows and literal clipped/scaled targets,
+so broadcasting the first row cannot pass. `test_artifact_parity.py` writes and rereads
+an artifact before comparing its restored plans and network bytes.
+`test_policy_trace.py` rereads the original file after a refused overwrite; comparing an
+old in-memory string would miss a writer that changed the file before reporting failure.
+
+Native `UERLTerrainGeneratorTests.cpp` checks the requested plane footprint, the independent
+9-by-9 heightfield vertex count and the 4-by-4 box raster. Failed size/parse preconditions
+return before indexing the failed output, preserving a diagnostic failure instead of a crash.
+`test_terrain_curriculum.py` decodes actual UE terrain observations after distinct level resets
+and checks the unaffected Slot tier and episode count after a real Step. Raw RESET responses
+zero-fill unselected rows; use subsequent physical observations instead of treating padding
+as an unchanged-state snapshot. Its plane/non-plane oracle complements the exact native
+geometry checks; neither proves learned locomotion quality.

@@ -82,7 +82,11 @@ bool FUERLCanonicalJsonTest::RunTest(const FString& Parameters)
 		TEXT("cdab067e9f3beb32d1252cfd63e492592fecbf591b0d08cadb24bb17f3864246"));
 	TSharedPtr<FJsonObject> Parsed;
 	const TArray<uint8> NumberJson = UERLJson::ToUtf8(TEXT("{\"numbers\":[1e30,4.50,2e-3,1e-27]}"));
-	TestTrue(TEXT("strict number JSON parses"), UERLJson::ParseStrictObject(NumberJson, Parsed, Error));
+	if (!TestTrue(TEXT("strict number JSON parses"), UERLJson::ParseStrictObject(NumberJson, Parsed, Error))
+		|| !TestTrue(TEXT("parsed number object exists"), Parsed.IsValid()))
+	{
+		return false;
+	}
 	FString CanonicalNumbers;
 	TestTrue(TEXT("numbers canonicalize"),
 		UERLJson::Canonicalize(Parsed->TryGetField(TEXT("numbers")), CanonicalNumbers, Error));

@@ -1,6 +1,7 @@
 """Run bounded UE Worker regressions over the target SocketBridge."""
 from __future__ import annotations
 
+import argparse
 import sys
 from typing import cast
 
@@ -21,8 +22,8 @@ def run_negative_gate() -> bool:
     with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
         proc = _launch(port, log_file, ["-uerlforcebadgate=1"])
         rejected = False
+        client = SocketBridgeClient("127.0.0.1", port, N, SEED)
         try:
-            client = SocketBridgeClient("127.0.0.1", port, N, SEED)
             client.connect(timeout_s=120.0)
             try:
                 client.initialize()
@@ -30,7 +31,11 @@ def run_negative_gate() -> bool:
                 rejected = "CONFIG_REJECTED" in str(exc)
                 print(f"[VERIFY] invalid physics gate rejected: {exc}")
         finally:
-            return_code = _stop_process(proc)
+            try:
+                if client.sock is not None:
+                    client.sock.close()
+            finally:
+                return_code = _stop_process(proc)
     if return_code == 0 and not rejected:
         raise AssertionError("forced physics gate failure was not rejected")
     return rejected
@@ -74,10 +79,12 @@ def run_stability(steps: int = 1000) -> bool:
     )
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Run selected phase regressions and return a process-style status code."""
 
-    mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("mode", nargs="?", choices=("all", "negative", "repeat", "stability"), default="all")
+    mode = parser.parse_args(argv).mode
     results: dict[str, bool] = {}
     if mode in ("negative", "all"):
         results["negative_gate"] = run_negative_gate()

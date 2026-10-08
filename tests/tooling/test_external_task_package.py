@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def _run(command: list[str], cwd: Path, *, env: dict[str, str] | None = None) -> None:
-    completed = subprocess.run(command, cwd=cwd, env=env, text=True, capture_output=True, check=False)
+    completed = subprocess.run(command, cwd=cwd, env=env, text=True, capture_output=True, check=False, timeout=180)
     assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
@@ -40,17 +40,21 @@ def test_installed_wheels_discover_external_task_and_load_resources(tmp_path: Pa
     generated = tmp_path / "balance-demo"
     assert new.main(["external-cartpole", "balance-demo", "--output-dir", str(generated)]) == 0
     generated_test_env = os.environ.copy()
+    generated_test_env["PYTEST_ADDOPTS"] = "-p no:cacheprovider"
     generated_test_env["PYTHONPATH"] = os.pathsep.join(
         (str(generated / "src"), str(REPO / "src"), generated_test_env.get("PYTHONPATH", ""))
     )
-    _run([sys.executable, "-m", "pytest", "-q", "tests"], generated, env=generated_test_env)
+    _run([sys.executable, "-m", "pytest", "--basetemp", str(tmp_path / "generated-pytest"), "-q", "tests"],
+        generated, env=generated_test_env)
     generated_direct = tmp_path / "direct-balance-demo"
     assert new.main(["direct-cartpole", "direct-balance-demo", "--output-dir", str(generated_direct)]) == 0
     generated_direct_test_env = os.environ.copy()
+    generated_direct_test_env["PYTEST_ADDOPTS"] = "-p no:cacheprovider"
     generated_direct_test_env["PYTHONPATH"] = os.pathsep.join(
         (str(generated_direct / "src"), str(REPO / "src"), generated_direct_test_env.get("PYTHONPATH", ""))
     )
-    _run([sys.executable, "-m", "pytest", "-q", "tests"], generated_direct, env=generated_direct_test_env)
+    _run([sys.executable, "-m", "pytest", "--basetemp", str(tmp_path / "generated-direct-pytest"), "-q", "tests"],
+        generated_direct, env=generated_direct_test_env)
     wheels = tmp_path / "wheels"
     wheels.mkdir()
     # Build from an sdist too, so both release formats must carry the YAML resources.
@@ -175,11 +179,12 @@ assert main(['check', 'task', 'Example-CartPole-v0']) == 1
         text=True,
         capture_output=True,
         check=False,
+        timeout=180,
     )
     assert direct_task_result.returncode == 0, direct_task_result.stdout + direct_task_result.stderr
     assert "installed Direct Tasks stepped through DirectEnv" in direct_task_result.stdout
     completed = subprocess.run([sys.executable, "-I", str(probe), str(installed)], cwd=tmp_path,
-                               env=env, text=True, capture_output=True, check=False)
+                               env=env, text=True, capture_output=True, check=False, timeout=180)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "already registered" in completed.stdout
 

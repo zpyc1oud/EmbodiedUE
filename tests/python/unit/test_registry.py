@@ -59,7 +59,7 @@ def test_register_resolve_and_list_are_stable() -> None:
 
     assert registry.resolve("a-task").task_version == "1.0"
     assert [item.task_id for item in registry.list()] == ["a-task", "z-task"]
-    print("[VERIFY] VC-003: duplicate=REJECTED unknown=REJECTED order=STABLE")
+    print("[VERIFY] VC-003: order=STABLE")
 
 
 def test_duplicate_task_id_is_rejected() -> None:

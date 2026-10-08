@@ -17,6 +17,7 @@ from uerl import (
     SessionConfig,
     WorkerConfig,
 )
+from uerl.core.config.canonical import to_jsonable
 from uerl.errors import ConfigError
 from uerl.tasks.registry import RunnerConfigFactory, TaskConfigFactory, TaskFactory, WorkerConfigFactory
 
@@ -79,7 +80,7 @@ def test_resolve_applies_typed_overrides_and_computes_hash() -> None:
     assert result.worker.slot_count == 4
     assert result.worker.environment_config["gravity"] == 9.8
     assert len(result.normalized_hash) == 64
-    print(f"[VERIFY] VC-001: config_hash={result.normalized_hash} unknown_path=REJECTED")
+    print(f"[VERIFY] VC-001: config_hash={result.normalized_hash}")
 
 
 @pytest.mark.parametrize(
@@ -150,6 +151,7 @@ def test_resolve_accepts_valid_terrain_configuration() -> None:
     assert resolved_terrain["num_levels"] == terrain["num_levels"]
     resolved_tiers = cast(list[dict[str, object]], resolved_terrain["tiers"])
     assert resolved_tiers[0]["seed"] == "1"
+    assert to_jsonable(result.worker.terrain_config) == terrain
 
 
 def test_resolve_rejects_invalid_terrain_configuration() -> None:

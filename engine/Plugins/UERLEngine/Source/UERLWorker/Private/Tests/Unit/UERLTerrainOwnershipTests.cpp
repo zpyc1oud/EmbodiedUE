@@ -206,6 +206,14 @@ bool FUERLSharedHeightfield64SlotGenerationTest::RunTest(const FString& Paramete
 		return false;
 	}
 
+	if (!TestEqual(TEXT("narrow plan has one mesh"), NarrowPlans[0].Meshes.Num(), 1)
+		|| !TestEqual(TEXT("wide plan has one mesh"), WidePlans[0].Meshes.Num(), 1)
+		|| !TestEqual(TEXT("narrow plan samples all Slots"), NarrowPlans[0].Samples.Num(), NumSlots)
+		|| !TestEqual(TEXT("wide plan samples all Slots"), WidePlans[0].Samples.Num(), NumSlots))
+	{
+		return false;
+	}
+
 	const FUERLTerrainMeshSpec& NarrowMesh = NarrowPlans[0].Meshes[0];
 	const FUERLTerrainMeshSpec& WideMesh = WidePlans[0].Meshes[0];
 	const bool bGeometryUnchanged = NarrowMesh.VerticesMeters == WideMesh.VerticesMeters

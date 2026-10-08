@@ -28,6 +28,45 @@
 
 namespace
 {
+	/** Pin a valid synchronous-substep deploy baseline for the artifact contract (DtMin=10ms, DtMax=20ms). */
+	struct FDeployPhysicsSettingsGuard
+	{
+		FDeployPhysicsSettingsGuard(float SubstepDelta = 0.005f, int32 Substeps = 6)
+		{
+			UPhysicsSettings* Settings = GetMutableDefault<UPhysicsSettings>();
+			OldTickAsync = Settings->bTickPhysicsAsync;
+			OldSubstepping = Settings->bSubstepping;
+			OldSubsteppingAsync = Settings->bSubsteppingAsync;
+			OldSubstep = Settings->MaxSubstepDeltaTime;
+			OldMaxSubsteps = Settings->MaxSubsteps;
+			OldMinDelta = Settings->MinPhysicsDeltaTime;
+			Settings->bTickPhysicsAsync = false;
+			Settings->bSubstepping = true;
+			Settings->bSubsteppingAsync = false;
+			Settings->MaxSubstepDeltaTime = SubstepDelta;
+			Settings->MaxSubsteps = Substeps;
+			Settings->MinPhysicsDeltaTime = 0.0f;
+		}
+
+		~FDeployPhysicsSettingsGuard()
+		{
+			UPhysicsSettings* Settings = GetMutableDefault<UPhysicsSettings>();
+			Settings->bTickPhysicsAsync = OldTickAsync;
+			Settings->bSubstepping = OldSubstepping;
+			Settings->bSubsteppingAsync = OldSubsteppingAsync;
+			Settings->MaxSubstepDeltaTime = OldSubstep;
+			Settings->MaxSubsteps = OldMaxSubsteps;
+			Settings->MinPhysicsDeltaTime = OldMinDelta;
+		}
+
+		bool OldTickAsync = false;
+		bool OldSubstepping = false;
+		bool OldSubsteppingAsync = false;
+		float OldSubstep = 0.0f;
+		int32 OldMaxSubsteps = 0;
+		float OldMinDelta = 0.0f;
+	};
+
 	bool ResolveComponentArtifact(TArray<uint8>& OutBytes, FString& OutError, const TCHAR* FileName)
 	{
 		const TArray<FString> Candidates = {
@@ -435,15 +474,7 @@ bool FUERLPolicyComponentAutoStartTest::RunTest(const FString& Parameters)
 	Component->bClaimOwnerMesh = false;
 	Component->bAutoStart = true;
 	Component->RegisterComponent();
-	UPhysicsSettings* Settings = GetMutableDefault<UPhysicsSettings>();
-	const bool OldSubstepping = Settings->bSubstepping;
-	const bool OldTickAsync = Settings->bTickPhysicsAsync;
-	const bool OldSubsteppingAsync = Settings->bSubsteppingAsync;
-	Settings->bTickPhysicsAsync = false;
-	Settings->bSubsteppingAsync = false;
-	Settings->bSubstepping = true;
-	Settings->MaxSubstepDeltaTime = 0.004f;
-	Settings->MaxSubsteps = 5;
+	FDeployPhysicsSettingsGuard Guard(0.004f, 5);
 	if (!Component->HasBegunPlay())
 	{
 		Component->BeginPlay();
@@ -458,9 +489,6 @@ bool FUERLPolicyComponentAutoStartTest::RunTest(const FString& Parameters)
 		AddError(FString::Printf(TEXT("auto-start error: %s"), *Component->GetLastError()));
 	}
 	Component->StopPolicy();
-	Settings->bSubstepping = OldSubstepping;
-	Settings->bTickPhysicsAsync = OldTickAsync;
-	Settings->bSubsteppingAsync = OldSubsteppingAsync;
 	AddInfo(TEXT("[VERIFY] auto-start waits for Actor BeginPlay commands, then starts on the first tick"));
 	return true;
 }
@@ -494,12 +522,7 @@ bool FUERLPolicyComponentClearanceProbeTest::RunTest(const FString& Parameters)
 	Component->bClaimOwnerMesh = false;
 	Component->bAutoStart = false;
 	Component->RegisterComponent();
-	UPhysicsSettings* Settings = GetMutableDefault<UPhysicsSettings>();
-	Settings->bTickPhysicsAsync = false;
-	Settings->bSubsteppingAsync = false;
-	Settings->bSubstepping = true;
-	Settings->MaxSubstepDeltaTime = 0.004f;
-	Settings->MaxSubsteps = 5;
+	FDeployPhysicsSettingsGuard Guard(0.004f, 5);
 	AddExpectedError(
 		TEXT("no WorldStatic ground under the robot to measure start clearance"),
 		EAutomationExpectedErrorFlags::Contains,
@@ -608,45 +631,6 @@ bool FUERLPolicyComponentClearanceIgnoresOverheadAndOwnerTest::RunTest(const FSt
 
 namespace
 {
-	/** Pin a valid synchronous-substep deploy baseline for the artifact contract (DtMin=10ms, DtMax=20ms). */
-	struct FDeployPhysicsSettingsGuard
-	{
-		FDeployPhysicsSettingsGuard(float SubstepDelta = 0.005f, int32 Substeps = 6)
-		{
-			UPhysicsSettings* Settings = GetMutableDefault<UPhysicsSettings>();
-			OldTickAsync = Settings->bTickPhysicsAsync;
-			OldSubstepping = Settings->bSubstepping;
-			OldSubsteppingAsync = Settings->bSubsteppingAsync;
-			OldSubstep = Settings->MaxSubstepDeltaTime;
-			OldMaxSubsteps = Settings->MaxSubsteps;
-			OldMinDelta = Settings->MinPhysicsDeltaTime;
-			Settings->bTickPhysicsAsync = false;
-			Settings->bSubstepping = true;
-			Settings->bSubsteppingAsync = false;
-			Settings->MaxSubstepDeltaTime = SubstepDelta;
-			Settings->MaxSubsteps = Substeps;
-			Settings->MinPhysicsDeltaTime = 0.0f;
-		}
-
-		~FDeployPhysicsSettingsGuard()
-		{
-			UPhysicsSettings* Settings = GetMutableDefault<UPhysicsSettings>();
-			Settings->bTickPhysicsAsync = OldTickAsync;
-			Settings->bSubstepping = OldSubstepping;
-			Settings->bSubsteppingAsync = OldSubsteppingAsync;
-			Settings->MaxSubstepDeltaTime = OldSubstep;
-			Settings->MaxSubsteps = OldMaxSubsteps;
-			Settings->MinPhysicsDeltaTime = OldMinDelta;
-		}
-
-		bool OldTickAsync = false;
-		bool OldSubstepping = false;
-		bool OldSubsteppingAsync = false;
-		float OldSubstep = 0.0f;
-		int32 OldMaxSubsteps = 0;
-		float OldMinDelta = 0.0f;
-	};
-
 	void TickPolicyWorld(UWorld* World, float DeltaSeconds)
 	{
 		World->Tick(ELevelTick::LEVELTICK_All, DeltaSeconds);
@@ -2239,7 +2223,10 @@ bool FUERLPolicyTraceRecorderYamlTest::RunTest(const FString& Parameters)
 	ExistingTrace->PolicyComponent = Rig.Component;
 	ExistingTrace->RegisterComponent();
 	TestFalse(TEXT("a finalized trace path is rejected on a later start"), ExistingTrace->StartTrace(FileName, 9));
-	TestTrue(TEXT("the retained file still belongs to the original writer"), Contents.Contains(TEXT("seed: 7")));
+	FString RetainedContents;
+	TestTrue(TEXT("the retained trace is readable after a refused replacement"),
+		FFileHelper::LoadFileToString(RetainedContents, *TracePath));
+	TestEqual(TEXT("refusing a replacement preserves the finalized trace"), RetainedContents, Contents);
 	UUERLPolicyTraceRecorder* AbandonedTrace = NewObject<UUERLPolicyTraceRecorder>(Rig.Host);
 	Rig.Host->AddInstanceComponent(AbandonedTrace);
 	AbandonedTrace->PolicyComponent = Rig.Component;

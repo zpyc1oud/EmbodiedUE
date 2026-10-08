@@ -62,6 +62,7 @@ _PHANTOMX_EXPECTED = [
 ]
 
 _NORM_EPS = 0.01
+_SYNTHETIC_TIMING = ArtifactTiming(1.0 / 60.0, 1, 1)
 
 
 def _metadata() -> ArtifactMetadata:
@@ -122,7 +123,10 @@ def _robot_runtime(*, actuator_count: int) -> RobotRuntime:
     )
 
 
-def _write_artifact(path: Path, *, obs: int, act: int, onnx_bytes: bytes) -> None:
+def _write_artifact(
+    path: Path, *, obs: int, act: int, onnx_bytes: bytes,
+    timing: ArtifactTiming = _SYNTHETIC_TIMING,
+) -> None:
     artifact = PolicyArtifact(
         format_version=ARTIFACT_FORMAT_VERSION,
         task_id="policynet.fixture",
@@ -132,7 +136,7 @@ def _write_artifact(path: Path, *, obs: int, act: int, onnx_bytes: bytes) -> Non
         robot_runtime=_robot_runtime(actuator_count=act),
         onnx=onnx_bytes,
         metadata=_metadata(),
-        timing=ArtifactTiming(1.0 / 60.0, 1, 1),
+        timing=timing,
     )
     artifact.write(path)
 
@@ -283,6 +287,40 @@ class _PhantomXmlOnnx(nn.Module):
         return out
 
 
+def generate_phantomx_fixture() -> None:
+    """Convert the legacy model while preserving its recorded deployment timing."""
+    # PhantomX parity — convert legacy UERLMLP1 to ONNX with baked normalizer.
+    if not _PHANTOMX_POLICY.is_file():
+        raise FileNotFoundError(_PHANTOMX_POLICY)
+    mean_p, std_p, layers = _parse_uerlmlp1(_PHANTOMX_POLICY)
+    phantom = _PhantomXmlOnnx(mean_p, std_p, layers)
+    onnx_p = _export_onnx(phantom, 115)
+    with torch.no_grad():
+        actual = phantom(torch.zeros(1, 115)).numpy().reshape(-1)
+    expected_p = np.asarray(_PHANTOMX_EXPECTED, dtype=np.float32)
+    max_err = float(np.max(np.abs(actual - expected_p)))
+    if max_err > 2.0e-5:
+        raise RuntimeError(f"PhantomX torch/ONNX reference max abs err {max_err} > 2e-5")
+    source_timing = PolicyArtifact.read(_PHANTOMX_POLICY.with_suffix(".uerlpol2")).timing
+    _write_artifact(
+        _OUT / "phantomx_115.uerlpol2", obs=115, act=18, onnx_bytes=onnx_p,
+        timing=source_timing,
+    )
+    (_OUT / "phantomx_115.expected.json").write_text(
+        json.dumps(
+            {
+                "input": [0.0] * 115,
+                "expected": _PHANTOMX_EXPECTED,
+                "tolerance": 2.0e-5,
+                "max_torch_abs_err": max_err,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     _OUT.mkdir(parents=True, exist_ok=True)
 
@@ -356,32 +394,7 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    # PhantomX parity — convert legacy UERLMLP1 to ONNX with baked normalizer.
-    if not _PHANTOMX_POLICY.is_file():
-        raise FileNotFoundError(_PHANTOMX_POLICY)
-    mean_p, std_p, layers = _parse_uerlmlp1(_PHANTOMX_POLICY)
-    phantom = _PhantomXmlOnnx(mean_p, std_p, layers)
-    onnx_p = _export_onnx(phantom, 115)
-    with torch.no_grad():
-        actual = phantom(torch.zeros(1, 115)).numpy().reshape(-1)
-    expected_p = np.asarray(_PHANTOMX_EXPECTED, dtype=np.float32)
-    max_err = float(np.max(np.abs(actual - expected_p)))
-    if max_err > 2.0e-5:
-        raise RuntimeError(f"PhantomX torch/ONNX reference max abs err {max_err} > 2e-5")
-    _write_artifact(_OUT / "phantomx_115.uerlpol2", obs=115, act=18, onnx_bytes=onnx_p)
-    (_OUT / "phantomx_115.expected.json").write_text(
-        json.dumps(
-            {
-                "input": [0.0] * 115,
-                "expected": _PHANTOMX_EXPECTED,
-                "tolerance": 2.0e-5,
-                "max_torch_abs_err": max_err,
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    generate_phantomx_fixture()
 
     print("wrote fixtures to", _OUT)
     for name in sorted(p.name for p in _OUT.iterdir() if p.suffix in {".uerlpol2", ".json"}):

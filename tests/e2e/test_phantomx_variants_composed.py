@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
+from tests.e2e.support.worker_runner import UE_CMD, UPROJECT, run_owned_command
 from uerl.policy.artifact import PolicyArtifact
 from uerl.tasks.phantomx.config import (
     PHANTOMX_DISCRETE_TERRAIN_TASK_ID,
@@ -59,7 +58,7 @@ def test_phantomx_composed_variant_trains_one_iteration(task_id: str, tmp_path: 
     # smoke test single-slot so it validates the task wiring without turning a
     # one-iteration check into a capacity benchmark.
     slot_count = "1"
-    completed = subprocess.run(
+    completed = run_owned_command(
         [
             sys.executable,
             "-m",
@@ -82,10 +81,7 @@ def test_phantomx_composed_variant_trains_one_iteration(task_id: str, tmp_path: 
             str(run_directory),
         ],
         cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=480,
-        check=False,
     )
     output = f"{completed.stdout}\n{completed.stderr}"
     assert completed.returncode == 0, output[-6000:]
@@ -96,7 +92,7 @@ def test_phantomx_walk_export_produces_valid_uerlpol2(tmp_path: Path) -> None:
     """Train walk once, export UERLPOL2 from the DirectTask plan path, reload artifact."""
 
     run_directory = tmp_path / "walk-export-train"
-    train = subprocess.run(
+    train = run_owned_command(
         [
             sys.executable,
             "-m",
@@ -119,10 +115,7 @@ def test_phantomx_walk_export_produces_valid_uerlpol2(tmp_path: Path) -> None:
             str(run_directory),
         ],
         cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=480,
-        check=False,
     )
     train_out = f"{train.stdout}\n{train.stderr}"
     assert train.returncode == 0, train_out[-6000:]
@@ -132,7 +125,7 @@ def test_phantomx_walk_export_produces_valid_uerlpol2(tmp_path: Path) -> None:
     runtime_path = tmp_path / "robot_runtime.json"
     _write_robot_runtime(runtime_path)
     artifact_path = tmp_path / "phantomx_walk_composed.uerlpol2"
-    export = subprocess.run(
+    export = run_owned_command(
         [
             sys.executable,
             "-m",
@@ -155,10 +148,7 @@ def test_phantomx_walk_export_produces_valid_uerlpol2(tmp_path: Path) -> None:
             "1",
         ],
         cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=480,
-        check=False,
     )
     export_out = f"{export.stdout}\n{export.stderr}"
     assert export.returncode == 0, export_out[-6000:]

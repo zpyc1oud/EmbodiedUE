@@ -119,21 +119,13 @@ namespace
 		return bOk;
 	}
 
-	bool RunEvaluateCase(
+	bool EvaluateReviewedCase(
 		FAutomationTestBase& Test,
+		FUERLPolicyNetwork& Network,
 		const FString& CorpusDir,
 		const FString& Stem)
 	{
 		FString Error;
-		FUERLPolicyArtifact Artifact;
-		FUERLPolicyNetwork Network;
-		const FString ArtifactPath = FPaths::Combine(CorpusDir, Stem + TEXT(".uerlpol2"));
-		if (!LoadArtifactAndBuild(ArtifactPath, Artifact, Network, Error))
-		{
-			Test.AddError(FString::Printf(TEXT("%s build: %s"), *Stem, *Error));
-			return false;
-		}
-
 		TSharedPtr<FJsonObject> ExpectedObject;
 		const FString ExpectedPath = FPaths::Combine(CorpusDir, Stem + TEXT(".expected.json"));
 		if (!LoadPolicyNetJsonObject(ExpectedPath, ExpectedObject, Error))
@@ -165,6 +157,24 @@ namespace
 			return false;
 		}
 		return AssertFloatClose(Test, Stem, Actual, Expected, static_cast<float>(Tolerance));
+	}
+
+	bool RunEvaluateCase(
+		FAutomationTestBase& Test,
+		const FString& CorpusDir,
+		const FString& Stem)
+	{
+		FString Error;
+		FUERLPolicyArtifact Artifact;
+		FUERLPolicyNetwork Network;
+		const FString ArtifactPath = FPaths::Combine(CorpusDir, Stem + TEXT(".uerlpol2"));
+		if (!LoadArtifactAndBuild(ArtifactPath, Artifact, Network, Error))
+		{
+			Test.AddError(FString::Printf(TEXT("%s build: %s"), *Stem, *Error));
+			return false;
+		}
+
+		return EvaluateReviewedCase(Test, Network, CorpusDir, Stem);
 	}
 }
 
@@ -232,16 +242,7 @@ bool FUERLPolicyNetworkTwoShapesTest::RunTest(const FString& Parameters)
 		{
 			TestEqual(TEXT("2x64 input"), Network.InputWidth(), 8);
 			TestEqual(TEXT("2x64 output"), Network.OutputWidth(), 4);
-			TArray<float> Obs;
-			Obs.SetNumZeroed(Network.InputWidth());
-			TArray<float> Action;
-			TestTrue(TEXT("2x64 evaluate"), Network.Evaluate(Obs, Action, Error));
-			if (!Error.IsEmpty())
-			{
-				AddError(Error);
-				bOk = false;
-			}
-			TestEqual(TEXT("2x64 action width"), Action.Num(), 4);
+			bOk = EvaluateReviewedCase(*this, Network, CorpusDir, TEXT("mlp_2x64")) && bOk;
 		}
 	}
 	{
@@ -257,16 +258,7 @@ bool FUERLPolicyNetworkTwoShapesTest::RunTest(const FString& Parameters)
 		{
 			TestEqual(TEXT("5x256 input"), Network.InputWidth(), 16);
 			TestEqual(TEXT("5x256 output"), Network.OutputWidth(), 6);
-			TArray<float> Obs;
-			Obs.SetNumZeroed(Network.InputWidth());
-			TArray<float> Action;
-			TestTrue(TEXT("5x256 evaluate"), Network.Evaluate(Obs, Action, Error));
-			if (!Error.IsEmpty())
-			{
-				AddError(Error);
-				bOk = false;
-			}
-			TestEqual(TEXT("5x256 action width"), Action.Num(), 6);
+			bOk = EvaluateReviewedCase(*this, Network, CorpusDir, TEXT("mlp_5x256")) && bOk;
 		}
 	}
 	return bOk;

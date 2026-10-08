@@ -89,15 +89,20 @@ class SocketBridgeClient:
 
         deadline = time.monotonic() + timeout_s
         last_error: Exception | None = None
-        while time.monotonic() < deadline:
+        while (remaining := deadline - time.monotonic()) > 0.0:
             try:
-                self.sock = socket.create_connection((self.host, self.port), timeout=min(5.0, timeout_s))
+                self.sock = socket.create_connection((self.host, self.port), timeout=remaining)
                 self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 self.sock.settimeout(timeout_s)
                 break
             except OSError as exc:
                 last_error = exc
-                time.sleep(0.05)
+                if self.sock is not None:
+                    self.sock.close()
+                    self.sock = None
+                remaining = deadline - time.monotonic()
+                if remaining > 0.0:
+                    time.sleep(min(0.05, remaining))
         if self.sock is None:
             raise ConnectionError(f"cannot connect to SocketBridge: {last_error}")
         response, _ = self._json_request(

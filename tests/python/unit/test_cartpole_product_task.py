@@ -231,7 +231,7 @@ def test_cartpole_robot_observation_values_follow_declared_order() -> None:
 
 
 def test_ac_py_unit_generic_002_cartpole_schema_and_robot_action_scale_are_stable() -> None:
-    """Verify names, units, clipping, and Newton action scaling."""
+    """Verify names, clipping, and Newton action scaling."""
 
     task = _make_task()
     commands = task.preprocess_actions(torch.tensor([[-2.0], [0.25], [2.0]]), {})

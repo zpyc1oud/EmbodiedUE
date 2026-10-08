@@ -79,7 +79,7 @@ def test_launch_owns_and_reclaims_its_popen_handle() -> None:
     assert process.terminated
     assert process.waited
     assert controller.handle is None
-    print("[VERIFY] VC-004: launch_owned_exit=true attached_host_alive=true")
+    print("[VERIFY] VC-004: launch_owned_cleanup=PASS")
 
 
 def test_close_waits_for_graceful_process_exit_before_forcing_termination() -> None:

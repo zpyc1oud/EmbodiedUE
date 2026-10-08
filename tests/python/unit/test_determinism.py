@@ -51,6 +51,6 @@ def test_manifest_identity_is_independent_of_output_directory(tmp_path: Path) ->
 
     assert first_hash == second_hash
     print(
-        "[VERIFY] VC-009: config_hash=EQUAL manifest_contract=EQUAL "
-        "seed_derivation=EQUAL output_directory=EXCLUDED"
+        "[VERIFY] VC-009: manifest_identity=EQUAL "
+        "output_directory=EXCLUDED"
     )

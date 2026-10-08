@@ -84,4 +84,8 @@ def test_train_resume_resolves_source_and_writes_new_run_command(
     assert captured[0].worker.decimation == (3, 3)
     assert captured[0].task.rew_scale_alive == 0.75
     assert captured[0].runner.max_iterations == 7
-    assert (output / "command.txt").is_file()
+    command = (output / "command.txt").read_text(encoding="utf-8")
+    assert "--task " + CARTPOLE_TASK_ID in command
+    assert "--resume" in command and str(source) in command
+    assert "--max-iterations 7" in command
+    assert str(output) in command

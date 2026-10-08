@@ -103,8 +103,14 @@ bool FUERLTopologyReflectorCartPoleTest::RunTest(const FString& Parameters)
 	FString Error;
 	const bool bReflected = ReflectPhysicsAssetTopology(Asset, Topology, Error);
 
-	TestTrue(TEXT("cartpole topology reflects"), bReflected);
-	TestEqual(TEXT("two bodies"), Topology.BodyNames.Num(), 2);
+	if (!TestTrue(TEXT("cartpole topology reflects"), bReflected))
+	{
+		return false;
+	}
+	if (!TestEqual(TEXT("two bodies"), Topology.BodyNames.Num(), 2))
+	{
+		return false;
+	}
 	TestEqual(TEXT("body 0 is cart"), Topology.BodyNames[0], Cart);
 	TestEqual(TEXT("body 1 is pole"), Topology.BodyNames[1], Pole);
 	TestEqual(TEXT("one joint"), Topology.Joints.Num(), 1);
@@ -170,7 +176,9 @@ bool FUERLTopologyReflectorMetadataTest::RunTest(const FString& Parameters)
 	FUERLRobotTopology Topology;
 	FString Error;
 	TestTrue(TEXT("fixed-base chain reflects"), ReflectPhysicsAssetTopology(Asset, Topology, Error));
-	if (!Topology.BodyNames.IsValidIndex(2) || Topology.Joints.Num() != 2)
+	if (!TestEqual(TEXT("three body motion types"), Topology.BodyMotionTypes.Num(), 3)
+		|| !TestEqual(TEXT("three body names"), Topology.BodyNames.Num(), 3)
+		|| !TestEqual(TEXT("two joints"), Topology.Joints.Num(), 2))
 	{
 		return false;
 	}
@@ -263,6 +271,11 @@ bool FUERLTopologyReflectorCanonicalOrderTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("canonical bodies are root-first with sorted children"),
 		FirstTopology.BodyNames, TArray<FName>({ TEXT("root"), TEXT("alpha"), TEXT("zeta") }));
 	TestEqual(TEXT("body order ignores PhysicsAsset array order"), FirstTopology.BodyNames, SecondTopology.BodyNames);
+	if (!TestEqual(TEXT("first topology has two joints"), FirstTopology.Joints.Num(), 2)
+		|| !TestEqual(TEXT("second topology has two joints"), SecondTopology.Joints.Num(), 2))
+	{
+		return false;
+	}
 	TestEqual(TEXT("first canonical joint is alpha"), FirstTopology.Joints[0].Name, FName(TEXT("root_to_alpha")));
 	TestEqual(TEXT("joint order ignores PhysicsAsset array order"),
 		FirstTopology.Joints[0].Name, SecondTopology.Joints[0].Name);

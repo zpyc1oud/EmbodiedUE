@@ -178,21 +178,68 @@ def test_real_ue_negotiates_all_terrain_tiers_and_resets_each_slot(tmp_path: Pat
             reset_layout.layout_id,
             _reset_payload(reset_layout, (True, True), (0, 1), reset_values),
         )
-        assert len(first_reset) == layouts["reset_result"].payload_length
+        result_layout = layouts["reset_result"]
+
+        def field(
+            payload: bytes, name: str, layout: Layout = result_layout,
+        ) -> np.ndarray[Any, np.dtype[np.float32]]:
+            segment = layout.segment(name)
+            return np.frombuffer(payload, dtype="<f4", count=segment.byte_length // 4,
+                                 offset=segment.offset).reshape(2, -1)
+
+        scan_name = "robot.body.base_link.terrain_height"
+        first_scan = field(first_reset, scan_name)
+        np.testing.assert_allclose(first_scan[0], first_scan[0, 0], atol=1e-6, rtol=0)
+        assert np.ptp(first_scan[1]) > 1e-4, "heightfield Slot must observe non-flat ground"
+
 
         assert curriculum.update([0], [1.1], [2.0]) == (1, 0)
         _, second_reset = session.reset(
             reset_layout.layout_id,
             _reset_payload(reset_layout, (True, True), curriculum.levels, reset_values),
         )
-        assert len(second_reset) == layouts["reset_result"].payload_length
+        second_scan = field(second_reset, scan_name)
+        assert np.ptp(second_scan[0]) > 1e-4, "Slot0 must switch from plane to heightfield"
+        np.testing.assert_allclose(second_scan[1], second_scan[1, 0], atol=1e-6, rtol=0)
+
+
+        def observe_next_step() -> bytes:
+            action_layout = layouts["step_action"]
+            action = bytearray(action_layout.payload_length)
+            segment = action_layout.segment("step_decimation")
+            action[segment.offset:segment.offset + segment.byte_length] = np.asarray(
+                [config.worker.decimation[0]], dtype="<i4",
+            ).tobytes()
+            return session.step(action_layout.layout_id, bytes(action))[1]
 
         assert curriculum.update([1], [1.1], [2.0]) == (1, 1)
         _, third_reset = session.reset(
             reset_layout.layout_id,
-            _reset_payload(reset_layout, (False, True), curriculum.levels, reset_values),
+            # Slot0's unused level deliberately differs; the mask must ignore it.
+            _reset_payload(reset_layout, (False, True), (0, 1), reset_values),
         )
-        assert len(third_reset) == layouts["reset_result"].payload_length
+        assert third_reset[result_layout.segment("system.reset_mask").offset] == 2
+        assert np.ptp(field(third_reset, scan_name)[1]) > 1e-4, "selected Slot1 must switch tier"
+        episodes = np.frombuffer(third_reset, dtype="<u8", count=2,
+                                 offset=result_layout.segment("system.episode_index").offset)
+        np.testing.assert_array_equal(episodes, [2, 3])
+        after_sparse = observe_next_step()
+        assert np.ptp(field(after_sparse, scan_name, layouts["step_result"])[0]) > 1e-4, (
+            "unselected Slot0 must retain its heightfield, not move to the unused plane level"
+        )
+        _, boxes_reset = session.reset(
+            reset_layout.layout_id,
+            _reset_payload(reset_layout, (True, False), (2, 0), reset_values),
+        )
+        assert boxes_reset[result_layout.segment("system.reset_mask").offset] == 1
+        assert np.ptp(field(boxes_reset, scan_name)[0]) > 1e-4, "boxes tier must expose varying heights"
+        episodes = np.frombuffer(boxes_reset, dtype="<u8", count=2,
+                                 offset=result_layout.segment("system.episode_index").offset)
+        np.testing.assert_array_equal(episodes, [3, 3])
+        after_boxes = observe_next_step()
+        assert np.ptp(field(after_boxes, scan_name, layouts["step_result"])[1]) > 1e-4, (
+            "unselected Slot1 must retain its heightfield, not move to the unused plane level"
+        )
 
         with pytest.raises(BridgeProtocolError):
             session.reset(

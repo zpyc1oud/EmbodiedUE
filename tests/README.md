@@ -134,7 +134,7 @@ The command `scripts/run_e2e.py --suite all` includes `PIEAttach` and supplies i
 
 ```powershell
 $automationGroups = @(
-  'UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.VariableDt+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component',
+  'UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component',
   'UERL.Integration.Robot.GenericDrive+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+UERL.Integration.Robot.TopologyReflector+UERL.Integration.Worker.EnvironmentPool+UERL.Integration.Worker.Terrain'
 )
 foreach ($group in $automationGroups) {
@@ -208,3 +208,10 @@ Pytest imports product code from `src/uerl` through the paths in `pyproject.toml
 The directory `tests/protocol/support/` contains an independent test-only oracle.
 Product code must not import it.
 It is not a training entry point.
+
+
+The completed Issue #29 review adds real-file rewrite and no-overwrite assertions,
+distinct action rows, independent native network/terrain values and sparse E2E reset checks.
+Runner tests include unsuccessful/duplicate Automation completions and actual Windows
+owned-descendant timeout cleanup. Test-support sockets and packaging commands have bounded waits.
+See the [review matrix](../docs/testing/README.md#real-workflow-matrix) for retained task smoke scope.

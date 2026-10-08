@@ -13,7 +13,10 @@ def test_tasks_json_lists_stable_filtered_rows(capsys) -> None:  # type: ignore[
     assert tasks_cli.main(["--filter", "phantomx", "--json"]) == 0
 
     rows = json.loads(capsys.readouterr().out)
-    assert rows
+    assert {row["task_id"] for row in rows} == {
+        "UERL-PhantomX-Walk-v0", "UERL-PhantomX-Pursuit-v0",
+        "UERL-PhantomX-ContinuousTerrain-v0", "UERL-PhantomX-DiscreteTerrain-v0",
+    }
     assert all("phantomx" in row["task_id"].casefold() for row in rows)
     assert [row["task_id"] for row in rows] == sorted(row["task_id"] for row in rows)
     assert {"task_id", "robot_id", "environment_id", "slot_count", "map_path"} <= set(rows[0])

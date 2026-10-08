@@ -60,9 +60,11 @@ def _batch_zero(layout: Layout, field_name: str) -> bytes:
 
 
 def _step_action(layout: Layout, *, step_decimation: int) -> bytes:
-    """Zero actuator targets and write one in-range step_decimation scalar."""
+    """Move the two Slots differently and write an in-range decimation."""
 
     payload = bytearray(_batch_zero(layout, "robot.actuator.target"))
+    target = layout.segment("robot.actuator.target")
+    payload[target.offset : target.offset + target.byte_length] = np.asarray([50.0, -25.0], dtype="<f4").tobytes()
     segment = layout.segment("step_decimation")
     payload[segment.offset : segment.offset + segment.byte_length] = np.asarray(
         [step_decimation], dtype="<i4"
@@ -79,7 +81,9 @@ def _reset_one(layout: Layout) -> bytes:
     return bytes(payload)
 
 
-def _drive_formal_session(config: ResolvedRunConfig) -> tuple[dict[str, Any], dict[str, Any]]:
+def _drive_formal_session(
+    config: ResolvedRunConfig, *, perform_reset: bool = True,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, np.ndarray[Any, np.dtype[np.float32]]]]:
     """Drive one formal Session and return its persisted Manifest and response."""
 
     session = UERLSession.open(
@@ -122,13 +126,46 @@ def _drive_formal_session(config: ResolvedRunConfig) -> tuple[dict[str, Any], di
                 step_decimation=int(config.worker.decimation[0]),
             ),
         )
-        _, reset_payload = session.reset(
-            layouts["reset_request"].layout_id,
-            _reset_one(layouts["reset_request"]),
-        )
         assert len(step_payload) == layouts["step_result"].payload_length
-        assert len(reset_payload) == layouts["reset_result"].payload_length
-        return manifest, result.response
+        if perform_reset:
+            _, reset_payload = session.reset(
+                layouts["reset_request"].layout_id, _reset_one(layouts["reset_request"]),
+            )
+            reset_layout = layouts["reset_result"]
+            assert len(reset_payload) == reset_layout.payload_length
+            assert reset_payload[reset_layout.segment("system.reset_mask").offset] == 1
+            episodes = np.frombuffer(reset_payload, dtype="<u8", count=2,
+                                     offset=reset_layout.segment("system.episode_index").offset)
+            np.testing.assert_array_equal(episodes, [1, 0])
+            for descriptor in schema.state_requirements:
+                name = str(descriptor["name"])
+                before_segment = layouts["step_result"].segment(name)
+                after_segment = reset_layout.segment(name)
+                before = np.frombuffer(step_payload, dtype="<f4", count=before_segment.byte_length // 4,
+                                       offset=before_segment.offset).reshape(2, -1)
+                after = np.frombuffer(reset_payload, dtype="<f4", count=after_segment.byte_length // 4,
+                                      offset=after_segment.offset).reshape(2, -1)
+                # Wire ResetResult deliberately zero-fills unselected rows.
+                np.testing.assert_array_equal(after[1], 0.0, err_msg=f"wire padding Slot1 {name}")
+                np.testing.assert_allclose(after[0], 0.0, atol=1e-5, rtol=0, err_msg=f"reset Slot0 {name}")
+                if name == "robot.joint.cart.joint_velocity":
+                    assert abs(float(before[0, 0])) > 1e-4, "selected Slot must move before reset"
+
+        # A subsequent Step observes both physical Slots. Compare Slot1 with a
+        # separate, identical two-Step run that performs no intervening Reset.
+        _, next_payload = session.step(
+            layouts["step_action"].layout_id,
+            _step_action(layouts["step_action"], step_decimation=int(config.worker.decimation[0])),
+        )
+        untouched = {}
+        for descriptor in schema.state_requirements:
+            name = str(descriptor["name"])
+            segment = layouts["step_result"].segment(name)
+            untouched[name] = np.frombuffer(next_payload, dtype="<f4", count=segment.byte_length // 4,
+                                            offset=segment.offset).reshape(2, -1)[1].copy()
+        assert abs(float(untouched["robot.joint.cart.joint_velocity"][0])) > 1e-4
+        return manifest, result.response, untouched
+
     finally:
         session.close("p1_e2e")
 
@@ -138,8 +175,13 @@ def test_formal_session_completes_real_ue_initialize_step_reset_shutdown(tmp_pat
 
     port = _free_port()
     config = _resolved_config(port, tmp_path / "run")
-    first_manifest, first_response = _drive_formal_session(config)
-    second_manifest, second_response = _drive_formal_session(config)
+    first_manifest, first_response, after_sparse = _drive_formal_session(config)
+    second_manifest, second_response, without_reset = _drive_formal_session(config, perform_reset=False)
+    for name, expected in without_reset.items():
+        # Float32 roundoff budget for two same-host fixed steps; well below the
+        # independently required 1e-4 motion, so an accidental reset is visible.
+        np.testing.assert_allclose(after_sparse[name], expected, atol=1e-6, rtol=0,
+                                   err_msg=f"physical unselected Slot1 {name}")
 
     for key in (
         "resolved_config",
@@ -152,5 +194,5 @@ def test_formal_session_completes_real_ue_initialize_step_reset_shutdown(tmp_pat
     ):
         assert first_manifest[key] == second_manifest[key]
     assert first_response["effective_worker_config_hash"] == second_response["effective_worker_config_hash"]
-    print("[VERIFY] VC-006: init=1 step=1 reset=1 shutdown=1 in_flight_max=1")
+    print("[VERIFY] VC-006: init=1 step=2 reset=1 shutdown=1 sparse_reset=VERIFIED")
     print("[VERIFY] VC-009: config_hash=EQUAL manifest_contract=EQUAL seed_derivation=EQUAL")

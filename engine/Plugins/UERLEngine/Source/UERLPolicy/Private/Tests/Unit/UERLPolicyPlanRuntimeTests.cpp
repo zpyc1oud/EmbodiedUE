@@ -271,7 +271,10 @@ bool FUERLPolicyPlanRuntimePreviousActionFirstFrameTest::RunTest(const FString& 
 	Inputs.PreviousAction = Zeros;
 	TArray<float> Out;
 	TestTrue(TEXT("first Execute after reset succeeds"), Runtime.Execute(Inputs, Out, Error));
-	TestEqual(TEXT("width"), Out.Num(), 3);
+	if (!TestEqual(TEXT("width"), Out.Num(), 3))
+	{
+		return false;
+	}
 	TestEqual(TEXT("zero[0]"), Out[0], 0.f);
 	TestEqual(TEXT("zero[1]"), Out[1], 0.f);
 	TestEqual(TEXT("zero[2]"), Out[2], 0.f);
@@ -307,6 +310,10 @@ bool FUERLPolicyPlanRuntimePreviousActionResetClearsResidueTest::RunTest(const F
 	NonzeroInputs.PreviousAction = Nonzero;
 	TArray<float> Mid;
 	TestTrue(TEXT("nonzero Execute"), Runtime.Execute(NonzeroInputs, Mid, Error));
+	if (!TestEqual(TEXT("nonzero Execute output width"), Mid.Num(), 3))
+	{
+		return false;
+	}
 	TestEqual(TEXT("mid[0]"), Mid[0], 0.5f);
 
 	// Controller Reset(): re-supply zeros — operator must not retain prior values.
@@ -315,6 +322,10 @@ bool FUERLPolicyPlanRuntimePreviousActionResetClearsResidueTest::RunTest(const F
 	ResetInputs.PreviousAction = Zeros;
 	TArray<float> AfterReset;
 	TestTrue(TEXT("Execute after reset"), Runtime.Execute(ResetInputs, AfterReset, Error));
+	if (!TestEqual(TEXT("Execute after reset output width"), AfterReset.Num(), 3))
+	{
+		return false;
+	}
 	TestEqual(TEXT("cleared[0]"), AfterReset[0], 0.f);
 	TestEqual(TEXT("cleared[1]"), AfterReset[1], 0.f);
 	TestEqual(TEXT("cleared[2]"), AfterReset[2], 0.f);
@@ -404,11 +415,18 @@ bool FUERLPolicyPlanRuntimeControlFrameDtSourceTest::RunTest(const FString& Para
 	Inputs.ControlFrameDtSeconds = 0.005f;
 	TArray<float> Out;
 	TestTrue(TEXT("first interval executes"), Runtime.Execute(Inputs, Out, Error));
-	TestEqual(TEXT("one output"), Out.Num(), 1);
+	if (!TestEqual(TEXT("one output"), Out.Num(), 1))
+	{
+		return false;
+	}
 	TestTrue(TEXT("first scaled value"), FMath::IsNearlyEqual(Out[0], 0.5f));
 
 	Inputs.ControlFrameDtSeconds = 0.035f;
 	TestTrue(TEXT("second interval executes"), Runtime.Execute(Inputs, Out, Error));
+	if (!TestEqual(TEXT("second interval executes output width"), Out.Num(), 1))
+	{
+		return false;
+	}
 	TestTrue(TEXT("source is stateless"), FMath::IsNearlyEqual(Out[0], 3.5f));
 	return true;
 }

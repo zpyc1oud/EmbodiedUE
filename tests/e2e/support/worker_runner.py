@@ -98,6 +98,67 @@ def _stop_process(proc: subprocess.Popen[str]) -> int:
             return proc.wait(timeout=10)
 
 
+
+def run_owned_command(
+    command: list[str], *, cwd: Path, timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    """Capture a trainer/export child and reclaim its owned tree on failure."""
+    from scripts.test_runner_support import stop_owned_process
+
+    process = subprocess.Popen(
+        command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, start_new_session=os.name != "nt",
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except BaseException as primary:
+        try:
+            stop_owned_process(cast(subprocess.Popen[bytes], process))
+        except BaseException as cleanup:
+            primary.add_note(f"Owned training process cleanup failed: {cleanup}")
+        raise
+    finally:
+        for stream in (process.stdout, process.stderr):
+            if stream is not None:
+                stream.close()
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+
+def _cleanup_run(
+    env: UERLDirectEnv | None, session: UERLSession | None,
+    process: subprocess.Popen[str] | None, *, reason: str, terminate_host: bool,
+) -> int:
+    """Close acquired resources independently while retaining the primary error."""
+    primary = sys.exception()
+    errors: list[BaseException] = []
+    for resource in (env, session):
+        if resource is not None:
+            try:
+                resource.close(reason)
+            except BaseException as error:
+                errors.append(error)
+    return_code = 0
+    if process is not None:
+        try:
+            try:
+                if terminate_host and process.poll() is None:
+                    process.terminate()
+            finally:
+                return_code = _stop_process(process)
+        except BaseException as error:
+            errors.append(error)
+    if errors:
+        if primary is None:
+            primary = errors.pop(0)
+            for cleanup_error in errors:
+                primary.add_note(f"Additional cleanup failure: {cleanup_error}")
+            raise primary
+        for cleanup_error in errors:
+            primary.add_note(f"Worker cleanup failure: {cleanup_error}")
+    return return_code
+
+
 def run_session(
     num_steps: int = NUM_STEPS,
     *,
@@ -242,14 +303,9 @@ def run_session(
                         stale.close()
                         stats["port_released"] = False
             finally:
-                if env is not None:
-                    env.close("test_complete")
-                elif raw_session is not None:
-                    raw_session.close("test_complete")
-                if proc is not None:
-                    if attached and proc.poll() is None:
-                        proc.terminate()
-                    return_code = _stop_process(proc)
+                return_code = _cleanup_run(
+                    env, raw_session, proc, reason="test_complete", terminate_host=attached,
+                )
 
     if not attached and return_code != 0:
         raise RuntimeError(f"UE Worker exited abnormally with code {return_code}; see {log_path}")
@@ -357,13 +413,9 @@ def run_pie_attach() -> bool:
                 if return_code != 0:
                     raise RuntimeError(f"PIE attach automation exited with {return_code}; see {log_path}")
             finally:
-                if env is not None:
-                    env.close("pie_attach_cleanup")
-                elif raw_session is not None:
-                    raw_session.close("pie_attach_cleanup")
-                if proc.poll() is None:
-                    proc.terminate()
-                _stop_process(proc)
+                _cleanup_run(
+                    env, raw_session, proc, reason="pie_attach_cleanup", terminate_host=True,
+                )
 
     with open(log_path, encoding="utf-8", errors="replace") as log_file:
         log_text = log_file.read()

@@ -102,7 +102,6 @@ def test_layout_validates_hash_and_layout_id() -> None:
 
     assert layout.payload_length == 0
     assert layout.layout_hash == descriptor["layout_hash"]
-    print("[VERIFY] VC-005: protocol=U4 sequence=PASS layout_hash=PASS")
 
 
 def test_layout_rejects_payload_length_not_explained_by_segments() -> None:

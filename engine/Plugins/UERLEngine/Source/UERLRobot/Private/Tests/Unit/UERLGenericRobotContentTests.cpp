@@ -1837,6 +1837,10 @@ bool FUERLDeploymentOverheadGroundTest::RunTest(const FString& Parameters)
 		AddError(Error);
 		return false;
 	}
+	if (!TestEqual(TEXT("overhead observation preserves all 36 channels"), UnderCeiling.Num(), 36))
+	{
+		return false;
+	}
 	bool bSameObservation = UnderCeiling.Num() == OpenSky.Num();
 	for (int32 Index = 0; bSameObservation && Index < OpenSky.Num(); ++Index)
 	{

@@ -27,10 +27,12 @@ def _run_error_case(name: str, action: Callable[[SocketBridgeClient], dict[str, 
             print(f"[VERIFY] destructive case {name}: {code}")
             return code
         finally:
-            if client.sock is not None:
-                client.sock.close()
-                client.sock = None
-            _stop_process(proc)
+            try:
+                if client.sock is not None:
+                    client.sock.close()
+                    client.sock = None
+            finally:
+                _stop_process(proc)
 
 
 def run_envelope_error_matrix() -> dict[str, str]:
@@ -127,12 +129,14 @@ def _connect_raw(port: int, timeout_s: float = 120.0) -> socket.socket:
                 raise last_error
             raise TimeoutError(f"SocketBridge did not accept a connection on port {port}")
         try:
-            connection = socket.create_connection(("127.0.0.1", port), timeout=min(0.1, remaining))
+            connection = socket.create_connection(("127.0.0.1", port), timeout=remaining)
             connection.settimeout(3.0)
             return connection
         except OSError as exc:
             last_error = exc
-            time.sleep(min(0.05, remaining))
+            remaining = deadline - time.monotonic()
+            if remaining > 0:
+                time.sleep(min(0.05, remaining))
 
 
 def run_timeout_and_half_close() -> dict[str, float]:
@@ -148,18 +152,24 @@ def run_timeout_and_half_close() -> dict[str, float]:
         log_path = worker_log_path(f"_ue_worker_{name}")
         with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
             proc = _launch(port, log_file, ["-uerlhandshaketimeoutms=500"])
-            connection = _connect_raw(port)
-            started = time.monotonic()
+            connection: socket.socket | None = None
+            started: float | None = None
             try:
+                connection = _connect_raw(port)
+                started = time.monotonic()
                 if send_partial:
                     hello = protocol.FrameHeader(0, 0, protocol.HELLO, protocol.REQUEST, 0, 1, uuid4())
                     connection.sendall(hello.pack()[:17])
                     connection.shutdown(socket.SHUT_WR)
                 assert connection.recv(1) == b""
             finally:
-                durations[name] = time.monotonic() - started
-                connection.close()
-                _stop_process(proc)
+                if started is not None:
+                    durations[name] = time.monotonic() - started
+                try:
+                    if connection is not None:
+                        connection.close()
+                finally:
+                    _stop_process(proc)
         if durations[name] > 2.5:
             raise AssertionError(f"{name} did not fail fast: {durations[name]:.3f}s")
         print(f"[VERIFY] destructive case {name}: disconnected in {durations[name]:.3f}s")
@@ -195,7 +205,12 @@ def run_post_ready_disconnect() -> float:
                 raise AssertionError(f"post-Ready disconnect exited with {return_code}, expected 1")
             duration = time.monotonic() - started
         finally:
-            _stop_process(proc)
+            try:
+                if client.sock is not None:
+                    client.sock.close()
+                    client.sock = None
+            finally:
+                _stop_process(proc)
     print(f"[VERIFY] destructive case post_ready_disconnect: exited in {duration:.3f}s")
     return duration
 
@@ -227,10 +242,12 @@ def run_pre_ready_shutdown() -> float:
                 raise AssertionError(f"pre-Ready shutdown exited with {return_code}, expected 0")
             duration = time.monotonic() - started
         finally:
-            if client.sock is not None:
-                client.sock.close()
-                client.sock = None
-            _stop_process(proc)
+            try:
+                if client.sock is not None:
+                    client.sock.close()
+                    client.sock = None
+            finally:
+                _stop_process(proc)
     print(f"[VERIFY] destructive case pre_ready_shutdown: exited in {duration:.3f}s")
     return duration
 
@@ -274,10 +291,12 @@ def run_active_step_timeout() -> float:
                 raise AssertionError(f"timed-out active Step exited with {return_code}, expected 1")
             duration = time.monotonic() - started
         finally:
-            if client.sock is not None:
-                client.sock.close()
-                client.sock = None
-            _stop_process(proc)
+            try:
+                if client.sock is not None:
+                    client.sock.close()
+                    client.sock = None
+            finally:
+                _stop_process(proc)
     with open(log_path, encoding="utf-8", errors="replace") as log_file:
         log_text = log_file.read()
         if "SocketBridge TIMEOUT" not in log_text:
@@ -376,10 +395,12 @@ def run_initialize_failure() -> bool:
             if return_code != 1:
                 raise AssertionError(f"Initialize failure exited with {return_code}, expected 1")
         finally:
-            if client.sock is not None:
-                client.sock.close()
-                client.sock = None
-            _stop_process(proc)
+            try:
+                if client.sock is not None:
+                    client.sock.close()
+                    client.sock = None
+            finally:
+                _stop_process(proc)
 
     with open(log_path, encoding="utf-8", errors="replace") as log_file:
         log_text = log_file.read()
