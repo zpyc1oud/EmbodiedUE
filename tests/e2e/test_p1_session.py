@@ -60,9 +60,11 @@ def _batch_zero(layout: Layout, field_name: str) -> bytes:
 
 
 def _step_action(layout: Layout, *, step_decimation: int) -> bytes:
-    """Zero actuator targets and write one in-range step_decimation scalar."""
+    """Move the two Slots differently and write an in-range decimation."""
 
     payload = bytearray(_batch_zero(layout, "robot.actuator.target"))
+    target = layout.segment("robot.actuator.target")
+    payload[target.offset : target.offset + target.byte_length] = np.asarray([50.0, -25.0], dtype="<f4").tobytes()
     segment = layout.segment("step_decimation")
     payload[segment.offset : segment.offset + segment.byte_length] = np.asarray(
         [step_decimation], dtype="<i4"
@@ -128,6 +130,19 @@ def _drive_formal_session(config: ResolvedRunConfig) -> tuple[dict[str, Any], di
         )
         assert len(step_payload) == layouts["step_result"].payload_length
         assert len(reset_payload) == layouts["reset_result"].payload_length
+        for descriptor in schema.state_requirements:
+            name = str(descriptor["name"])
+            before_segment = layouts["step_result"].segment(name)
+            after_segment = layouts["reset_result"].segment(name)
+            before = np.frombuffer(step_payload, dtype="<f4", count=before_segment.byte_length // 4,
+                                   offset=before_segment.offset).reshape(2, -1)
+            after = np.frombuffer(reset_payload, dtype="<f4", count=after_segment.byte_length // 4,
+                                  offset=after_segment.offset).reshape(2, -1)
+            np.testing.assert_array_equal(after[1], before[1], err_msg=f"unselected Slot1 {name}")
+            np.testing.assert_allclose(after[0], 0.0, atol=1e-5, rtol=0, err_msg=f"reset Slot0 {name}")
+            if name == "robot.joint.cart.joint_velocity":
+                assert abs(float(before[0, 0])) > 1e-4, "selected Slot must move before reset"
+
         return manifest, result.response
     finally:
         session.close("p1_e2e")
@@ -152,5 +167,5 @@ def test_formal_session_completes_real_ue_initialize_step_reset_shutdown(tmp_pat
     ):
         assert first_manifest[key] == second_manifest[key]
     assert first_response["effective_worker_config_hash"] == second_response["effective_worker_config_hash"]
-    print("[VERIFY] VC-006: init=1 step=1 reset=1 shutdown=1 in_flight_max=1")
+    print("[VERIFY] VC-006: init=1 step=1 reset=1 shutdown=1 sparse_reset=VERIFIED")
     print("[VERIFY] VC-009: config_hash=EQUAL manifest_contract=EQUAL seed_derivation=EQUAL")

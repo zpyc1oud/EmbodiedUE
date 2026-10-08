@@ -78,13 +78,19 @@ bool FUERLPlanParseStructureTest::RunTest(const FString& Parameters)
 	}
 
 	FUERLObservationPlan Plan;
-	TestTrue(TEXT("ParseJson accepts the shared structure corpus"), Plan.ParseJson(Json.ToSharedRef(), Error));
+	if (!TestTrue(TEXT("ParseJson accepts the shared structure corpus"), Plan.ParseJson(Json.ToSharedRef(), Error)))
+	{
+		return false;
+	}
 	if (!Error.IsEmpty() && !TestTrue(TEXT("ParseJson leaves no error"), Error.IsEmpty()))
 	{
 		AddError(Error);
 	}
 
-	TestEqual(TEXT("op count"), Plan.Ops.Num(), 3);
+	if (!TestEqual(TEXT("op count"), Plan.Ops.Num(), 3))
+	{
+		return false;
+	}
 	TestEqual(TEXT("op[0] name"), Plan.Ops[0].Op, FName(TEXT("select")));
 	TestEqual(TEXT("op[1] name"), Plan.Ops[1].Op, FName(TEXT("select")));
 	TestEqual(TEXT("op[2] name"), Plan.Ops[2].Op, FName(TEXT("concat")));

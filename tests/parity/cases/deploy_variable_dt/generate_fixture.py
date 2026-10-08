@@ -2,29 +2,24 @@
 
 The fixture is deliberately a small deterministic contract probe. It is not a
 replacement for the PhantomX retrained artifact; its purpose is to exercise the
-new 116-wide plan, history reset, and off-grid control intervals in both runtimes.
+historical 116-wide plan, history reset, and off-grid control intervals in both runtimes.
 """
 
 from __future__ import annotations
 
 import json
-import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
 import torch
 from torch import nn
 
-from uerl.core.mdp.plan import ActionPlan
+from uerl.core.mdp.plan import ActionPlan, PlanOp
 from uerl.policy.artifact import ArtifactMetadata, PolicyArtifact
 from uerl.policy.reference import ReferencePolicyRunner
-from uerl.tasks.phantomx.observation_plan import build_phantomx_observation_plan
 
 ROOT = Path(__file__).resolve().parents[4]
-sys.path.insert(0, str(ROOT))
-
-from tests.python.unit.robot_shape_fixtures import generic_robot_observation_shapes  # noqa: E402
-
 OLD_CASE = ROOT / "tests" / "parity" / "cases" / "deploy" / "phantomx" / "multistep_walk.json"
 OLD_ARTIFACT = ROOT / "engine" / "Content" / "UERLHost" / "Policies" / "PhantomXContinuousSmooth.uerlpol2"
 OUT = Path(__file__).resolve().parent
@@ -67,7 +62,15 @@ def export_onnx() -> bytes:
 def main() -> None:
     source = json.loads(OLD_CASE.read_text(encoding="utf-8"))
     old = PolicyArtifact.read(OLD_ARTIFACT)
-    plan = build_phantomx_observation_plan(generic_robot_observation_shapes())
+    # Keep this historical 115+dt contract probe tied to its reviewed source.
+    # The current Task omits contact-force fields and has a different input width.
+    source_plan = old.observation_plan
+    plan = replace(
+        source_plan,
+        ops=(*source_plan.ops, PlanOp("control_frame_dt", (), "control_frame_dt", 1, {"scale": 100.0})),
+        groups={**source_plan.groups, "policy": (*source_plan.groups["policy"], "control_frame_dt")},
+        group_widths={**source_plan.group_widths, "policy": source_plan.group_widths["policy"] + 1},
+    )
     artifact = PolicyArtifact(
         format_version=old.format_version,
         task_id="UERL-PhantomX-VariableDt-ContractFixture-v0",

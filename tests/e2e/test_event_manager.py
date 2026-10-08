@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
+from unittest.mock import patch
 
+import numpy as np
 import torch
 
 from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
 from uerl import PresentationMode, UERLDirectEnv, UERLSession, UERLSessionAdapter
+from uerl.core.codec import Layout
 from uerl.core.config.robot import RobotSpec, RobotTopology
 from uerl.core.mdp.lib.events import randomize_initial_terrain_levels
 from uerl.core.mdp.managers.event import EventManager
@@ -89,20 +92,35 @@ def test_startup_terrain_level_event_reaches_session(tmp_path: Path) -> None:
     env: UERLDirectEnv | None = None
     try:
         adapter = UERLSessionAdapter(raw_session, device=ENVIRONMENT_DEVICE)
-        env = UERLDirectEnv(
-            adapter,
-            task,
-            resolved_config=config,
-            device=ENVIRONMENT_DEVICE,
-            curriculum_manager=curriculum_manager,
-            event_manager=events,
-        )
+        recorded_levels: list[list[int]] = []
+        original_reset = UERLSession.reset
+
+        def record_reset(session: UERLSession, layout_id: int, payload: bytes) -> tuple[Any, bytes]:
+            assert session.initialization is not None
+            definition = next(item for item in session.initialization.bridge_result.response["layouts"]
+                              if item["layout_kind"] == "reset_request")
+            segment = Layout.parse(definition, batch_size=SLOT_COUNT).segment("terrain_level")
+            recorded_levels.append(np.frombuffer(payload, dtype="<u2", count=SLOT_COUNT,
+                                                 offset=segment.offset).tolist())
+            return original_reset(session, layout_id, payload)
+
+        with patch.object(UERLSession, "reset", record_reset):
+            env = UERLDirectEnv(
+                adapter,
+                task,
+                resolved_config=config,
+                device=ENVIRONMENT_DEVICE,
+                curriculum_manager=curriculum_manager,
+                event_manager=events,
+            )
         levels = env._terrain_levels.detach().cpu().to(dtype=torch.int64)
         assert levels.shape == (SLOT_COUNT,)
         assert bool((levels >= 0).all() and (levels < num_levels).all())
         # Seeded startup must not leave every Slot on level 0 for this range.
         unique_count = int(torch.unique(levels).numel())
         assert unique_count >= 2
+        assert recorded_levels, "startup event must reach the actual Session RESET boundary"
+        assert recorded_levels[-1] == levels.tolist()
         _, _, _, _, info = env.step(torch.zeros(SLOT_COUNT, task.num_actions))
         assert "terrain_level" in info
         print(

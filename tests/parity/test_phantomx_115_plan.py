@@ -105,4 +105,18 @@ def test_ac_parity_plan_python_matches_handwritten(case_path: Path, ac: str) -> 
     )
     expected = torch.tensor(payload["expected"], dtype=torch.float32)
     assert actual.shape == expected.shape == (109,)
-    assert float((actual - expected).abs().max()) <= _HANDWRITTEN_TOL
+    differences = (actual - expected).abs()
+    index = int(differences.argmax())
+    group_field = "policy"
+    local_index = index
+    for member in plan.groups["policy"]:
+        width = next(op.width for op in plan.ops if op.output == member)
+        if local_index < width:
+            group_field = member
+            break
+        local_index -= width
+    assert float(differences[index]) <= _HANDWRITTEN_TOL, (
+        f"{case_path.name} policy[{index}] {group_field}[{local_index}]: "
+        f"actual={float(actual[index])} expected={float(expected[index])} "
+        f"absolute tolerance={_HANDWRITTEN_TOL}"
+    )

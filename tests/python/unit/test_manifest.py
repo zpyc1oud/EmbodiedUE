@@ -91,8 +91,8 @@ def test_capture_git_identity_reads_the_source_checkout_outside_current_director
     assert isinstance(identity["dirty"], bool)
 
 
-def test_manifest_is_written_before_ready_boundary(tmp_path: Path) -> None:
-    """Write resolved Config and Manifest atomically with complete fields."""
+def test_manifest_and_resolved_config_are_written_as_yaml(tmp_path: Path) -> None:
+    """Write resolved Config and Manifest as YAML with complete fields."""
 
     run_directory = tmp_path / "run"
     recorder = RunRecorder(run_directory)
@@ -109,7 +109,7 @@ def test_manifest_is_written_before_ready_boundary(tmp_path: Path) -> None:
     assert config_payload["task_id"] == "task"
     assert not (run_directory / "resolved_config.json").exists()
     assert not (run_directory / "manifest.json").exists()
-    print(f"[VERIFY] VC-002: manifest_before_ready=true ready_ack_count=0 hash={manifest_hash}")
+    print(f"[VERIFY] VC-002: yaml_config_and_manifest=WRITTEN hash={manifest_hash}")
 
 
 @pytest.mark.parametrize("enclosing_checkout", [False, True], ids=["outside-checkout", "inside-unrelated-checkout"])

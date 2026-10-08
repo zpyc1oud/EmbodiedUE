@@ -157,7 +157,9 @@ def test_e2e_training_child_uses_selected_host(tmp_path: Path, monkeypatch: pyte
         assert command[command.index("--project") + 1] == str(project)
         raise _LaunchBoundaryReached
 
-    monkeypatch.setattr(subprocess, "run", capture)
+    for callback in settings.values():
+        if callable(callback) and getattr(callback, "__module__", None) == "<run_path>":
+            monkeypatch.setitem(callback.__globals__, "run_owned_command", capture)
     with pytest.raises(_LaunchBoundaryReached):
         cast(Callable[..., None], settings["test_generic_phantomx_training_retains_position_targets"])(tmp_path)
 
@@ -185,7 +187,9 @@ def test_e2e_variant_children_use_selected_host(
         assert command[command.index("--project") + 1] == str(project)
         raise _LaunchBoundaryReached
 
-    monkeypatch.setattr(subprocess, "run", capture)
+    for callback in settings.values():
+        if callable(callback) and getattr(callback, "__module__", None) == "<run_path>":
+            monkeypatch.setitem(callback.__globals__, "run_owned_command", capture)
     with pytest.raises(_LaunchBoundaryReached):
         if stage == "variant_train":
             callback = cast(Callable[..., None], settings["test_phantomx_composed_variant_trains_one_iteration"])

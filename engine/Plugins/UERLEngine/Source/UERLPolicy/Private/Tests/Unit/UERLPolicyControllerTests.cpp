@@ -114,7 +114,10 @@ bool FUERLPolicyControllerResetBuffersTest::RunTest(const FString& Parameters)
 
 	Controller.Reset();
 
-	TestEqual(TEXT("Reset preserves previous-action width"), Controller.PreviousAction.Num(), 2);
+	if (!TestEqual(TEXT("Reset preserves previous-action width"), Controller.PreviousAction.Num(), 2))
+	{
+		return false;
+	}
 	TestEqual(TEXT("Reset clears positive previous action"), Controller.PreviousAction[0], 0.0f);
 	TestEqual(TEXT("Reset clears negative previous action"), Controller.PreviousAction[1], 0.0f);
 	return true;

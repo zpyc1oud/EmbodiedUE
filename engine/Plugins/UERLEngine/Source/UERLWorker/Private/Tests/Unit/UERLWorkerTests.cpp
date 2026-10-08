@@ -59,7 +59,7 @@ namespace
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FUERLVariableDtWorkerContractTest,
-	"UERL.Integration.Worker.VariableDt",
+	"UERL.Unit.Worker.VariableDt",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FUERLVariableDtWorkerContractTest::RunTest(const FString& Parameters)
@@ -77,17 +77,6 @@ bool FUERLVariableDtWorkerContractTest::RunTest(const FString& Parameters)
 	Projection.DecimationMax = 7;
 	TestTrue(TEXT("variable decimation projection is valid"), Projection.IsValid());
 
-	for (const int32 Requested : { 1, 7, 2 })
-	{
-		FUERLBridgeRequest Request;
-		Request.Type = EUERLBridgeRequestType::Step;
-		Request.StepDecimation = Requested;
-		TestEqual(
-			FString::Printf(TEXT("Step preserves requested decimation %d"), Requested),
-			Request.StepDecimation,
-			Requested);
-	}
-
 	FUERLWorkerProjection Reversed = Projection;
 	Reversed.DecimationMin = 7;
 	Reversed.DecimationMax = 1;
@@ -95,7 +84,7 @@ bool FUERLVariableDtWorkerContractTest::RunTest(const FString& Parameters)
 	FUERLWorkerProjection Zero = Projection;
 	Zero.DecimationMin = 0;
 	TestFalse(TEXT("zero decimation range is rejected"), Zero.IsWorkerConfigValid());
-	AddInfo(TEXT("[VERIFY] AC_UE_INT_WORKER_DT_001/003: variable range and typed Step N contract"));
+	AddInfo(TEXT("[VERIFY] AC_UE_INT_WORKER_DT_001/003: Worker projection validates the inclusive decimation range"));
 	return true;
 }
 
@@ -188,10 +177,13 @@ bool FUERLTerrainGeneratorTest::RunTest(const FString& Parameters)
 		}
 	}
 	TestTrue(TEXT("same seed and params produce identical plans"), bEqual);
-	TestEqual(TEXT("plane uses solid geometry"), First[0].Boxes.Num(), 2);
+	if (!TestEqual(TEXT("plane uses solid geometry"), First[0].Boxes.Num(), 2)
+		|| !TestEqual(TEXT("heightfield produces one mesh per Slot"), First[1].Meshes.Num(), 2))
+	{
+		return false;
+	}
 	TestEqual(TEXT("first plane box belongs to Slot 0"), First[0].Boxes[0].SlotId, 0);
 	TestEqual(TEXT("second plane box belongs to Slot 1"), First[0].Boxes[1].SlotId, 1);
-	TestEqual(TEXT("heightfield produces one mesh per Slot"), First[1].Meshes.Num(), 2);
 	TestEqual(TEXT("first heightfield belongs to Slot 0"), First[1].Meshes[0].SlotId, 0);
 	TestEqual(TEXT("second heightfield belongs to Slot 1"), First[1].Meshes[1].SlotId, 1);
 	TestTrue(TEXT("boxes produce deterministic solid geometry"), First[2].Boxes.Num() > 0);
@@ -207,7 +199,10 @@ bool FUERLTerrainGeneratorTest::RunTest(const FString& Parameters)
 	if (bSharedBuilt && SharedPlans.Num() == 3)
 	{
 		TestEqual(TEXT("shared plane generates one geometry owner"), SharedPlans[0].Boxes.Num(), 1);
-		TestEqual(TEXT("shared heightfield generates one mesh"), SharedPlans[1].Meshes.Num(), 1);
+		if (!TestEqual(TEXT("shared heightfield generates one mesh"), SharedPlans[1].Meshes.Num(), 1))
+		{
+			return false;
+		}
 		TestEqual(TEXT("shared tier keeps one spawn sample per Slot"), SharedPlans[1].Samples.Num(), 2);
 		TestEqual(TEXT("shared geometry has no Slot owner"),
 			SharedPlans[1].Meshes[0].SlotId, INDEX_NONE);
@@ -225,9 +220,16 @@ bool FUERLTerrainGeneratorTest::RunTest(const FString& Parameters)
 	if (bCoarseSampleBuilt && First.Num() > 1 && CoarseSamplePlans.Num() > 1)
 	{
 		const FUERLTerrainMeshSpec& BaseMesh = First[1].Meshes[0];
+		if (!TestEqual(TEXT("coarse heightfield has two Slot meshes"), CoarseSamplePlans[1].Meshes.Num(), 2))
+		{
+			return false;
+		}
 		const FUERLTerrainMeshSpec& CoarseSampleMesh = CoarseSamplePlans[1].Meshes[0];
-		TestEqual(TEXT("downsampling preserves fine vertex count"),
-			BaseMesh.VerticesMeters.Num(), CoarseSampleMesh.VerticesMeters.Num());
+		if (!TestEqual(TEXT("downsampling preserves fine vertex count"),
+			BaseMesh.VerticesMeters.Num(), CoarseSampleMesh.VerticesMeters.Num()))
+		{
+			return false;
+		}
 		bool bHeightfieldChanged = false;
 		for (int32 Index = 0; Index < BaseMesh.VerticesMeters.Num(); ++Index)
 		{
@@ -682,11 +684,23 @@ bool FUERLTerrainCatalogTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("heightfield contains relief above the base datum"),
 			MinimumHeight >= -KINDA_SMALL_NUMBER && MaximumHeight > KINDA_SMALL_NUMBER);
 
+		if (!TestTrue(TEXT("heightfield indices form complete triangles"),
+			HeightfieldMesh.Triangles.Num() > 0 && HeightfieldMesh.Triangles.Num() % 3 == 0))
+		{
+			return false;
+		}
 		bool bFacesUpward = true;
 		for (int32 TriangleIndex = 0;
 			TriangleIndex + 2 < HeightfieldMesh.Triangles.Num() && bFacesUpward;
 			TriangleIndex += 3)
 		{
+			if (!TestTrue(TEXT("triangle references generated vertices"),
+				HeightfieldMesh.VerticesMeters.IsValidIndex(HeightfieldMesh.Triangles[TriangleIndex])
+				&& HeightfieldMesh.VerticesMeters.IsValidIndex(HeightfieldMesh.Triangles[TriangleIndex + 1])
+				&& HeightfieldMesh.VerticesMeters.IsValidIndex(HeightfieldMesh.Triangles[TriangleIndex + 2])))
+			{
+				return false;
+			}
 			const FVector& A = HeightfieldMesh.VerticesMeters[HeightfieldMesh.Triangles[TriangleIndex]];
 			const FVector& B = HeightfieldMesh.VerticesMeters[HeightfieldMesh.Triangles[TriangleIndex + 1]];
 			const FVector& C = HeightfieldMesh.VerticesMeters[HeightfieldMesh.Triangles[TriangleIndex + 2]];
@@ -871,34 +885,6 @@ bool FUERLBatchBindingTest::RunTest(const FString& Parameters)
 	ShapeOverflowSchema.ActionWidth = 131073;
 	TestFalse(TEXT("shape width overflow is rejected"), ShapeOverflowSchema.IsValid());
 	AddInfo(TEXT("[VERIFY] AC-UE-UNIT-WORKER-003: named scalar/vector fields bind by descriptor"));
-	return true;
-}
-
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FUERLPhysicsGateConfigTest,
-	"UERL.Unit.Worker.PhysicsGateConfig",
-	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FUERLPhysicsGateConfigTest::RunTest(const FString& Parameters)
-{
-	UPhysicsSettings* Settings = GetMutableDefault<UPhysicsSettings>();
-	TestNotNull(TEXT("UPhysicsSettings available"), Settings);
-	if (!Settings) { return false; }
-	const bool OldTickAsync = Settings->bTickPhysicsAsync;
-	const bool OldSubstepping = Settings->bSubstepping;
-	const bool OldSubsteppingAsync = Settings->bSubsteppingAsync;
-	Settings->bTickPhysicsAsync = false;
-	Settings->bSubstepping = false;
-	Settings->bSubsteppingAsync = false;
-	TestFalse(TEXT("async physics disabled"), Settings->bTickPhysicsAsync);
-	TestFalse(TEXT("engine substepping disabled"), Settings->bSubstepping);
-	TestFalse(TEXT("async substepping disabled"), Settings->bSubsteppingAsync);
-	TestTrue(TEXT("maximum dt does not clamp Worker dt"), Settings->MaxPhysicsDeltaTime == 0.0f
-		|| Settings->MaxPhysicsDeltaTime >= UERLWorkerDefaults::PhysicsDt);
-	Settings->bTickPhysicsAsync = OldTickAsync;
-	Settings->bSubstepping = OldSubstepping;
-	Settings->bSubsteppingAsync = OldSubsteppingAsync;
-	AddInfo(TEXT("[VERIFY] AC-UE-UNIT-WORKER-004: Worker lockstep physics can be applied over the game default"));
 	return true;
 }
 

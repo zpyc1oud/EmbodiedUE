@@ -84,7 +84,10 @@ def test_ac_parity_deploy_variable_dt_005_006_007_python_reference() -> None:
         for key in ("observation", "action"):
             actual = result[key].detach().cpu().reshape(-1).numpy()
             expected = np.asarray(step[f"expected_{key}"], dtype=np.float32)
-            np.testing.assert_allclose(actual, expected, atol=tolerance, rtol=tolerance)
+            np.testing.assert_allclose(
+                actual, expected, atol=tolerance, rtol=tolerance,
+                err_msg=f"{_CASE.name} step {index} {key}",
+            )
         targets = _flatten_command_targets(result, artifact.action_plan.command_fields)
         np.testing.assert_allclose(
             targets,
@@ -109,3 +112,32 @@ def test_ac_parity_deploy_variable_dt_007_does_not_quantize_dt(dt: float) -> Non
         reset_history=True,
     )
     assert float(result["observation"][0, -1]) == pytest.approx(dt * 100.0)
+
+
+def test_variable_dt_generator_preserves_reviewed_historical_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regeneration must retain the frozen 116-wide fixture, not the current Task width."""
+    from tests.parity.cases.deploy_variable_dt import generate_fixture
+
+    monkeypatch.setattr(generate_fixture, "OUT", tmp_path)
+    monkeypatch.setattr(generate_fixture, "ARTIFACT_PATH", tmp_path / "probe.uerlpol2")
+    monkeypatch.setattr(generate_fixture, "CASE_PATH", tmp_path / "probe.json")
+    # The fixture stores a repository-relative artifact path. Keep output isolated
+    # while making that path relative to this test's temporary root.
+    monkeypatch.setattr(generate_fixture, "ROOT", tmp_path)
+    with torch.random.fork_rng(devices=[]):
+        generate_fixture.main()
+    reviewed, artifact = _load()
+    regenerated = PolicyArtifact.read(tmp_path / "probe.uerlpol2")
+    assert regenerated.observation_plan.to_json() == artifact.observation_plan.to_json()
+    assert regenerated.action_plan.to_json() == artifact.action_plan.to_json()
+    assert regenerated.timing.to_json() == artifact.timing.to_json()
+    payload = json.loads((tmp_path / "probe.json").read_text(encoding="utf-8"))
+    reviewed_steps = cast(list[dict[str, object]], reviewed["steps"])
+    for index, (actual, expected) in enumerate(zip(payload["steps"], reviewed_steps, strict=True)):
+        for field in ("expected_observation", "expected_action", "expected_targets"):
+            np.testing.assert_allclose(
+                actual[field], cast(list[float], expected[field]), atol=2e-5, rtol=2e-5,
+                err_msg=f"generated probe step {index} {field}",
+            )

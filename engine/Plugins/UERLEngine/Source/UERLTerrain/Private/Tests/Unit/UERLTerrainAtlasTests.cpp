@@ -94,6 +94,8 @@ bool FUERLTerrainAtlasOriginLayoutTest::RunTest(const FString& Parameters)
 			TestTrue(
 				TEXT("origin resolves for level/column"),
 				FUERLTerrainAtlas::ResolveOrigin(Config, Level, Column, Origin, Error));
+			TestTrue(FString::Printf(TEXT("level %d column %d has its exact origin"), Level, Column),
+				Origin.Equals(FVector(5.0 * Level, 4.0 * Column, 0.0), 1.0e-9));
 			Origins.Add(Origin);
 		}
 	}

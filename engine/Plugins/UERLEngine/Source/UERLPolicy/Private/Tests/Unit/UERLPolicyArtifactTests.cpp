@@ -480,7 +480,17 @@ bool FUERLPolicyArtifactCorruptionsTest::RunTest(const FString& Parameters)
 	}
 
 	TArray<uint8> Good;
-	TestTrue(TEXT("read first corpus as corruption baseline"), FFileHelper::LoadFileToArray(Good, *ArtifactPaths[0]));
+	if (!TestTrue(TEXT("read first corpus as corruption baseline"),
+		FFileHelper::LoadFileToArray(Good, *ArtifactPaths[0])))
+	{
+		return false;
+	}
+	FUERLPolicyArtifact Baseline;
+	if (!TestTrue(TEXT("corruption baseline is a valid artifact"), Baseline.LoadFromBytes(Good, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
 
 	auto ExpectLoadFails = [this](const TArray<uint8>& Bytes, const TCHAR* Label, const TCHAR* ExpectedToken)
 	{
@@ -671,7 +681,16 @@ bool FUERLPolicyArtifactIgnoresOnnxGraphTest::RunTest(const FString& Parameters)
 	}
 
 	TArray<uint8> Good;
-	TestTrue(TEXT("read first corpus"), FFileHelper::LoadFileToArray(Good, *ArtifactPaths[0]));
+	if (!TestTrue(TEXT("read first corpus"), FFileHelper::LoadFileToArray(Good, *ArtifactPaths[0])))
+	{
+		return false;
+	}
+	FUERLPolicyArtifact Baseline;
+	if (!TestTrue(TEXT("ONNX replacement baseline is a valid artifact"), Baseline.LoadFromBytes(Good, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
 	uint32 JsonLength = 0;
 	FMemory::Memcpy(&JsonLength, Good.GetData() + 12, sizeof(JsonLength));
 	const int32 OnnxLenOffset = 16 + static_cast<int32>(JsonLength);
@@ -700,7 +719,8 @@ bool FUERLPolicyArtifactIgnoresOnnxGraphTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("onnx garbage byte count preserved"), Artifact.OnnxBytes().Num(), FakeOnnx.Num());
 	TestTrue(
 		TEXT("onnx garbage bytes preserved bitwise"),
-		FMemory::Memcmp(Artifact.OnnxBytes().GetData(), FakeOnnx.GetData(), FakeOnnx.Num()) == 0);
+		Artifact.OnnxBytes().Num() == FakeOnnx.Num()
+			&& FMemory::Memcmp(Artifact.OnnxBytes().GetData(), FakeOnnx.GetData(), FakeOnnx.Num()) == 0);
 
 	AddInfo(TEXT("[VERIFY] AC_UE_UNIT_ARTIFACT_003: Load does not parse ONNX graph"));
 	return true;

@@ -275,7 +275,10 @@ def test_player_holds_default_targets_after_releasing_walk() -> None:
     assert torch.equal(player.gate_actions(policy_actions), torch.zeros_like(policy_actions))
 
 
-def test_custom_controller_publishes_its_velocity_into_the_policy_observation() -> None:
+def test_custom_controller_publishes_its_velocity_into_the_policy_observation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from uerl.tasks import controllers
+
+    monkeypatch.setattr(controllers, "_FACTORIES", dict(controllers._FACTORIES))
     expected = torch.tensor([[0.2, -0.1, 0.3]])
 
     class _Scripted:
@@ -306,7 +309,10 @@ def test_custom_controller_publishes_its_velocity_into_the_policy_observation() 
     assert torch.allclose(command, expected)
 
 
-def test_custom_controller_width_mismatch_fails_at_assembly() -> None:
+def test_custom_controller_width_mismatch_fails_at_assembly(monkeypatch: pytest.MonkeyPatch) -> None:
+    from uerl.tasks import controllers
+
+    monkeypatch.setattr(controllers, "_FACTORIES", dict(controllers._FACTORIES))
     class _Narrow:
         def channels(self) -> dict[str, int]:
             return {"velocity": 2}

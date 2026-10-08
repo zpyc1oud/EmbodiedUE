@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -12,7 +11,7 @@ from typing import cast
 import pytest
 import torch
 
-from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
+from tests.e2e.support.worker_runner import UE_CMD, UPROJECT, run_owned_command
 from uerl import PresentationMode, UERLDirectEnv, UERLSession, UERLSessionAdapter
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.phantomx import PHANTOMX_TERRAIN_TASK_ID
@@ -27,7 +26,7 @@ def test_generic_phantomx_training_retains_position_targets(tmp_path: Path) -> N
     """A short D4 rollout must use the generic runtime and apply each position target once."""
 
     run_directory = tmp_path / "generic-phantomx"
-    completed = subprocess.run(
+    completed = run_owned_command(
         [
             sys.executable,
             "-m",
@@ -50,10 +49,7 @@ def test_generic_phantomx_training_retains_position_targets(tmp_path: Path) -> N
             str(run_directory),
         ],
         cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=300,
-        check=False,
     )
 
     output = f"{completed.stdout}\n{completed.stderr}"

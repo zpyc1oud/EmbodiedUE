@@ -84,11 +84,54 @@ bool FUERLTerrainGeneratorsGenerateAndValidateTest::RunTest(const FString& Param
 	FUERLTerrainPatch Patch;
 	TestTrue(TEXT("plane generates"),
 		Plane->Generate(MakeRequest(EmptyParams(), 0.0), Patch, Error));
+	TestEqual(TEXT("2 m plane emits one solid box"), Patch.Boxes.Num(), 1);
+	if (Patch.Boxes.Num() == 1)
+	{
+		TestEqual(TEXT("plane occupies the requested footprint"), Patch.Boxes[0].ExtentMeters, FVector(1.0, 1.0, 0.005));
+		TestEqual(TEXT("plane top is the patch datum"), Patch.Boxes[0].CenterMeters, FVector(0.0, 0.0, -0.005));
+	}
+	TestEqual(TEXT("plane has collision geometry"), Patch.CollisionMeshes.Num(), 1);
 	TestTrue(TEXT("heightfield generates"),
 		Heightfield->Generate(MakeRequest(HeightfieldParams(), 0.5, 23), Patch, Error));
+	TestEqual(TEXT("heightfield emits one mesh"), Patch.Meshes.Num(), 1);
+	if (Patch.Meshes.Num() == 1)
+	{
+		const FUERLTerrainMeshSpec& Mesh = Patch.Meshes[0];
+		// A 2 m square sampled every 0.25 m is a 9x9 vertex grid with 8x8 quads.
+		TestEqual(TEXT("heightfield has all 81 vertices"), Mesh.VerticesMeters.Num(), 81);
+		TestEqual(TEXT("heightfield has 128 complete triangles"), Mesh.Triangles.Num(), 384);
+		if (Mesh.VerticesMeters.Num() == 81)
+		{
+			TestTrue(TEXT("heightfield starts at the requested lower XY corner"),
+				FMath::IsNearlyEqual(Mesh.VerticesMeters[0].X, -1.0)
+				&& FMath::IsNearlyEqual(Mesh.VerticesMeters[0].Y, -1.0));
+			TestTrue(TEXT("heightfield ends at the requested upper XY corner"),
+				FMath::IsNearlyEqual(Mesh.VerticesMeters.Last().X, 1.0)
+				&& FMath::IsNearlyEqual(Mesh.VerticesMeters.Last().Y, 1.0));
+		}
+		for (const int32 Index : Mesh.Triangles)
+		{
+			TestTrue(TEXT("heightfield collision index names a generated vertex"), Mesh.VerticesMeters.IsValidIndex(Index));
+		}
+	}
 	TestTrue(TEXT("boxes generates"),
 		Boxes->Generate(MakeRequest(BoxesParams(0.75), 0.75, 29), Patch, Error));
 
+	TestEqual(TEXT("0.5 m boxes fill a 4x4 grid"), Patch.Boxes.Num(), 16);
+	for (int32 Index = 0; Index < Patch.Boxes.Num(); ++Index)
+	{
+		const FUERLTerrainBoxSpec& Box = Patch.Boxes[Index];
+		TestTrue(TEXT("box centers follow the requested row-major raster"),
+			FMath::IsNearlyEqual(Box.CenterMeters.X, -0.75 + (Index % 4) * 0.5)
+			&& FMath::IsNearlyEqual(Box.CenterMeters.Y, -0.75 + (Index / 4) * 0.5));
+		TestTrue(TEXT("box footprint and base match the request"),
+			FMath::IsNearlyEqual(Box.ExtentMeters.X, 0.25)
+			&& FMath::IsNearlyEqual(Box.ExtentMeters.Y, 0.25)
+			&& FMath::IsNearlyEqual(Box.CenterMeters.Z - Box.ExtentMeters.Z, 0.0));
+		TestTrue(TEXT("difficulty 0.75 gives top heights in [0.05, 0.125] m"),
+			Box.ExtentMeters.Z * 2.0 >= 0.05 && Box.ExtentMeters.Z * 2.0 <= 0.125);
+	}
+	TestEqual(TEXT("boxes publish their collision mesh"), Patch.CollisionMeshes.Num(), 1);
 	TSharedPtr<FJsonObject> BadPlane = MakeShared<FJsonObject>();
 	BadPlane->SetNumberField(TEXT("unexpected"), 1.0);
 	TestFalse(TEXT("plane rejects unexpected params"), Plane->ValidateParams(*BadPlane, Error));

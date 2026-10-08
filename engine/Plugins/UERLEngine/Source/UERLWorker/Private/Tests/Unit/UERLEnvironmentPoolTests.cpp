@@ -239,17 +239,28 @@ bool FUERLEnvironmentPoolCanonicalInitializeTest::RunTest(const FString& Paramet
 	FUERLProviderConfig EmptyConfig;
 	FUERLTerrainConfig EmptyTerrain;
 	FString Error;
-	TestTrue(TEXT("probe Environment Pool creates"), Pool.Create(
+	if (!TestTrue(TEXT("probe Environment Pool creates"), Pool.Create(
 		*Scene->GetWorld(), 1,
 		EnvironmentFactory, EmptyConfig,
 		RobotFactory, RobotConfig,
-		{}, EmptyTerrain, Error));
+		{}, EmptyTerrain, Error)))
+	{
+		return false;
+	}
 	TestTrue(TEXT("Initialize uses the Robot canonical state"), Pool.InitializeSlots({}, Error));
 	TestTrue(TEXT("non-zero canonical position survives Initialize"), FMath::IsNearlyEqual(Probe->Position, 0.35));
+	if (!TestEqual(TEXT("one initialized episode"), Pool.EpisodeIndices().Num(), 1))
+	{
+		return false;
+	}
 	TestEqual(TEXT("Initialize does not advance the episode"), Pool.EpisodeIndices()[0], uint64(0));
 
 	TestTrue(TEXT("episode Reset accepts an explicit zero override"), Pool.ResetSlots({ 0 }, {}, { 0.0f }, Error));
 	TestTrue(TEXT("zero remains a legal Python-owned value"), FMath::IsNearlyZero(Probe->Position));
+	if (!TestEqual(TEXT("one reset episode"), Pool.EpisodeIndices().Num(), 1))
+	{
+		return false;
+	}
 	TestEqual(TEXT("episode Reset advances the episode"), Pool.EpisodeIndices()[0], uint64(1));
 	AddInfo(TEXT("[VERIFY] AC-UE-UNIT-ENV-POOL-001: Initialize preserves non-zero canonical state; Reset applies zero override"));
 	return true;
@@ -282,16 +293,23 @@ bool FUERLEnvironmentPoolResetTransactionTest::RunTest(const FString& Parameters
 	FUERLProviderConfig EmptyConfig;
 	FUERLTerrainConfig EmptyTerrain;
 	FString Error;
-	TestTrue(TEXT("probe Environment Pool creates"), Pool.Create(
+	if (!TestTrue(TEXT("probe Environment Pool creates"), Pool.Create(
 		*Scene->GetWorld(), 1,
 		EnvironmentFactory, EmptyConfig,
 		RobotFactory, RobotConfig,
-		{}, EmptyTerrain, Error));
+		{}, EmptyTerrain, Error)))
+	{
+		return false;
+	}
 	TestTrue(TEXT("Initialize establishes the canonical Robot state"), Pool.InitializeSlots({}, Error));
 
 	Probe->FailReset = true;
 	const double PositionBeforeFailedReset = Probe->Position;
 	TestFalse(TEXT("a rejected Robot reset fails the transaction"), Pool.ResetSlots({ 0 }, {}, { 0.25f }, Error));
+	if (!TestEqual(TEXT("rejected reset retains one episode"), Pool.EpisodeIndices().Num(), 1))
+	{
+		return false;
+	}
 	TestEqual(TEXT("a rejected reset does not advance the episode"), Pool.EpisodeIndices()[0], uint64(0));
 	TestTrue(TEXT("a rejected reset does not change Robot state"),
 		FMath::IsNearlyEqual(Probe->Position, PositionBeforeFailedReset));

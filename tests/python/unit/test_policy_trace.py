@@ -543,6 +543,8 @@ def test_trace_recorder_does_not_overwrite_existing_evidence(tmp_path: Path) -> 
             actor_observation_groups=("policy",),
         )
 
+    assert trace_path.read_text(encoding="utf-8") == "existing evidence\n"
+
 
 @pytest.mark.parametrize("episode_step", [5, 9, 10, 15, 18, 20, 23, 27, 30, 1000])
 def test_clock_pairing_accepts_accumulated_float32_solver_dt(

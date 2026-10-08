@@ -52,7 +52,8 @@ def test_action_plan_reuses_same_operator_specs_as_observation() -> None:
 def test_action_plan_matches_legacy_decode_at_1e_6() -> None:
     """DefaultPosition + ActionScale * clamp(action, -1, 1) within 1e-6."""
 
-    actions = torch.tensor([[0.3, -0.5, 0.7, -0.2, 1.5, -2.0]], dtype=torch.float32)
+    actions = torch.tensor([[0.3, -0.5, 0.7, -0.2, 1.5, -2.0],
+                            [-1.5, 0.5, -0.7, 0.2, -0.3, 2.0]], dtype=torch.float32)
     defaults = (0.0, 0.15, -0.3, 0.05, 0.1, -0.2)
     scale = 0.2
     plan = ActionPlan(
@@ -66,7 +67,8 @@ def test_action_plan_matches_legacy_decode_at_1e_6() -> None:
         policy_width=6,
     )
     got = ActionPlanExecutor(plan).execute(actions)["target"]
-    legacy = torch.tensor(defaults, dtype=torch.float32) + scale * actions.clamp(-1.0, 1.0)
+    legacy = torch.tensor([[0.06, 0.05, -0.16, 0.01, 0.30, -0.40],
+                           [-0.20, 0.25, -0.44, 0.09, 0.04, 0.0]], dtype=torch.float32)
     assert torch.max(torch.abs(got - legacy)).item() <= 1.0e-6
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import signal
 import subprocess
 import tempfile
@@ -195,9 +196,18 @@ class TestRun:
         except OSError as exc:
             stage.detail = f"UE Automation log is unavailable: {exc}"
         else:
-            completed = text.count("Test Completed. Result={")
+            results = re.findall(
+                r"Test Completed\. Result=\{([^}]+)\} Name=\{[^}]+\} Path=\{([^}]+)\}", text,
+            )
+            completed = len(results)
+            failed = [name for result, name in results if result != "Success"]
+            names = [name for _, name in results]
             if "**** TEST COMPLETE. EXIT CODE: 0 ****" not in text:
                 stage.detail = "UE Automation did not report successful completion."
+            elif failed:
+                stage.detail = "UE Automation reported unsuccessful tests: " + ", ".join(failed)
+            elif len(set(names)) != completed:
+                stage.detail = "UE Automation reported duplicate test completions."
             elif completed < minimum_completed:
                 stage.detail = f"Only {completed} tests completed; expected at least {minimum_completed}."
             else:

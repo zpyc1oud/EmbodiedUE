@@ -178,21 +178,49 @@ def test_real_ue_negotiates_all_terrain_tiers_and_resets_each_slot(tmp_path: Pat
             reset_layout.layout_id,
             _reset_payload(reset_layout, (True, True), (0, 1), reset_values),
         )
-        assert len(first_reset) == layouts["reset_result"].payload_length
+        result_layout = layouts["reset_result"]
+
+        def field(payload: bytes, name: str) -> np.ndarray[Any, np.dtype[np.float32]]:
+            segment = result_layout.segment(name)
+            return np.frombuffer(payload, dtype="<f4", count=segment.byte_length // 4,
+                                 offset=segment.offset).reshape(2, -1)
+
+        scan_name = "robot.body.base_link.terrain_height"
+        first_scan = field(first_reset, scan_name)
+        np.testing.assert_allclose(first_scan[0], first_scan[0, 0], atol=1e-6, rtol=0)
+        assert np.ptp(first_scan[1]) > 1e-4, "heightfield Slot must observe non-flat ground"
+
 
         assert curriculum.update([0], [1.1], [2.0]) == (1, 0)
         _, second_reset = session.reset(
             reset_layout.layout_id,
             _reset_payload(reset_layout, (True, True), curriculum.levels, reset_values),
         )
-        assert len(second_reset) == layouts["reset_result"].payload_length
+        second_scan = field(second_reset, scan_name)
+        assert np.ptp(second_scan[0]) > 1e-4, "Slot0 must switch from plane to heightfield"
+        np.testing.assert_allclose(second_scan[1], second_scan[1, 0], atol=1e-6, rtol=0)
+
 
         assert curriculum.update([1], [1.1], [2.0]) == (1, 1)
         _, third_reset = session.reset(
             reset_layout.layout_id,
             _reset_payload(reset_layout, (False, True), curriculum.levels, reset_values),
         )
-        assert len(third_reset) == layouts["reset_result"].payload_length
+        assert np.ptp(field(third_reset, scan_name)[1]) > 1e-4, "selected Slot1 must switch tier"
+        for descriptor in schema.state_requirements:
+            name = str(descriptor["name"])
+            np.testing.assert_array_equal(field(third_reset, name)[0], field(second_reset, name)[0],
+                                          err_msg=f"unselected Slot0 {name}")
+        _, boxes_reset = session.reset(
+            reset_layout.layout_id,
+            _reset_payload(reset_layout, (True, False), (2, 1), reset_values),
+        )
+        assert np.ptp(field(boxes_reset, scan_name)[0]) > 1e-4, "boxes tier must expose varying heights"
+        for descriptor in schema.state_requirements:
+            name = str(descriptor["name"])
+            np.testing.assert_array_equal(field(boxes_reset, name)[1], field(third_reset, name)[1],
+                                          err_msg=f"unselected Slot1 {name}")
+
 
         with pytest.raises(BridgeProtocolError):
             session.reset(
