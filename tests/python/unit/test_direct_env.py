@@ -360,9 +360,9 @@ def test_ac_py_unit_dt_001_002_004_variable_decimation_is_seeded_shared_and_rest
     """Variable N uses both endpoints, isolates RNG, and restores its continuation."""
 
     with torch.random.fork_rng(devices=[]):
-        torch.random.default_generator.manual_seed(123)
+        torch.set_rng_state(torch.Generator(device="cpu").manual_seed(123).get_state())
         expected_global = torch.rand(4)
-        torch.random.default_generator.manual_seed(123)
+        torch.set_rng_state(torch.Generator(device="cpu").manual_seed(123).get_state())
         env, session, _task = _variable_env(run_seed=7)
         for _ in range(512):
             env.step(torch.zeros(2, 1))
@@ -873,7 +873,7 @@ def test_ac_py_unit_env_010_random_initial_length_staggers_simulated_time_timeou
     )
     wrapper = UERLVecEnvWrapper(env)
     with torch.random.fork_rng(devices=[]):
-        torch.random.default_generator.manual_seed(0)
+        torch.set_rng_state(torch.Generator(device="cpu").manual_seed(0).get_state())
         # The assignment made by rsl_rl OnPolicyRunner.learn(init_at_random_ep_len=True).
         wrapper.episode_length_buf = torch.randint_like(
             wrapper.episode_length_buf, high=int(wrapper.max_episode_length)

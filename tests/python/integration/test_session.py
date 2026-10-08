@@ -442,7 +442,8 @@ def test_session_preserves_primary_failure_when_cleanup_also_fails(
     def fail(*_args: object, **_kwargs: object) -> object:
         raise primary
 
-    def build(_config: SessionConfig) -> IBridgeSession:
+    def build(config: SessionConfig) -> IBridgeSession:
+        del config
         if phase == "build":
             raise primary
         return cast(IBridgeSession, bridge)
