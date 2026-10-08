@@ -90,6 +90,10 @@ namespace
 				Target->AddInstanceComponent(Capsule);
 				Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 				Capsule->SetCollisionResponseToAllChannels(ECR_Block);
+				// The flat-arena proxy has a prescribed height. Exclude its supporting
+				// floor from horizontal sweeps, which can start in floor contact.
+				// Robot and obstacle sweeps still block and produce capture events.
+				Capsule->IgnoreActorWhenMoving(Floor, true);
 				Capsule->RegisterComponent();
 				TargetBody = Capsule;
 				// Project-owned primitive human proxy: head, torso and four limbs.

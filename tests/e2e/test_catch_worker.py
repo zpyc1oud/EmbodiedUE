@@ -1,5 +1,6 @@
 """Verify the Catch scene through the real Worker and completed physics windows."""
 
+import math
 from pathlib import Path
 
 import torch
@@ -35,7 +36,11 @@ def test_catch_target_moves_contacts_robot_and_reset_clears_capture(tmp_path: Pa
         assert first.state_valid.tolist() == [True]
         assert first.values[TARGET_CAPTURE_FIELD].item() == 0.0
         first_target = first.values[PHANTOMX_PURSUIT_TARGET_FIELD].clone()
-        assert first_target[0, 1].item() > 0.0
+        expected_target = torch.tensor([[0.6 + 0.3 * (math.cos(0.02) - 1.0),
+                                         0.3 * math.sin(0.02), 0.85]])
+        assert torch.allclose(first_target, expected_target, atol=1e-5, rtol=0.0), (
+            "the target must follow its physical-time path without sticking to the floor"
+        )
         captured = False
         for _ in range(250):
             transition = adapter.step(command, step_decimation=4)
