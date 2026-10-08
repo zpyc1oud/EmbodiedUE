@@ -130,9 +130,31 @@ $runDir = 'runs/UERL-PhantomX-ContinuousTerrain-v0/<run-directory>'
 ```
 
 Compare completed episodes, success and fall rates, forward velocity, speed error, and body vibration.
-The metric `success_rate` counts completed episodes without base contact.
-It does not establish command tracking.
-A stationary robot can have a high survival rate.
+The metric `survival_rate` counts episodes that reach the time limit without a
+fall or Slot fault. `tracking_success_rate` also requires both linear and yaw
+tracking to pass. Both rates use all completed episodes as their denominator.
+A stationary robot can have a high survival rate and a low tracking success rate.
+
+For each valid control interval, divide the linear error by
+`clamp(0.5 * command_speed, 0.03, 0.20)` m/s. Divide the yaw error by
+`clamp(0.5 * abs(command_yaw), 0.05, 0.25)` rad/s. An episode passes each
+tracking check when the physical-time mean of the squared normalized error is
+less than 1. Evaluate standing, low-speed walking, and turning as separate cases.
+These initial criteria must stay fixed during a candidate comparison.
+
+The report also gives linear and yaw RMSE, in m/s and rad/s. Each valid Slot
+interval is weighted by its completed physical duration. Invalid samples do not
+contribute to error means. An episode with a Slot fault cannot pass.
+If no valid samples are available, error metrics are NaN.
+Historical reports use `success_rate` for survival only.
 The mean curriculum level or a video alone is also insufficient evidence.
 
 See [recording](record-video.md) and [test boundaries](../../tests/README.md).
+
+### Check turn-in-place playback
+
+With the player controller, hold A or Q to turn left. Hold D or E to turn right.
+W adds forward motion. S stops both forward and turn commands. A turn command
+does not require W. Opposite turn keys
+cancel each other. Releasing all keys sends zero velocity and default joint
+targets. Use fixed commands for quantitative comparisons.

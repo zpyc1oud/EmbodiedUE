@@ -122,7 +122,7 @@ def velocity_from_held_keys(
         [
             speed_mps if moving else 0.0,
             0.0,
-            yaw * max_yaw_rate if moving else 0.0,
+            yaw * max_yaw_rate if "S" not in normalized else 0.0,
         ],
         dtype=torch.float32,
     )

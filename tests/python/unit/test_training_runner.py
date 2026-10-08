@@ -497,6 +497,7 @@ def test_run_evaluation_loads_checkpoint_and_aggregates_completed_episodes(
                 "log": {
                     "phantomx/forward_velocity": torch.tensor([0.2, 0.4]),
                     "phantomx/linear_velocity_error": torch.tensor([0.3, 0.1]),
+                    "phantomx/yaw_rate_error": torch.zeros(2),
                     "phantomx/command_vx": torch.tensor([0.4, 0.4]),
                     "phantomx/command_speed": torch.tensor([0.4, 0.4]),
                     "phantomx/action_clip_fraction": torch.tensor([0.0, 0.0]),
@@ -527,6 +528,7 @@ def test_run_evaluation_loads_checkpoint_and_aggregates_completed_episodes(
                 "log": {
                     "phantomx/forward_velocity": torch.tensor([0.4, 0.6]),
                     "phantomx/linear_velocity_error": torch.tensor([0.1, 0.1]),
+                    "phantomx/yaw_rate_error": torch.zeros(2),
                     "phantomx/command_vx": torch.tensor([0.4, 0.4]),
                     "phantomx/command_speed": torch.tensor([0.4, 0.4]),
                     "phantomx/action_clip_fraction": torch.tensor([0.0, 0.0]),
@@ -585,17 +587,21 @@ def test_run_evaluation_loads_checkpoint_and_aggregates_completed_episodes(
     assert direct_env_type.call_args.kwargs.get("event_manager_factory") is None
     assert calls["log_dir"] is None
     assert result.completed_episodes == 3
-    assert result.mean_forward_velocity == pytest.approx(0.4)
-    assert result.mean_speed_error == pytest.approx(0.15)
-    assert result.success_rate == pytest.approx(2.0 / 3.0)
+    assert result.mean_forward_velocity == pytest.approx(0.475)
+    assert result.mean_speed_error == pytest.approx(0.1125)
+    assert result.survival_rate == pytest.approx(2.0 / 3.0)
+    assert result.tracking_success_rate == pytest.approx(2.0 / 3.0)
+    assert result.linear_velocity_rmse == pytest.approx(0.1224744871)
+    assert result.yaw_rate_rmse == 0.0
+    assert result.fault_rate == 0.0
     assert result.mean_command_vx == pytest.approx(0.4)
     assert result.mean_command_speed == pytest.approx(0.4)
-    assert result.mean_actor_command_vx == pytest.approx(0.5)
-    assert result.mean_actor_command_speed == pytest.approx(2**0.5 / 2)
-    assert result.mean_command_observation_error == pytest.approx(0.5)
+    assert result.mean_actor_command_vx == pytest.approx(0.875)
+    assert result.mean_actor_command_speed == pytest.approx(0.875 * 2**0.5)
+    assert result.mean_command_observation_error == pytest.approx(0.575)
     assert result.mean_action_clip_fraction == pytest.approx(0.0)
-    assert result.mean_torque_clip_fraction == pytest.approx(0.075)
-    assert result.mean_torque_over_limit == pytest.approx(0.025)
+    assert result.mean_torque_clip_fraction == pytest.approx(0.01875)
+    assert result.mean_torque_over_limit == pytest.approx(0.00625)
     assert result.fall_rate == pytest.approx(1.0 / 3.0)
     assert result.base_contact_rate == pytest.approx(1.0 / 3.0)
     assert len(result.termination_events) == 3

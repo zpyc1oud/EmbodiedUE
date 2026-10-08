@@ -347,7 +347,7 @@ def test_player_keys_replace_the_walk_command_in_the_policy_observation() -> Non
         ({"W", "A", "Q"}, [0.5, 0.0, 1.0]),
         ({"W", "S", "A", "D", "Q", "E"}, [0.0, 0.0, 0.0]),
         ({"S", "A", "Q"}, [0.0, 0.0, 0.0]),
-        ({"Q"}, [0.0, 0.0, 0.0]),
+        ({"Q"}, [0.0, 0.0, 1.0]),
         (set(), [0.0, 0.0, 0.0]),
     )
 

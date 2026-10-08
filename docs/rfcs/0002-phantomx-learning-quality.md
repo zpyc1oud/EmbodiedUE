@@ -66,3 +66,22 @@ errors, stationary drift, clipping, stopping behavior, seeds and physical durati
 A passing smoke run does not accept this proposal's learning-quality requirement.
 Catch, its contact contract, and distribution of the final package remain separate
 parts of Issue #40.
+
+## Evaluation criteria
+
+Use `survival_rate` for episodes that reach the time limit without a fall or Slot
+fault. Use `tracking_success_rate` for surviving episodes whose physical-time
+mean squared normalized errors are below 1 for both linear velocity and yaw.
+The linear normalization limit is `clamp(0.5 * command_speed, 0.03, 0.20)` m/s.
+The yaw limit is `clamp(0.5 * abs(command_yaw), 0.05, 0.25)` rad/s.
+Evaluate zero, low-speed, moving, turning and stopping commands separately.
+Freeze these criteria before held-out runs.
+
+Report physical-time linear and yaw RMSE and the Slot-fault rate. Exclude invalid
+samples from error averages, but count their episodes as failures. Reset each
+Slot's error integrals only when that Slot ends. Record the completed-episode
+count with all rates. Zero completed episodes cannot demonstrate behavior.
+
+The player controller must allow yaw input without forward input. S retains its
+stop behavior. This makes turn-in-place playback reachable with the same velocity
+channel used during training.

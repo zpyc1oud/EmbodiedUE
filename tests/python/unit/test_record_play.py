@@ -163,7 +163,11 @@ def test_play_forwards_an_explicit_task_trace_path(
             completed_episodes=0,
             mean_forward_velocity=0.0,
             mean_speed_error=0.0,
-            success_rate=0.0,
+            survival_rate=0.0,
+            tracking_success_rate=0.0,
+            linear_velocity_rmse=0.0,
+            yaw_rate_rmse=0.0,
+            fault_rate=0.0,
             fall_rate=0.0,
             base_contact_rate=0.0,
             mean_episode_length=0.0,
@@ -328,3 +332,18 @@ def test_custom_controller_width_mismatch_fails_at_assembly(monkeypatch: pytest.
 
     with pytest.raises(ConfigError, match="width"):
         task.bind_robot_spec(_robot_spec(), observation_shapes=SHAPES)
+
+
+def test_player_can_turn_in_place_without_forward_input() -> None:
+    player = PlayerVelocityController(speed_mps=0.5, max_yaw_rate=1.0, batch_size=1)
+    actions = torch.full((1, 18), 0.25)
+    player.set_held({"Q"})
+    player.update({})
+    assert torch.equal(player.current()["velocity"], torch.tensor([[0.0, 0.0, 1.0]]))
+    assert torch.equal(player.gate_actions(actions), actions)
+    player.set_held({"E"})
+    player.update({})
+    assert torch.equal(player.current()["velocity"], torch.tensor([[0.0, 0.0, -1.0]]))
+    player.set_held({"Q", "E"})
+    player.update({})
+    assert torch.equal(player.gate_actions(actions), torch.zeros_like(actions))
