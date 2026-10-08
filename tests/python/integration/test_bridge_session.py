@@ -29,7 +29,6 @@ from uerl.core.codec import (
     canonical_json,
     sha256_json,
 )
-
 from uerl.core.codec.transport import SocketTransport, connect_socket_with_deadline
 
 SESSION_ID = UUID("00112233-4455-4677-8899-aabbccddeeff")
