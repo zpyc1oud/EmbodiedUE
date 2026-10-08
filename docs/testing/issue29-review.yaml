@@ -260,8 +260,7 @@ files:
       real Worker
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'E:/EmbodiedUE-validation/20261008-test-quality-02/: stateful-focused 82 passed, session-red 10 failed;
-      source review and detection records'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
     implementation_status: repaired
   - path: tests/python/integration/test_direct_task_entrypoint_equivalence.py
     layer: python
@@ -275,8 +274,7 @@ files:
     reachable_failure: fixture discards a pre-existing imported example module; identity probe failed before repair
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'E:/EmbodiedUE-validation/20261008-test-quality-02/: stateful-focused 82 passed, session-red 10 failed;
-      source review and detection records'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
     implementation_status: repaired
   - {path: tests/python/integration/test_host_check_cli.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/integration/test_host_launch_cli.py, layer: python, finding_status: not-reviewed, review_scope: none}
@@ -295,8 +293,7 @@ files:
       phases/categories
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'E:/EmbodiedUE-validation/20261008-test-quality-02/: stateful-focused 82 passed, session-red 10 failed;
-      source review and detection records'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
     implementation_status: repaired
   - {path: tests/python/integration/test_shape_agreement.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/integration/test_train_resume_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
@@ -350,8 +347,7 @@ files:
     reachable_failure: commuting transforms and single-term state cannot detect reversed order or cross-term restoration
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'E:/EmbodiedUE-validation/20261008-test-quality-02/: stateful-focused 82 passed, session-red 10 failed;
-      source review and detection records'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
     implementation_status: repaired
   - {path: tests/python/unit/test_determinism.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - path: tests/python/unit/test_direct_env.py
@@ -367,8 +363,7 @@ files:
       before repair
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'E:/EmbodiedUE-validation/20261008-test-quality-02/: stateful-focused 82 passed, session-red 10 failed;
-      source review and detection records'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
     implementation_status: repaired
   - path: tests/python/unit/test_direct_session_adapter.py
     layer: python
@@ -382,8 +377,7 @@ files:
       asserting those behaviors
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'E:/EmbodiedUE-validation/20261008-test-quality-02/: stateful-focused 82 passed, session-red 10 failed;
-      source review and detection records'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
     implementation_status: repaired
   - {path: tests/python/unit/test_direct_task.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/unit/test_direct_task_contract.py, layer: python, finding_status: not-reviewed, review_scope: none}
@@ -398,8 +392,7 @@ files:
     reachable_failure: call-name-only evidence misses corrupted values or whole-batch reset overwrite
     planned_assertion: null
     owner: 'Issue #29 stateful review slice'
-    evidence: 'E:/EmbodiedUE-validation/20261008-test-quality-02/: stateful-focused 82 passed, session-red 10 failed;
-      source review and detection records'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
     implementation_status: repaired
   - {path: tests/python/unit/test_external_task_example.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/unit/test_external_tasks.py, layer: python, finding_status: not-reviewed, review_scope: none}

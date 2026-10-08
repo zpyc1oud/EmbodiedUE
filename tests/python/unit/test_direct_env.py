@@ -359,14 +359,15 @@ def _variable_env(
 def test_ac_py_unit_dt_001_002_004_variable_decimation_is_seeded_shared_and_restorable() -> None:
     """Variable N uses both endpoints, isolates RNG, and restores its continuation."""
 
-    torch.manual_seed(123)
-    expected_global = torch.rand(4)
-    torch.manual_seed(123)
-    env, session, _task = _variable_env(run_seed=7)
-    for _ in range(512):
-        env.step(torch.zeros(2, 1))
-    observed_global = torch.rand(4)
-    assert torch.equal(observed_global, expected_global)
+    with torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(123)
+        expected_global = torch.rand(4)
+        torch.random.default_generator.manual_seed(123)
+        env, session, _task = _variable_env(run_seed=7)
+        for _ in range(512):
+            env.step(torch.zeros(2, 1))
+        observed_global = torch.rand(4)
+        assert torch.equal(observed_global, expected_global)
     assert min(session.step_decimations) == 1
     assert max(session.step_decimations) == 7
 
@@ -872,7 +873,7 @@ def test_ac_py_unit_env_010_random_initial_length_staggers_simulated_time_timeou
     )
     wrapper = UERLVecEnvWrapper(env)
     with torch.random.fork_rng(devices=[]):
-        torch.manual_seed(0)
+        torch.random.default_generator.manual_seed(0)
         # The assignment made by rsl_rl OnPolicyRunner.learn(init_at_random_ep_len=True).
         wrapper.episode_length_buf = torch.randint_like(
             wrapper.episode_length_buf, high=int(wrapper.max_episode_length)

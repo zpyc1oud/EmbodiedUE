@@ -25,7 +25,7 @@ from uerl import (
     UERLSession,
     WorkerConfig,
 )
-from uerl.core.codec import FrameHeader, InitializeDescription, InitializeResult
+from uerl.core.codec import FrameHeader, IBridgeSession, InitializeDescription, InitializeResult
 from uerl.core.config.robot import parse_robot_config
 from uerl.runtime.session import WorkerProcessController
 from uerl.runtime.session.process import PopenFactory
@@ -442,10 +442,10 @@ def test_session_preserves_primary_failure_when_cleanup_also_fails(
     def fail(*_args: object, **_kwargs: object) -> object:
         raise primary
 
-    def build(_config: SessionConfig) -> CloseFailureBridge:
+    def build(_config: SessionConfig) -> IBridgeSession:
         if phase == "build":
             raise primary
-        return bridge
+        return cast(IBridgeSession, bridge)
 
     session = None
     request: dict[str, object] = {"state_requirements": [], "action_schema": []}
