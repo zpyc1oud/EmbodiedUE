@@ -152,7 +152,8 @@ def connect_socket_with_deadline(
 
     The bounded connection attempts cover Worker startup only; once a socket is
     connected, request failures are not retried because request ownership is
-    ambiguous.
+    ambiguous. Each OS handshake uses the remaining startup budget; a shorter
+    attempt timeout can abandon a connection that the Windows listener accepts.
     """
 
     deadline = time.monotonic() + connect_timeout_s
@@ -167,11 +168,11 @@ def connect_socket_with_deadline(
             return SocketTransport.connect(
                 host,
                 port,
-                min(1.0, remaining),
+                remaining,
                 request_timeout_s=request_timeout_s,
             )
         except OSError as exc:
             last_error = exc
             # Retry only connection establishment until the single startup
             # deadline; never replay a partially sent protocol request.
-            time.sleep(min(0.05, remaining))
+            time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))

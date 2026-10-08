@@ -196,6 +196,11 @@ a saved policy artifact read through the real export boundary, and mixed termina
 See [Write tests](../docs/how-to/write-tests.md#example-distinct-slots-and-saved-artifacts).
 Temporary faults must fail the intended assertion and be restored; setup errors are not regression evidence.
 These CPU cases do not establish C++ parity, Chaos response or learning quality.
+The stateful slice adds error-precedence and cleanup-note assertions at the
+controlled Session boundary, noncommuting curriculum terms, distinct checkpoint
+states and literal sparse event values. Test fixtures restore global RNG/module
+state; verification output is limited to the behavior the test actually asserts.
+
 
 ## Import boundary
 

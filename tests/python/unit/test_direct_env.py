@@ -359,14 +359,15 @@ def _variable_env(
 def test_ac_py_unit_dt_001_002_004_variable_decimation_is_seeded_shared_and_restorable() -> None:
     """Variable N uses both endpoints, isolates RNG, and restores its continuation."""
 
-    torch.manual_seed(123)
-    expected_global = torch.rand(4)
-    torch.manual_seed(123)
-    env, session, _task = _variable_env(run_seed=7)
-    for _ in range(512):
-        env.step(torch.zeros(2, 1))
-    observed_global = torch.rand(4)
-    assert torch.equal(observed_global, expected_global)
+    with torch.random.fork_rng(devices=[]):
+        torch.set_rng_state(torch.Generator(device="cpu").manual_seed(123).get_state())
+        expected_global = torch.rand(4)
+        torch.set_rng_state(torch.Generator(device="cpu").manual_seed(123).get_state())
+        env, session, _task = _variable_env(run_seed=7)
+        for _ in range(512):
+            env.step(torch.zeros(2, 1))
+        observed_global = torch.rand(4)
+        assert torch.equal(observed_global, expected_global)
     assert min(session.step_decimations) == 1
     assert max(session.step_decimations) == 7
 
@@ -871,11 +872,12 @@ def test_ac_py_unit_env_010_random_initial_length_staggers_simulated_time_timeou
         resolved_config=_resolved_config(0, physics_dt=0.005, decimation=(1, 7)),
     )
     wrapper = UERLVecEnvWrapper(env)
-    torch.manual_seed(0)
-    # The exact assignment made by rsl_rl OnPolicyRunner.learn(init_at_random_ep_len=True).
-    wrapper.episode_length_buf = torch.randint_like(
-        wrapper.episode_length_buf, high=int(wrapper.max_episode_length)
-    )
+    with torch.random.fork_rng(devices=[]):
+        torch.set_rng_state(torch.Generator(device="cpu").manual_seed(0).get_state())
+        # The assignment made by rsl_rl OnPolicyRunner.learn(init_at_random_ep_len=True).
+        wrapper.episode_length_buf = torch.randint_like(
+            wrapper.episode_length_buf, high=int(wrapper.max_episode_length)
+        )
 
     first_timeout_step = torch.full((slots,), -1)
     first_length = torch.full((slots,), -1)

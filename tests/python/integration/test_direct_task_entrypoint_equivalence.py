@@ -68,13 +68,15 @@ def _create_external_minimal_task(
     inserted = package_source_text not in sys.path
     if inserted:
         sys.path.insert(0, package_source_text)
-    sys.modules.pop("example_direct_cartpole", None)
+    previous_module = sys.modules.pop("example_direct_cartpole", None)
     try:
         direct_example = importlib.import_module("example_direct_cartpole")
         task = direct_example.create_task(CartPoleTaskConfig.from_direct(config), robot_spec=robot_spec)
         return cast(DirectTask, task)
     finally:
         sys.modules.pop("example_direct_cartpole", None)
+        if previous_module is not None:
+            sys.modules["example_direct_cartpole"] = previous_module
         if inserted:
             sys.path.remove(package_source_text)
 

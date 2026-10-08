@@ -1,5 +1,5 @@
 issue: 29
-baseline: b67cd6e2f60e57afd28ac8c6690b0fb0ab7b83c4
+baseline: 26af83affdbcb7a02811fbacb646848f4f4657d9
 review_date: '2026-10-08'
 scope:
   roots:
@@ -20,10 +20,10 @@ scope:
   excluded: Product implementation and deployment artifact generation belong to their feature reviews
 counts:
   tracked_files: 236
-  full_file_reviews: 9
+  full_file_reviews: 16
   carried_focused_reviews: 7
-  not_reviewed: 220
-  remaining_full_file_reviews: 227
+  not_reviewed: 213
+  remaining_full_file_reviews: 220
 limits:
 - Inventory presence is not assertion review or executed case count.
 - Focused historical evidence does not dispose of every assertion in that file.
@@ -247,13 +247,56 @@ files:
   - {path: tests/protocol/unit/test_bridge_codec.py, layer: protocol, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/__init__.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/integration/__init__.py, layer: python, finding_status: not-reviewed, review_scope: none}
-  - {path: tests/python/integration/test_bridge_session.py, layer: python, finding_status: not-reviewed, review_scope: none}
-  - {path: tests/python/integration/test_direct_task_entrypoint_equivalence.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/integration/test_bridge_session.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Controlled fragmented transport reaches real Bridge lifecycle, envelope validation and failure closeout
+      without resend
+    required_host: Python CPU; controlled external boundaries
+    oracle: exact handshake/state, one in-flight request, closed transport, outbound count on disconnect and bounded
+      OS connection establishment
+    disposition: keep assertions; remove unsupported print claim; repair premature startup handshake timeout
+    reachable_failure: scripted transport printed unsupported process claims; one-second OS attempt timeout
+      abandons a connection accepted by a Windows listener, causing Worker exit and later startup timeout
+    planned_assertion: null
+    owner: 'Issue #29 stateful review slice'
+    evidence: 'Stateful slice source review, focused cases and two startup-deadline red/green regressions; Windows
+      delayed-listener reproduction and full real E2E results recorded in Issue #29'
+    implementation_status: repaired
+  - path: tests/python/integration/test_direct_task_entrypoint_equivalence.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: External/Manager Tasks each match independent rewards, observations, actions and sparse resets; temporary
+      imports restore previous module
+    required_host: Python CPU; controlled external boundaries
+    oracle: reviewed four-Slot matrices, rewards and physical commands; existing loaded-module identity restored
+    disposition: repair fixture isolation; keep independent behavior oracle
+    reachable_failure: fixture discards a pre-existing imported example module; identity probe failed before repair
+    planned_assertion: null
+    owner: 'Issue #29 stateful review slice'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
+    implementation_status: repaired
   - {path: tests/python/integration/test_host_check_cli.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/integration/test_host_launch_cli.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/integration/test_resume_checkpoint.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/integration/test_saved_run_cli_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
-  - {path: tests/python/integration/test_session.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/integration/test_session.py
+    layer: python
+    finding_status: confirmed-defect
+    review_scope: full-file
+    contract: Protocol/interrupt/state errors remain primary across independent cleanup failures; resources close
+      and lifecycle remains failed/closed
+    required_host: Python CPU; controlled external boundaries
+    oracle: same raised exception object, cleanup-error notes, state, bridge close and owned-controller release
+    disposition: improve; repair Session cleanup error precedence
+    reachable_failure: original cleanup error overwrites the supported primary failure; regression failed at ten public
+      phases/categories
+    planned_assertion: null
+    owner: 'Issue #29 stateful review slice'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
+    implementation_status: repaired
   - {path: tests/python/integration/test_shape_agreement.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/integration/test_train_resume_config.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/run_config_files.py, layer: python, finding_status: not-reviewed, review_scope: none}
@@ -295,13 +338,64 @@ files:
   - {path: tests/python/unit/test_config_validation_parity.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/unit/test_configspec.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/unit/test_continuation.py, layer: python, finding_status: not-reviewed, review_scope: none}
-  - {path: tests/python/unit/test_curriculum_manager.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_curriculum_manager.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Declared term order, namespaced numerical metrics and named checkpoint restoration
+    required_host: Python CPU; controlled external boundaries
+    oracle: '[1,4] -> [5,11] for multiply then offset; metrics 1/.5; two checkpoint terms restore updates 1/8'
+    disposition: strengthen
+    reachable_failure: commuting transforms and single-term state cannot detect reversed order or cross-term restoration
+    planned_assertion: null
+    owner: 'Issue #29 stateful review slice'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
+    implementation_status: repaired
   - {path: tests/python/unit/test_determinism.py, layer: python, finding_status: not-reviewed, review_scope: none}
-  - {path: tests/python/unit/test_direct_env.py, layer: python, finding_status: not-reviewed, review_scope: none}
-  - {path: tests/python/unit/test_direct_session_adapter.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_direct_env.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Initial episode, variable dt, terminal/backfill/fault math, sparse reset, curriculum/event sequencing
+      and test isolation
+    required_host: Python CPU; controlled external boundaries
+    oracle: existing literal row/mask/time/action assertions retained; one-off probe verifies CPU RNG restoration
+    disposition: repair test isolation; retain effective behavior tests
+    reachable_failure: manual global seed and randint draws affect following tests; before/after RNG probe failed
+      before repair
+    planned_assertion: null
+    owner: 'Issue #29 stateful review slice'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
+    implementation_status: repaired
+  - path: tests/python/unit/test_direct_session_adapter.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Actual encode/decode values, variable decimation, sparse reset bits/indices, invalid layout/mask rejection
+    required_host: Python CPU; controlled external boundaries
+    oracle: literal payload bytes and typed vectors; preflight bad masks cause no Worker mutation
+    disposition: keep assertions; remove unsupported verification print claims
+    reachable_failure: successful encode/reset tests printed initialization-failure cleanup and unchanged seed without
+      asserting those behaviors
+    planned_assertion: null
+    owner: 'Issue #29 stateful review slice'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
+    implementation_status: repaired
   - {path: tests/python/unit/test_direct_task.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/unit/test_direct_task_contract.py, layer: python, finding_status: not-reviewed, review_scope: none}
-  - {path: tests/python/unit/test_event_manager.py, layer: python, finding_status: not-reviewed, review_scope: none}
+  - path: tests/python/unit/test_event_manager.py
+    layer: python
+    finding_status: confirmed-gap
+    review_scope: full-file
+    contract: Mode scheduling, seeded per-Slot timers, sparse reset values and unaffected Slot retention
+    required_host: Python CPU; controlled external boundaries
+    oracle: literal calls/masks and final values [23,11], existing independent timer/reset checks retained
+    disposition: strengthen
+    reachable_failure: call-name-only evidence misses corrupted values or whole-batch reset overwrite
+    planned_assertion: null
+    owner: 'Issue #29 stateful review slice'
+    evidence: 'Stateful slice source review and focused 82-case run; pre-fix failures and detection records in Issue #29'
+    implementation_status: repaired
   - {path: tests/python/unit/test_external_task_example.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/unit/test_external_tasks.py, layer: python, finding_status: not-reviewed, review_scope: none}
   - {path: tests/python/unit/test_generalization_evaluator.py, layer: python, finding_status: not-reviewed, review_scope: none}
