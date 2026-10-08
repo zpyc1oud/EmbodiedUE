@@ -89,7 +89,7 @@ files:
     fault should yield diagnostic and completed Failed case.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyArtifactTests.cpp
   layer: native
@@ -107,7 +107,7 @@ files:
     corpus yields bounded Automation failure
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyComponentTestEvents.h
   layer: native
@@ -141,7 +141,7 @@ files:
     finalized trace after refused start and compare pre/post bytes
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyControllerTests.cpp
   layer: native
@@ -158,7 +158,7 @@ files:
   planned_assertion: Guard expected width after TestEqual before scalar comparisons, retain exact zero oracle
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyDeployParityTests.cpp
   layer: native
@@ -237,7 +237,7 @@ files:
   planned_assertion: Guard exact output width before reading outputs, keeping independent expected values
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/UERLPolicyVariableDtParityTests.cpp
   layer: native
@@ -270,7 +270,7 @@ files:
     A real handler regression returning no paths aborts Automation instead of a bounded test failure.
   planned_assertion: Return false after failed CanReimport or incorrect path count before indexing; retain exact
     source-path and byte equality assertions.
-  implementation_status: implemented prerequisite guard; exact-source Editor rebuild and five-case Automation pending
+  implementation_status: implemented prerequisite guard; exact-source Editor rebuild and five-case Automation passed
   evidence: Complete file source read; all five registered cases and fixture/physics lifetimes inspected. Tracked
     filename and actual Automation/Python test-definition scans find this as the only additional source omitted
     from the 236-entry inventory.
@@ -321,7 +321,7 @@ files:
     assertions
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/UERLGenericRobotKinematicsTests.cpp
   layer: native
@@ -396,7 +396,7 @@ files:
   planned_assertion: Return bounded failure when reflection or required arrays are absent before exact scalar checks
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLTerrain/Private/Tests/Unit/UERLTerrainAtlasTests.cpp
   layer: native
@@ -411,7 +411,7 @@ files:
   planned_assertion: Compare all six origins to reviewed row/column positions5*level,4*column
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLTerrain/Private/Tests/Unit/UERLTerrainExtensibilityProbeTests.cpp
   layer: native
@@ -442,7 +442,7 @@ files:
     before reusing Patch
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLTransport/Private/Tests/Unit/UERLTransportTests.cpp
   layer: native
@@ -457,7 +457,7 @@ files:
   planned_assertion: Guard successful parse/validpointer before canonical number assertion; preserve literalgolden
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLAuthoredPursuitEnvironmentTests.cpp
   layer: native
@@ -486,7 +486,7 @@ files:
   planned_assertion: Guard successful pool create and episode width before dependent comparisons
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLIsolatedGridEnvironmentTests.cpp
   layer: native
@@ -546,7 +546,7 @@ files:
     and physicsoracles
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/UERLWorkerTests.cpp
   layer: native
@@ -564,7 +564,7 @@ files:
     Projection tests; protect geometry output dimensions before indexed numerical assertions
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: examples/external-direct-cartpole/tests/test_registration.py
   layer: example-package
@@ -637,7 +637,7 @@ files:
   planned_assertion: Parse selected/completed identities and reject required missing or duplicate completions.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: scripts/run_e2e.py
   layer: runner/config
@@ -667,7 +667,7 @@ files:
   planned_assertion: Parse selected/completed identities and reject required missing or duplicate completions.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/README.md
   layer: README.md
@@ -740,7 +740,7 @@ files:
   planned_assertion: Unknown mode must fail argument parsing; valid mode must execute a nonempty selection.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/e2e/support/socket_negative.py
   layer: e2e
@@ -757,7 +757,7 @@ files:
     teardown on setup exceptions; use remaining startup handshake budget.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/e2e/support/worker_runner.py
   layer: e2e
@@ -774,7 +774,7 @@ files:
     close-failure must still stop recorded own Popen.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/e2e/test_cartpole_worker.py
   layer: e2e
@@ -808,7 +808,7 @@ files:
     terrain levels at Session reset can preserve these assertions.
   planned_assertion: Observe UE-reported per-Slot placement/ground for selected deterministic levels or record actual
     Session reset payload at boundary in separate regression; preserve actual E2E.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
 - path: tests/e2e/test_p1_session.py
   layer: e2e
   finding_status: confirmed-gap
@@ -825,7 +825,7 @@ files:
     remove unmeasured in-flight print or assert observable sequence.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/e2e/test_p2_direct_env.py
   layer: e2e
@@ -858,7 +858,7 @@ files:
     orphan Worker before nextcase.
   planned_assertion: Use recorded Popen timeout helper that cleans child tree before killing parent; test trainer+child
     cleanup; keep existing smoke/artifact assertions.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
 - path: tests/e2e/test_phantomx_worker.py
   layer: e2e
   finding_status: confirmed-gap
@@ -875,7 +875,7 @@ files:
     finallycleanup.
   planned_assertion: Share owned-child timeout cleanup with variantCLI tests and assert childexit, retaining physical/contact
     assertions.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
 - path: tests/e2e/test_terrain_curriculum.py
   layer: e2e
   finding_status: confirmed-gap
@@ -893,7 +893,7 @@ files:
     all generated and per-Slot behavior can pass with incorrect movement.
   planned_assertion: Decode rawState/root/groundframes across distinct target levels; assert selected move and unchanged
     Slot, and relevant primitive evidence.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
 - path: tests/parity/cases/action_plan/full_chain.json
   layer: parity
   finding_status: reviewed-adequate
@@ -964,7 +964,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp ActionPlanCorpus; Python test_action_plan_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/action_plan/out_of_range_clip.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1035,7 +1035,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp ActionPlanCorpus; Python test_action_plan_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/action_plan/width_mismatch.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1104,7 +1104,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp ActionPlanCorpus; Python test_action_plan_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/artifact/tiny_mlp.expected.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1160,7 +1160,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyArtifactTests.cpp Artifact Corpus + Timing; Python test_artifact_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/artifact/tiny_mlp.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -1358,7 +1358,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyArtifactTests.cpp Artifact Corpus + Timing; Python test_artifact_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/clip/bounds.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1413,7 +1413,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/clip/low_gt_high.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1466,7 +1466,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/command/missing_channel.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1509,7 +1509,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/command/multi_and_single_channel.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1574,7 +1574,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/command/width_mismatch.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1621,7 +1621,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/concat/pose_then_joint.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1692,7 +1692,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/dt_005_scale_100.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1733,7 +1733,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/dt_0173_scale_half.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1774,7 +1774,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/dt_035_scale_two.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1815,7 +1815,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/missing_dt.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1857,7 +1857,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/missing_scale.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1898,7 +1898,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/negative_dt.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1940,7 +1940,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/nonpositive_dt.json
   layer: parity
   finding_status: reviewed-adequate
@@ -1982,7 +1982,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/control_frame_dt/zero_scale.json
   layer: parity
   finding_status: reviewed-adequate
@@ -2024,7 +2024,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/controller/cartpole_controller.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -2224,7 +2224,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyControllerTests.cpp and UERLPolicyComponentTests.cpp no-command AC022; real UE object/asset
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/controller/cartpole_no_commands.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -2427,7 +2427,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyControllerTests.cpp and UERLPolicyComponentTests.cpp no-command AC022; real UE object/asset
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/controller/generate_no_commands_fixture.py
   layer: parity
   finding_status: reviewed-adequate
@@ -2448,7 +2448,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyControllerTests.cpp and UERLPolicyComponentTests.cpp no-command AC022; real UE object/asset
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/deploy/phantomx/multistep_walk.json
   layer: parity
   finding_status: reviewed-adequate
@@ -3080,7 +3080,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyDeployParityTests.cpp DeployParity Corpus; Python test_deploy_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/deploy_variable_dt/generate_fixture.py
   layer: parity
   finding_status: confirmed-gap
@@ -3096,10 +3096,10 @@ files:
     builder, verify regenerated container width/timing/weights against existing fixture
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyVariableDtParityTests.cpp Corpus; Python test_deploy_variable_dt.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/deploy_variable_dt/phantomx_variable_dt.json
   layer: parity
   finding_status: reviewed-adequate
@@ -3954,7 +3954,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyVariableDtParityTests.cpp Corpus; Python test_deploy_variable_dt.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/deploy_variable_dt/phantomx_variable_dt.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -4133,7 +4133,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyVariableDtParityTests.cpp Corpus; Python test_deploy_variable_dt.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/joint_pos_rel/default_length_mismatch.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4190,7 +4190,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/joint_pos_rel/nonuniform_default.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4250,7 +4250,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/joint_pos_rel/single_joint.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4301,7 +4301,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/joint_pos_rel/zero_default.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4358,7 +4358,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/offset/scalar.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4412,7 +4412,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/offset/vector.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4472,7 +4472,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_115/recorded_airborne_03.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4594,7 +4594,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_phantomx_115_plan.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_115/recorded_contact_02.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4716,7 +4716,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_phantomx_115_plan.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_115/recorded_flat_01.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4838,7 +4838,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_phantomx_115_plan.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_115/recorded_moving_05.json
   layer: parity
   finding_status: reviewed-adequate
@@ -4960,7 +4960,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_phantomx_115_plan.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_115/recorded_tilted_04.json
   layer: parity
   finding_status: reviewed-adequate
@@ -5082,7 +5082,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_phantomx_115_plan.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_variants/continuous_terrain.expected.json
   layer: parity
   finding_status: reviewed-adequate
@@ -5345,7 +5345,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: CPU-only Task goldens consumed by tests/python/unit/test_phantomx_variants.py; no cross-language
     claim applies
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_variants/discrete_terrain.expected.json
   layer: parity
   finding_status: reviewed-adequate
@@ -5608,7 +5608,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: CPU-only Task goldens consumed by tests/python/unit/test_phantomx_variants.py; no cross-language
     claim applies
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_variants/pursuit_flat.expected.json
   layer: parity
   finding_status: reviewed-adequate
@@ -5875,7 +5875,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: CPU-only Task goldens consumed by tests/python/unit/test_phantomx_variants.py; no cross-language
     claim applies
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/phantomx_variants/walk_flat.expected.json
   layer: parity
   finding_status: reviewed-adequate
@@ -6138,7 +6138,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: CPU-only Task goldens consumed by tests/python/unit/test_phantomx_variants.py; no cross-language
     claim applies
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/generate_fixtures.py
   layer: parity
   finding_status: confirmed-gap
@@ -6153,11 +6153,11 @@ files:
     fixtures
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/mlp_2x64.expected.json
   layer: parity
   finding_status: confirmed-gap
@@ -6207,12 +6207,11 @@ files:
     replacing goldens
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: fixture retained; native TwoShapes consumer now checks these independent values; Automation
-    pending
+  implementation_status: fixture retained; native TwoShapes independent-value checks passed
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/mlp_2x64.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -6452,7 +6451,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/mlp_5x256.expected.json
   layer: parity
   finding_status: confirmed-gap
@@ -6502,12 +6501,11 @@ files:
     replacing goldens
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: fixture retained; native TwoShapes consumer now checks these independent values; Automation
-    pending
+  implementation_status: fixture retained; native TwoShapes independent-value checks passed
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/mlp_5x256.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -6683,7 +6681,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/mlp_norm_nontrivial.expected.json
   layer: parity
   finding_status: reviewed-adequate
@@ -6745,7 +6743,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/mlp_norm_nontrivial.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -7026,7 +7024,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/phantomx_115.expected.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7081,7 +7079,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/policynet/phantomx_115.uerlpol2
   layer: parity
   finding_status: reviewed-adequate
@@ -7272,7 +7270,7 @@ files:
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyNetworkTests.cpp BuildWidths/TwoShapes/NoDoubleNormalization/PhantomXParity; native
     execution needed
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/previous_action/nonzero.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7320,7 +7318,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/projected_gravity/gravity_tilted.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7378,7 +7376,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/rotate_inverse/asymmetric_rotation.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7443,7 +7441,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/rotate_inverse/identity.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7508,7 +7506,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/rotate_inverse/yaw_180.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7573,7 +7571,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/scale/factor_length_mismatch.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7630,7 +7628,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/scale/negative_scalar.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7684,7 +7682,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/scale/scalar.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7738,7 +7736,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/scale/vector.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7798,7 +7796,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/select/basic_pose.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7853,7 +7851,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/slice/from_start.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7912,7 +7910,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/slice/quat_from_pose.json
   layer: parity
   finding_status: reviewed-adequate
@@ -7972,7 +7970,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/slice/to_end.json
   layer: parity
   finding_status: reviewed-adequate
@@ -8028,7 +8026,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLPolicyParityTests.cpp OperatorCorpus; Python test_operator_parity.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/cases/structure/observation_select_concat.json
   layer: parity
   finding_status: reviewed-adequate
@@ -8101,7 +8099,7 @@ files:
   implementation_status: retained
   owner: 'Issue #29 complete repository review'
   consumer_mapping: UERLInterface UERLPlanTests.cpp ParseJson shared structure; Python test_plan_structure.py
-  execution_evidence: Pending candidate validation; source review is complete.
+  execution_evidence: Python consumers passed; applicable native consumers passed in the 155-case Automation run. CPU-only Task goldens retain their stated scope. See README.md acceptance record.
 - path: tests/parity/test_action_plan_parity.py
   layer: parity
   finding_status: reviewed-adequate
@@ -8130,7 +8128,7 @@ files:
     timing/metadata/plan data
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/parity/test_deploy_parity.py
   layer: parity
@@ -8160,7 +8158,7 @@ files:
     tolerances
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/parity/test_operator_parity.py
   layer: parity
@@ -8191,7 +8189,7 @@ files:
     exact goldens
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/parity/test_plan_structure.py
   layer: parity
@@ -8249,7 +8247,7 @@ files:
     thread termination and errors assertion
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/protocol/support/__init__.py
   layer: protocol
@@ -8297,7 +8295,7 @@ files:
     regression; never retry sent requests
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/protocol/unit/__init__.py
   layer: protocol
@@ -8327,7 +8325,7 @@ files:
     validation assertions
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/__init__.py
   layer: python
@@ -8564,7 +8562,7 @@ files:
   planned_assertion: Two asymmetric action rows and literal clipped/scaled/offset outputs
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_cartpole_product_task.py
   layer: python
@@ -8580,7 +8578,7 @@ files:
   planned_assertion: Narrow the action case description to its names, clipping and Newton scaling assertions.
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_cartpole_registration.py
   layer: python
@@ -8653,7 +8651,7 @@ files:
   planned_assertion: Exact four PhantomX IDs
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_cli_export.py
   layer: python
@@ -8757,7 +8755,7 @@ files:
   planned_assertion: Recorded train command contains original Task/resume/budget flags
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_cli_runs.py
   layer: python
@@ -8828,7 +8826,7 @@ files:
   planned_assertion: Exact error codes/paths, changed hash, literal three-tier input; strengthen full terrain preservation
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_config_snapshot.py
   layer: python
@@ -8916,7 +8914,7 @@ files:
     identity assertion
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_direct_env.py
   layer: python
@@ -9005,7 +9003,7 @@ files:
   planned_assertion: Literal -2 reward and all other defaults; restore prior imported module after isolated import
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_external_tasks.py
   layer: python
@@ -9093,7 +9091,7 @@ files:
     Ready claim to filesystem evidence
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_observation_manager.py
   layer: python
@@ -9311,7 +9309,7 @@ files:
     accumulatedfloat32 5ms versus real lost step; reread no-overwrite evidence
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_process_controller.py
   layer: python
@@ -9327,7 +9325,7 @@ files:
     text
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_record_play.py
   layer: python
@@ -9344,7 +9342,7 @@ files:
     custom controller registry
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_registry.py
   layer: python
@@ -9361,7 +9359,7 @@ files:
     overclaim print
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/python/unit/test_resume_state.py
   layer: python
@@ -9700,7 +9698,7 @@ files:
     rewards -3/-4/-5/-6 and9 registrations; add finite subprocess budgets
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/tooling/test_generate_phantomx_deploy_artifact.py
   layer: tooling
@@ -9758,7 +9756,7 @@ files:
   planned_assertion: Sentinel fake UAT output absent and explicit paths/Win64; add finite subprocess budget
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/tooling/test_stage_profiler.py
   layer: tooling
@@ -9790,7 +9788,7 @@ files:
     success/unique test IDs and real Windows descendant cleanup
   evidence: Full-file review against 282ace1; all source or fixture values inspected. Applicable execution evidence
     is recorded separately.
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
   owner: 'Issue #29 complete repository review'
 - path: tests/tooling/test_test_runner_paths.py
   layer: tooling
@@ -9808,7 +9806,7 @@ files:
     seam for owned-deadline helper
   planned_assertion: Environmentisolated precedence, missing-host blocked no command, unique logs; update training-child
     seam for owned-deadline helper
-  implementation_status: implemented; applicable runtime validation pending
+  implementation_status: implemented; applicable validation passed (README.md acceptance record)
 - path: tests/ue/__init__.py
   layer: ue
   finding_status: reviewed-adequate

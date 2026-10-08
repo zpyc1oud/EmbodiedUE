@@ -61,6 +61,7 @@ The existing E2E matrix is retained. Counts here describe configured Slots, not 
 | PhantomX Walk artifact | 1 | Train, supported export, real artifact reload and plan validation |
 | PhantomX terrain/contact | 64 | Contact fields, terminal timeout, position targets and startup terrain levels |
 | PhantomX terrain reset | 2 | All three primitives, distinct levels and unaffected Slot observations |
+| Installed external Direct Task | 2 | One-iteration train, strict resume, 32-step play and unsupported export rejection before Worker launch |
 
 Pursuit uses its authorized configured content; missing content blocks that case.
 The installed external-package checks build real distributions and run from an isolated target.
@@ -68,3 +69,54 @@ External Direct Task export is explicitly unsupported and tested before Worker s
 Strict checkpoint continuation and finite-play CLI behavior retain their separate integration
 and recorded real-workflow evidence. A one-iteration smoke does not establish learning quality;
 that acceptance remains in Issue #8.
+
+
+## Completed acceptance (2026-10-08)
+
+The final code candidate is `709613dbd37794ca5df72bad091e8a884d2a3513`.
+The review baseline is `282ace1600ba27c080cfa8bdad4a70025d3cd98d`; the candidate
+also incorporates main's contribution templates at `1bb3b19`.
+Subsequent acceptance-record edits change documentation only.
+Windows 11 validation used Python 3.11.15, UE 5.8.3 CL 58210709,
+PyTorch 2.11.0+cu128, pytest 9.1.1 and rsl-rl-lib 5.4.2.
+
+| Layer | Command or operation | Actual result |
+|---|---|---|
+| Default Python | `python -m pytest -q` | 1034 passed, 2 platform skips, 0 failed; exit 0 on final code |
+| Static checks | Ruff, Mypy and Linux-target Mypy | Passed; Mypy checks 259 files; final-code GitHub static CI passed |
+| Editor | UBT Development Editor build | Initial 63-action build passed; final-code 4-action Editor rebuild passed |
+| Native Automation | Full runner core and terrain/Robot filters | 142 + 13 passed; exact completed identities reconciled against registered cases |
+| Changed Editor cases | `UERL.Unit.Policy.Editor` filter after final rebuild | All 5 passed; these are reruns within the 155, not extra unique cases |
+| Real E2E | `python scripts/run_e2e.py --suite all --host-profile <profile> --output-dir <output> --timeout 1200` | 25 passed, 0 failed/skipped in one complete invocation; exit 0; includes PIEAttach |
+| Installed package | Isolated installed framework and generated external Task | Train, resume and 32-step play exited 0; unsupported export exited 1 before Worker launch as expected |
+| Windows ownership | Actual trainer/descendant timeout and affected cleanup file | 27 passed, 1 Linux-only skip; no surviving owned child |
+
+The 155-case native run used `2009096`, with the same final native source except
+the additional Editor prerequisite guard. The final rebuild and all five Editor
+cases validate that delta. Together with the separate E2E PIEAttach case, all
+156 registered native identities have success evidence. Deployment component,
+clock, controller and corpus parity checks establish their named behavior;
+short training does not establish learned policy quality.
+
+The first complete runner invocation is retained as a failure: Python and both
+native stages passed, while E2E had 22 passes and 3 failures. Two new sparse-reset
+oracles incorrectly read unselected RESET padding as physical state. Their
+replacements inspect the next real Step against an appropriate control or
+terrain response. The third failure lacked Pursuit's configured authorized map;
+the host's existing content was reused and the original scene passed. Focused
+three-case and subsequent complete 25-case runs both passed.
+
+Installed continuation restored the actor, critic, optimizer, iteration,
+curriculum and decimation RNG under the existing contract. Optimizer steps
+advanced from 20 to 60 and actor parameters changed; finite play completed
+32 decisions. Episodes start fresh, and full RNG/physical state are not saved.
+No new dependency installation or private-content redistribution was needed.
+
+Per-file review completion is 237/237, including all 220 requested files plus
+the newly discovered Editor source and the 16 previously reviewed files.
+Both source-review axes have zero unresolved findings. Raw commands, revision
+and dirty-state records, complete logs, YAML summaries, completed native names,
+checkpoint evidence and process identities remain in the local verification
+archive. UE-generated configuration output was backed up and excluded from the
+candidate. The two default-suite skips are Windows symlink privilege and
+Linux `/proc` inspection. Learning-quality acceptance remains in Issue #8.
