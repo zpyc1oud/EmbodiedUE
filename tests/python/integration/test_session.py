@@ -20,6 +20,7 @@ from uerl import (
     ResolvedRunConfig,
     RslRlRunnerConfig,
     SessionConfig,
+    SessionError,
     SessionState,
     UERLSession,
     WorkerConfig,
@@ -363,7 +364,7 @@ def test_close_releases_worker_ownership_when_transport_close_fails(tmp_path: Pa
     session.close()
 
 
-@pytest.mark.parametrize("failure", ["interrupt", "close"])
+@pytest.mark.parametrize("failure", ["interrupt", "close", "interrupt_close"])
 def test_launch_failure_reclaims_owned_worker(tmp_path: Path, failure: str) -> None:
     """Startup cancellation and socket-close errors both reclaim a launched Worker."""
 
@@ -386,13 +387,13 @@ def test_launch_failure_reclaims_owned_worker(tmp_path: Path, failure: str) -> N
 
     class FailingBridge(_FakeBridge):
         def connect(self) -> dict[str, object]:
-            if failure == "interrupt":
+            if failure in {"interrupt", "interrupt_close"}:
                 raise KeyboardInterrupt
             return super().connect()
 
         def close(self) -> None:
             super().close()
-            if failure == "close":
+            if failure in {"close", "interrupt_close"}:
                 raise OSError("socket close failed")
 
     process = Process()
@@ -404,7 +405,7 @@ def test_launch_failure_reclaims_owned_worker(tmp_path: Path, failure: str) -> N
         _config(tmp_path / "run"),
         session=SessionConfig(mode=LaunchMode.LAUNCH, worker_executable=Path("Worker.exe")),
     )
-    with pytest.raises(KeyboardInterrupt if failure == "interrupt" else OSError):
+    with pytest.raises(KeyboardInterrupt if failure != "close" else OSError):
         session = UERLSession.open(
             config, process_controller=controller, bridge_factory=lambda _config: bridge,
         )
@@ -414,3 +415,131 @@ def test_launch_failure_reclaims_owned_worker(tmp_path: Path, failure: str) -> N
     assert controller.handle is None
     assert process.terminated
     assert process.waits == 2
+
+
+@pytest.mark.parametrize(
+    "phase", ["build", "connect", "describe", "initialize", "ready", "step", "reset", "event", "shutdown"],
+)
+def test_session_preserves_primary_failure_when_cleanup_also_fails(
+    tmp_path: Path, phase: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep the failing exchange visible and attempt both independent cleanup paths."""
+
+    class CloseFailureBridge(_FakeBridge):
+        def close(self) -> None:
+            super().close()
+            raise OSError("socket close failed")
+
+    class CloseFailureController(WorkerProcessController):
+        def close(self, reason: str = "session_close") -> None:
+            super().close(reason)
+            raise OSError("process cleanup failed")
+
+    bridge = CloseFailureBridge()
+    controller = CloseFailureController()
+    primary = ProtocolError(f"{phase} exchange failed")
+
+    def fail(*_args: object, **_kwargs: object) -> object:
+        raise primary
+
+    def build(_config: SessionConfig) -> CloseFailureBridge:
+        if phase == "build":
+            raise primary
+        return bridge
+
+    session = None
+    request: dict[str, object] = {"state_requirements": [], "action_schema": []}
+    with pytest.raises(ProtocolError) as raised:
+        if phase == "connect":
+            monkeypatch.setattr(bridge, "connect", fail)
+        session = UERLSession.open(
+            _config(tmp_path / "run"), process_controller=controller, bridge_factory=build,
+        )
+        if phase == "describe":
+            monkeypatch.setattr(bridge, "describe", fail)
+            session.describe(request)
+        session.describe(request)
+        if phase == "initialize":
+            monkeypatch.setattr(bridge, "initialize", fail)
+        session.initialize(request)
+        if phase == "ready":
+            monkeypatch.setattr(bridge, "acknowledge_ready", fail)
+        session.acknowledge_ready()
+        if phase == "step":
+            monkeypatch.setattr(bridge, "step", fail)
+            session.step(0x42, b"action")
+        elif phase == "reset":
+            monkeypatch.setattr(bridge, "reset", fail)
+            session.reset(0x42, b"mask")
+        elif phase == "event":
+            monkeypatch.setattr(bridge, "event", fail)
+            session.event({})
+        elif phase == "shutdown":
+            monkeypatch.setattr(bridge, "shutdown", fail)
+            session.close()
+
+    assert raised.value is primary
+    notes = "\n".join(raised.value.__notes__)
+    assert "process cleanup failed" in notes
+    assert controller.handle is None
+    if phase != "build":
+        assert bridge.closed
+        assert "socket close failed" in notes
+    if session is not None:
+        assert session.state is (SessionState.CLOSED if phase == "shutdown" else SessionState.FAILED)
+
+
+@pytest.mark.parametrize("operation", ["initialize", "ready"])
+def test_invalid_state_failure_survives_cleanup_error(tmp_path: Path, operation: str) -> None:
+    """State validation stays distinguishable from a later socket-close failure."""
+
+    class CloseFailureBridge(_FakeBridge):
+        def close(self) -> None:
+            super().close()
+            raise OSError("socket close failed")
+
+    bridge = CloseFailureBridge()
+    controller = WorkerProcessController()
+    session = UERLSession.open(
+        _config(tmp_path / "run"), process_controller=controller, bridge_factory=lambda _config: bridge,
+    )
+    message = "preceding Describe" if operation == "initialize" else "state open"
+    with pytest.raises(SessionError, match=message) as raised:
+        if operation == "initialize":
+            session.initialize({"state_requirements": [], "action_schema": []})
+        else:
+            session.acknowledge_ready()
+
+    assert session.state is SessionState.FAILED
+    assert bridge.closed
+    assert controller.handle is None
+    assert "socket close failed" in "\n".join(raised.value.__notes__)
+
+
+def test_close_retains_first_cleanup_error_without_exchange_failure(tmp_path: Path) -> None:
+    """Successful Shutdown still exposes both Bridge and Worker cleanup failures."""
+
+    class CloseFailureBridge(_FakeBridge):
+        def close(self) -> None:
+            super().close()
+            raise OSError("socket close failed")
+
+    class CloseFailureController(WorkerProcessController):
+        def close(self, reason: str = "session_close") -> None:
+            super().close(reason)
+            raise OSError("process cleanup failed")
+
+    bridge = CloseFailureBridge()
+    controller = CloseFailureController()
+    session = UERLSession.open(
+        _config(tmp_path / "run"), process_controller=controller, bridge_factory=lambda _config: bridge,
+    )
+    with pytest.raises(OSError, match="socket close failed") as raised:
+        session.close()
+
+    assert "process cleanup failed" in "\n".join(raised.value.__notes__)
+    assert bridge.events == ["connect", "shutdown", "close"]
+    assert controller.handle is None
+    assert session.state is SessionState.CLOSED
+    session.close()
+    assert bridge.events.count("close") == 1

@@ -871,11 +871,12 @@ def test_ac_py_unit_env_010_random_initial_length_staggers_simulated_time_timeou
         resolved_config=_resolved_config(0, physics_dt=0.005, decimation=(1, 7)),
     )
     wrapper = UERLVecEnvWrapper(env)
-    torch.manual_seed(0)
-    # The exact assignment made by rsl_rl OnPolicyRunner.learn(init_at_random_ep_len=True).
-    wrapper.episode_length_buf = torch.randint_like(
-        wrapper.episode_length_buf, high=int(wrapper.max_episode_length)
-    )
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(0)
+        # The assignment made by rsl_rl OnPolicyRunner.learn(init_at_random_ep_len=True).
+        wrapper.episode_length_buf = torch.randint_like(
+            wrapper.episode_length_buf, high=int(wrapper.max_episode_length)
+        )
 
     first_timeout_step = torch.full((slots,), -1)
     first_length = torch.full((slots,), -1)

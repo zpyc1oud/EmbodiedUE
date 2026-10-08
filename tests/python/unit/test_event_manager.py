@@ -96,13 +96,13 @@ def _record_call(
     bridge: RecordingEventBridge,
     mask: torch.Tensor,
     *,
-    name: str,
+    value: float,
     generator: torch.Generator | None = None,
     **_params: object,
 ) -> None:
     del generator
     # Stage a sentinel tensor so AC_006 can prove Session-bridge-only mutation.
-    bridge.write_robot_reset_values(torch.full((mask.numel(), 1), float(hash(name) % 97)), mask)
+    bridge.write_robot_reset_values(torch.full((mask.numel(), 1), value), mask)
 
 
 def test_ac_py_unit_evtmgr_001_modes_fire_at_correct_timing() -> None:
@@ -269,8 +269,8 @@ def test_ac_py_unit_evtmgr_006_events_only_use_session_bridge() -> None:
 
     cfg = EventCfg(
         terms={
-            "startup": EventTermCfg(func=_record_call, mode="startup", params={"name": "startup"}),
-            "reset": EventTermCfg(func=_record_call, mode="reset", params={"name": "reset"}),
+            "startup": EventTermCfg(func=_record_call, mode="startup", params={"value": 11.0}),
+            "reset": EventTermCfg(func=_record_call, mode="reset", params={"value": 23.0}),
         }
     )
     _, spec = _cartpole_bundle()
@@ -285,12 +285,15 @@ def test_ac_py_unit_evtmgr_006_events_only_use_session_bridge() -> None:
         "write_robot_reset_values",
     ]
     assert bridge.robot_reset_values is not None
-    # No side channel: effects are exactly the recorded bridge writes.
-    assert all(name.startswith("write_") for name, _values, _mask in bridge.calls)
+    assert torch.equal(bridge.calls[0][1], torch.tensor([[11.0], [11.0]]))
+    assert torch.equal(bridge.calls[0][2], torch.tensor([True, True]))
+    assert torch.equal(bridge.calls[1][1], torch.tensor([[23.0], [23.0]]))
+    assert torch.equal(bridge.calls[1][2], torch.tensor([True, False]))
+    assert torch.equal(bridge.robot_reset_values, torch.tensor([[23.0], [11.0]]))
 
 
 def test_available_modes_omits_empty_modes() -> None:
-    cfg = EventCfg(terms={"only_reset": EventTermCfg(func=_record_call, mode="reset", params={"name": "r"})})
+    cfg = EventCfg(terms={"only_reset": EventTermCfg(func=_record_call, mode="reset", params={"value": 7.0})})
     _, spec = _cartpole_bundle()
     manager = EventManager(cfg, spec, batch_size=1, device="cpu", generator=_seeded_generator(0))
     assert manager.available_modes == frozenset({"reset"})

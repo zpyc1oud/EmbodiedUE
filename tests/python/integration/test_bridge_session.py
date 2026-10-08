@@ -293,7 +293,6 @@ def test_session_completes_u4_sequence_with_one_in_flight() -> None:
     assert session.state.value == "closed"
     assert transport.closed
     print("[VERIFY] VC-005: protocol=U4 sequence=PASS layout_hash=PASS")
-    print("[VERIFY] VC-007: retry_current_step=false launch_nonzero=true attach_host_alive=true")
 
 
 def test_session_exchanges_ready_event_control_frame() -> None:

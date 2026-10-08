@@ -104,7 +104,8 @@ class UERLSession:
 
         Side effects:
             Launches or records an attached Worker and opens a Bridge. Any
-            failure closes resources already acquired; no process-name scan or
+            failure closes resources already acquired and retains cleanup failures
+            as notes on the original exception; no process-name scan or
             retry is performed.
         """
 
@@ -122,16 +123,13 @@ class UERLSession:
             controller.attach(config.session)
         try:
             bridge = bridge_builder(config.session)
-        except BaseException:
-            controller.close("bridge_connect_failed")
+        except BaseException as exc:
+            _close_resources(controller, None, "bridge_connect_failed", exc)
             raise
         try:
             bridge.connect()
-        except BaseException:
-            try:
-                bridge.close()
-            finally:
-                controller.close("bridge_connect_failed")
+        except BaseException as exc:
+            _close_resources(controller, bridge, "bridge_connect_failed", exc)
             raise
         session = cls(config, controller, bridge, run_recorder)
         session._state = SessionState.OPEN
@@ -211,20 +209,21 @@ class UERLSession:
         """Reflect the Robot topology before committing Task field layouts."""
 
         if self._state is not SessionState.OPEN:
-            self._fail("describe_in_invalid_state")
-            raise SessionError(f"Describe is not valid in state {self._state.value}")
+            error = SessionError(f"Describe is not valid in state {self._state.value}")
+            self._fail("describe_in_invalid_state", error)
+            raise error
         request = _build_initialize_request(self.config, schema_request)
         try:
             result = self._bridge.describe(request)
             robot_spec = _merge_robot_spec_if_configured(self.config, result)
-        except (OSError, ProtocolError, SessionError):
-            self._fail("describe_failed")
+        except (OSError, ProtocolError, SessionError) as exc:
+            self._fail("describe_failed", exc)
             raise
-        except ConfigError:
-            self._fail("robot_topology_merge_failed")
+        except ConfigError as exc:
+            self._fail("robot_topology_merge_failed", exc)
             raise
         except ValueError as exc:
-            self._fail("robot_topology_response_invalid")
+            self._fail("robot_topology_response_invalid", exc)
             raise ProtocolError("Invalid robot topology response") from exc
         self._description = (result, robot_spec)
         return result
@@ -252,12 +251,14 @@ class UERLSession:
         """
 
         if self._state is not SessionState.OPEN:
-            self._fail("initialize_in_invalid_state")
-            raise SessionError(f"Initialize is not valid in state {self._state.value}")
+            error = SessionError(f"Initialize is not valid in state {self._state.value}")
+            self._fail("initialize_in_invalid_state", error)
+            raise error
         pending_description = self._description
         if pending_description is None:
-            self._fail("initialize_without_description")
-            raise SessionError("Initialize commit requires a preceding Describe")
+            error = SessionError("Initialize commit requires a preceding Describe")
+            self._fail("initialize_without_description", error)
+            raise error
         request = _build_initialize_request(
             self.config,
             schema_request,
@@ -270,14 +271,14 @@ class UERLSession:
             manifest = _build_manifest(self.config, result)
             self._recorder.write_resolved_config(self.config)
             manifest_hash = self._recorder.write_manifest_atomic(manifest)
-        except (OSError, ProtocolError, SessionError, GitIdentityError):
-            self._fail("initialize_failed")
+        except (OSError, ProtocolError, SessionError, GitIdentityError) as exc:
+            self._fail("initialize_failed", exc)
             raise
-        except ConfigError:
-            self._fail("robot_topology_merge_failed")
+        except ConfigError as exc:
+            self._fail("robot_topology_merge_failed", exc)
             raise
         except ValueError as exc:
-            self._fail("robot_topology_response_invalid")
+            self._fail("robot_topology_response_invalid", exc)
             raise ProtocolError("Invalid robot topology response") from exc
         self._initialization = SessionInitialization(result, robot_spec, manifest_hash)
         self._description = None
@@ -301,13 +302,14 @@ class UERLSession:
         """
 
         if self._state is not SessionState.INITIALIZED:
-            self._fail("ready_in_invalid_state")
-            raise SessionError(f"Ready is not valid in state {self._state.value}")
+            error = SessionError(f"Ready is not valid in state {self._state.value}")
+            self._fail("ready_in_invalid_state", error)
+            raise error
         initialization = cast(SessionInitialization, self._initialization)
         try:
             response = self._bridge.acknowledge_ready(initialization.manifest_hash)
-        except (OSError, ProtocolError, SessionError):
-            self._fail("ready_failed")
+        except (OSError, ProtocolError, SessionError) as exc:
+            self._fail("ready_failed", exc)
             raise
         self._state = SessionState.READY
         return response
@@ -335,8 +337,8 @@ class UERLSession:
         self._ensure_state(SessionState.READY)
         try:
             return self._bridge.step(layout_id, payload)
-        except (OSError, ProtocolError, SessionError):
-            self._fail("step_failed")
+        except (OSError, ProtocolError, SessionError) as exc:
+            self._fail("step_failed", exc)
             raise
 
     def reset(self, layout_id: int, payload: bytes) -> tuple[Any, bytes]:
@@ -363,8 +365,8 @@ class UERLSession:
         self._ensure_state(SessionState.READY)
         try:
             return self._bridge.reset(layout_id, payload)
-        except (OSError, ProtocolError, SessionError):
-            self._fail("reset_failed")
+        except (OSError, ProtocolError, SessionError) as exc:
+            self._fail("reset_failed", exc)
             raise
 
     def event(self, request: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -373,8 +375,8 @@ class UERLSession:
         self._ensure_state(SessionState.READY)
         try:
             return self._bridge.event(dict(request))
-        except (OSError, ProtocolError, SessionError):
-            self._fail("event_failed")
+        except (OSError, ProtocolError, SessionError) as exc:
+            self._fail("event_failed", exc)
             raise
 
     def close(self, reason: str = "session_close") -> None:
@@ -392,29 +394,46 @@ class UERLSession:
 
         if self._state is SessionState.CLOSED:
             return
+        error: BaseException | None = None
         try:
             if self._state in {SessionState.OPEN, SessionState.INITIALIZED, SessionState.READY}:
                 self._last_shutdown_response = self._bridge.shutdown(reason)
+        except BaseException as exc:
+            error = exc
         finally:
-            try:
-                self._bridge.close()
-            finally:
-                try:
-                    self._controller.close(reason)
-                finally:
-                    if self._state is not SessionState.FAILED:
-                        self._state = SessionState.CLOSED
+            error = _close_resources(self._controller, self._bridge, reason, error)
+            if self._state is not SessionState.FAILED:
+                self._state = SessionState.CLOSED
+        if error is not None:
+            raise error
 
-    def _fail(self, reason: str) -> None:
+    def _fail(self, reason: str, error: BaseException) -> None:
         self._state = SessionState.FAILED
-        try:
-            self._bridge.close()
-        finally:
-            self._controller.close(reason)
+        _close_resources(self._controller, self._bridge, reason, error)
 
     def _ensure_state(self, *allowed: SessionState) -> None:
         if self._state not in allowed:
             raise SessionError(f"Session operation is not valid in state {self._state.value}")
+
+
+def _close_resources(
+    controller: WorkerProcessController,
+    bridge: IBridgeSession | None,
+    reason: str,
+    error: BaseException | None = None,
+) -> BaseException | None:
+    """Attempt both Session cleanups and retain the first failure with later notes."""
+
+    bridge_cleanup = (("Bridge", bridge.close),) if bridge is not None else ()
+    for resource, close in (*bridge_cleanup, ("Worker", lambda: controller.close(reason))):
+        try:
+            close()
+        except BaseException as cleanup_error:
+            if error is None:
+                error = cleanup_error
+            else:
+                error.add_note(f"{resource} cleanup failed: {cleanup_error!r}")
+    return error
 
 
 def _merge_robot_spec_if_configured(

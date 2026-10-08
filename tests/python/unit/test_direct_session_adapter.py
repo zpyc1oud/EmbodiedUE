@@ -249,7 +249,6 @@ def test_adapter_encodes_commands_and_decodes_state_batches() -> None:
         "client_response_validate",
         "client_state_decode",
     }
-    print("[VERIFY] VC-002: ready_before_step=true init_failure_close=1")
 
 
 def test_adapter_requires_and_encodes_variable_step_decimation() -> None:
@@ -287,7 +286,6 @@ def test_adapter_packs_sparse_reset_and_updates_episode_index() -> None:
         "client_reset_decode",
         "client_reset_roundtrip",
     }
-    print("[VERIFY] VC-006: reset_calls=1 episode_steps=0 seed_unchanged=true")
 
 
 def test_adapter_encodes_terrain_levels_at_the_negotiated_offset() -> None:

@@ -15,14 +15,15 @@ from uerl.core.mdp.terms import CurriculumCfg, CurrTermCfg
 from uerl.errors import ConfigError
 
 
-class _ScaleTerm(CurriculumTerm):
-    def __init__(self, scale: float) -> None:
+class _AffineTerm(CurriculumTerm):
+    def __init__(self, scale: float, offset: float = 0.0) -> None:
         self.scale = scale
+        self.offset = offset
         self.updates = 0
         self.reset_masks: list[torch.Tensor] = []
 
     def transform_state(self, values: Mapping[str, torch.Tensor]) -> Mapping[str, torch.Tensor]:
-        return {**values, "state.value": values["state.value"] * self.scale}
+        return {**values, "state.value": values["state.value"] * self.scale + self.offset}
 
     def update(self, step: CurriculumStep) -> Mapping[str, torch.Tensor | float]:
         self.updates += 1
@@ -57,35 +58,41 @@ def _step() -> CurriculumStep:
 
 
 def test_manager_composes_named_terms_and_namespaces_metrics() -> None:
-    first = _ScaleTerm(2.0)
-    second = _ScaleTerm(3.0)
+    first = _AffineTerm(2.0)
+    second = _AffineTerm(1.0, offset=3.0)
     manager = CurriculumManager({"first": first, "second": second})
 
-    transformed = manager.transform_state({"state.value": torch.ones(2, 1)})
+    transformed = manager.transform_state({"state.value": torch.tensor([[1.0], [4.0]])})
     metrics = manager.update(_step())
     manager.reset(torch.tensor([True, False]), {"state.value": torch.ones(2, 1)})
 
-    assert torch.equal(transformed["state.value"], torch.full((2, 1), 6.0))
-    assert set(metrics) == {
-        "Curriculum/first/updates",
-        "Curriculum/first/done",
-        "Curriculum/second/updates",
-        "Curriculum/second/done",
+    assert torch.equal(transformed["state.value"], torch.tensor([[5.0], [11.0]]))
+    assert metrics == {
+        "Curriculum/first/updates": 1.0,
+        "Curriculum/first/done": 0.5,
+        "Curriculum/second/updates": 1.0,
+        "Curriculum/second/done": 0.5,
     }
     assert torch.equal(first.reset_masks[0], torch.tensor([True, False]))
     assert torch.equal(second.reset_masks[0], torch.tensor([True, False]))
 
 
 def test_manager_checkpoint_restores_each_registered_term() -> None:
-    source = CurriculumManager({"command": _ScaleTerm(2.0)})
+    first = _AffineTerm(2.0)
+    second = _AffineTerm(3.0)
+    second.updates = 7
+    source = CurriculumManager({"first": first, "second": second})
     source.update(_step())
     checkpoint = source.state_dict()
-    restored_term = _ScaleTerm(2.0)
-    restored = CurriculumManager({"command": restored_term})
+    restored_first = _AffineTerm(2.0)
+    restored_second = _AffineTerm(3.0)
+    restored = CurriculumManager({"first": restored_first, "second": restored_second})
 
     restored.load_state_dict(checkpoint)
 
-    assert restored_term.updates == 1
+    assert checkpoint == {"first": {"updates": 1}, "second": {"updates": 8}}
+    assert restored_first.updates == 1
+    assert restored_second.updates == 8
     with pytest.raises(ValueError, match="do not match"):
         restored.load_state_dict({"another": {}})
 
@@ -119,7 +126,7 @@ def test_curriculum_does_not_publish_command_channels() -> None:
 
 def test_manager_accepts_curriculum_cfg() -> None:
     manager = CurriculumManager(
-        CurriculumCfg(terms={"scale": CurrTermCfg(term_class=_ScaleTerm, params={"scale": 2.0})})
+        CurriculumCfg(terms={"scale": CurrTermCfg(term_class=_AffineTerm, params={"scale": 2.0})})
     )
     transformed = manager.transform_state({"state.value": torch.ones(2, 1)})
     assert torch.equal(transformed["state.value"], torch.full((2, 1), 2.0))

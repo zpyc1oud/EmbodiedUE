@@ -159,6 +159,15 @@ Include the relevant failure path:
 Assert the resulting state and the owned resource release.
 Do not only assert that an exception occurred.
 
+`test_session_preserves_primary_failure_when_cleanup_also_fails` exercises the
+real Session through controlled Bridge and process-controller boundaries.
+It asserts the original protocol exception, both cleanup failures as notes,
+released ownership, and the resulting lifecycle state.
+The fake boundary does not establish OS process termination or Chaos behavior.
+Use distinct named checkpoint values and noncommuting transforms to detect
+term mixups and execution-order defects, as in the curriculum-manager tests.
+
+
 ## Write protocol and parity cases
 
 Read [test_bridge_codec.py](../../tests/protocol/unit/test_bridge_codec.py).
