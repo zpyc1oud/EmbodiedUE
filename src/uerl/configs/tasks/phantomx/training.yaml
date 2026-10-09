@@ -13,6 +13,7 @@ task:
   reference_dt_s: 0.02
   slot_fault_reward: -10.0
   action_clip: 1.0
+  tracking_reward: shifted
   velocity_tracking_std: 0.20
   yaw_rate_tracking_std: 0.5
   heading_control_stiffness: 0.5

@@ -174,7 +174,11 @@ def build_phantomx_walk_cfg(
         reference_dt_s=params.reference_dt_s,
         terms={
             "lin_vel_tracking": RewTermCfg(
-                func=px_mdp.lin_vel_tracking,
+                func=(
+                    mdp.rewards.track_lin_vel_xy
+                    if params.tracking_reward == "exponential"
+                    else px_mdp.lin_vel_tracking
+                ),
                 weight=params.linear_velocity_tracking_weight,
                 time_mode="rate",
                 params={
@@ -194,7 +198,11 @@ def build_phantomx_walk_cfg(
                 },
             ),
             "yaw_rate_tracking": RewTermCfg(
-                func=px_mdp.yaw_rate_tracking,
+                func=(
+                    mdp.rewards.track_ang_vel_z
+                    if params.tracking_reward == "exponential"
+                    else px_mdp.yaw_rate_tracking
+                ),
                 weight=params.yaw_rate_tracking_weight,
                 time_mode="rate",
                 params={

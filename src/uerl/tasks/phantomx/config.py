@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -111,6 +112,13 @@ class PhantomXTrainingEventConfig:
     push_interval_max_s: float = 1.5
 
 
+class PhantomXTrackingReward(StrEnum):
+    """Name the objective recorded by each controlled training Run."""
+
+    SHIFTED = "shifted"
+    EXPONENTIAL = "exponential"
+
+
 @dataclass(frozen=True, slots=True)
 class PhantomXTaskConfig(DirectTaskConfig):
     """Hold walking reward, termination and action settings."""
@@ -122,6 +130,7 @@ class PhantomXTaskConfig(DirectTaskConfig):
     reference_dt_s: float | None = 0.02
     slot_fault_reward: float = -10.0
     action_clip: float = 1.0
+    tracking_reward: PhantomXTrackingReward = PhantomXTrackingReward.SHIFTED
     velocity_tracking_std: float = 0.20
     yaw_rate_tracking_std: float = 0.5
     linear_velocity_tracking_weight: float = 1.5
@@ -281,6 +290,7 @@ class PhantomXTaskCfg:
     reference_dt_s: float = spec_field(MISSING, gt=0.0, finite=True)
     slot_fault_reward: float = spec_field(MISSING, finite=True)
     action_clip: float = spec_field(MISSING, gt=0.0, finite=True)
+    tracking_reward: Literal["shifted", "exponential"] = spec_field(MISSING)
     velocity_tracking_std: float = spec_field(MISSING, gt=0.0, finite=True)
     yaw_rate_tracking_std: float = spec_field(MISSING, gt=0.0, finite=True)
     heading_control_stiffness: float = spec_field(MISSING, gt=0.0, finite=True)
@@ -490,6 +500,7 @@ def _assemble_phantomx_training_config(cfg: PhantomXTrainingCfg) -> PhantomXTrai
         reference_dt_s=task_cfg.reference_dt_s,
         slot_fault_reward=task_cfg.slot_fault_reward,
         action_clip=task_cfg.action_clip,
+        tracking_reward=PhantomXTrackingReward(task_cfg.tracking_reward),
         velocity_tracking_std=task_cfg.velocity_tracking_std,
         yaw_rate_tracking_std=task_cfg.yaw_rate_tracking_std,
         heading_control_stiffness=task_cfg.heading_control_stiffness,

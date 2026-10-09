@@ -517,3 +517,24 @@ def test_reward_manager_distinct_rows_keep_weights_and_sparse_episode_sums() -> 
         "Episode_Reward/track": 0.0,
         "Episode_Reward/cost": 0.0,
     }
+
+
+def test_yaw_tracking_exponential_uses_body_frame_and_distinct_commands() -> None:
+    entity = RobotEntityCfg(body_names="base")
+    entity.resolve(_tiny_spec())
+    # A 90-degree roll maps world +y to body -z. Include exact,
+    # one-standard-deviation and two-standard-deviation errors.
+    half = 2.0 ** -0.5
+    ctx = _context(rows=3, transition_state={
+        "robot.body.base.body_pose": torch.tensor([
+            [0, 0, 0, half, 0, 0, half],
+            [0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 1],
+        ]),
+        "robot.body.base.body_angular_velocity": torch.tensor([
+            [0, 0.5, 0], [0, 0, 0], [0, 0, -0.5],
+        ]),
+        "velocity": torch.tensor([[0, 0, -0.5], [0, 0, 0.5], [0, 0, 0.5]]),
+    })
+    actual = reward_lib.track_ang_vel_z(ctx, entity=entity, command_channel="velocity", std=0.5)
+    assert actual.tolist() == pytest.approx([1.0, 0.3678794412, 0.0183156389], abs=1e-6)

@@ -40,6 +40,29 @@ def track_lin_vel_xy(
     return torch.exp(-error / (std * std))
 
 
+def track_ang_vel_z(
+    ctx: StepContext,
+    *,
+    entity: RobotEntityCfg,
+    command_channel: str,
+    std: float,
+) -> torch.Tensor:
+    """Exponential yaw-rate tracking error in the body frame."""
+
+    if std <= 0.0:
+        raise ConfigError(
+            f"track_ang_vel_z std must be positive, got {std}",
+            code="CONFIG_OUT_OF_RANGE",
+            path="std",
+        )
+    pose = _body_pose(ctx.transition_state, entity)
+    world_vel = _concat_fields(ctx.transition_state, entity.body_field_names, "body_angular_velocity")
+    body_vel = _quat_rotate_inverse(pose[:, 3:7], world_vel[:, :3])
+    command = _command_tensor(ctx, command_channel)
+    error = (body_vel[:, 2] - command[:, 2]).square()
+    return torch.exp(-error / (std * std))
+
+
 def joint_torque_l2(ctx: StepContext, *, entity: RobotEntityCfg) -> torch.Tensor:
     """Sum of squared applied joint torques for the selected joints."""
 
@@ -155,5 +178,6 @@ __all__ = [
     "joint_pos_l2",
     "joint_torque_l2",
     "joint_vel_l1",
+    "track_ang_vel_z",
     "track_lin_vel_xy",
 ]

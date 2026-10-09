@@ -31,6 +31,8 @@ Those files are not included as experiment evidence.
 
 ## Development planning
 
+- [PhantomX tracking objective](design/phantomx-tracking-objective.md): controlled reward comparison after the command-coverage result.
+
 - [PhantomX command coverage](design/phantomx-command-coverage.md): Isaac Lab references and a controlled stopping/turning experiment.
 
 - [Task and runtime stabilization](design/task-runtime-stabilization.md): Isaac Lab comparison, configured input references, and bounded runtime verification.

@@ -27,6 +27,7 @@ from uerl.tasks.phantomx.config import (
     PHANTOMX_ROBOT_ID,
     PhantomXCommandConfig,
     PhantomXTaskConfig,
+    PhantomXTrackingReward,
     load_phantomx_training_config,
     parse_phantomx_training_config,
 )
@@ -770,3 +771,45 @@ def test_direct_command_mixture_contains_standing_turning_and_forward_rows() -> 
     assert bool((velocity[:, 2].abs() <= 0.5).all())
     assert bool((velocity[turning, 2] > 0).any()) and bool((velocity[turning, 2] < 0).any())
     assert bool((velocity[moving, 0] >= 0.05).all()) and bool((velocity[moving, 0] <= 0.5).all())
+
+
+@pytest.mark.parametrize("dt, scale", [(0.005, 0.25), (0.035, 1.75)])
+@pytest.mark.parametrize("objective, expected", [
+    (PhantomXTrackingReward.EXPONENTIAL, [2.25, 2.25, 0.0412101875]),
+    (PhantomXTrackingReward.SHIFTED, [0.0, 1.4222712574, -0.7865185551]),
+])
+def test_tracking_objectives_score_distinct_rows_in_physical_time(
+    dt: float, scale: float, objective: PhantomXTrackingReward, expected: list[float],
+) -> None:
+    task = PhantomXTask(replace(
+        PhantomXTaskConfig(), tracking_reward=objective, velocity_tracking_std=0.5,
+        linear_velocity_progress_weight=0.0, yaw_rate_progress_weight=0.0,
+    ), batch_size=3, robot_spec=_robot_spec(), observation_shapes=SHAPES)
+    state = _state(task, num_envs=3,
+                   linear_velocity=torch.tensor([[0, 0, 0], [0.5, 0, 0], [-0.5, 0, 0]]),
+                   angular_velocity=torch.tensor([[0, 0, 0], [0, 0, 0.5], [0, 0, -0.5]]))
+    state["velocity"] = torch.tensor([[0, 0, 0], [0.5, 0, 0.5], [0.5, 0, 0.5]])
+    state["robot.body.base_link.contact_force"] = torch.tensor([0.0, 0.0, 2.0])
+    context = replace(_context(task, state), transition_dt=dt)
+    termination = TerminationResult(
+        terminated=torch.tensor([False, False, True]),
+        truncated=torch.zeros(3, dtype=torch.bool),
+        reason={"base_contact": torch.tensor([False, False, True])},
+    )
+    actual = task.compute_rewards(context, termination)
+    # Exponential exact rows earn 2.25; opposite motion earns 2.25*exp(-4).
+    # Shifted scores subtract 2.25 at zero command, or 2.25*exp(-1) when moving.
+    # Fall cost occurs once, independent of the completed control duration.
+    assert actual.tolist() == pytest.approx(
+        [expected[0] * scale, expected[1] * scale, expected[2] * scale - 1.0], abs=1e-6,
+    )
+
+
+def test_tracking_reward_yaml_selects_candidate_and_rejects_unknown_objective() -> None:
+    document = TRAINING_PATH.read_text(encoding="utf-8")
+    assert parse_phantomx_training_config(document).task.tracking_reward == "shifted"
+    candidate = document.replace("tracking_reward: shifted", "tracking_reward: exponential")
+    assert parse_phantomx_training_config(candidate).task.tracking_reward == "exponential"
+    with pytest.raises(ConfigError) as error:
+        parse_phantomx_training_config(document.replace("tracking_reward: shifted", "tracking_reward: typo"))
+    assert error.value.path == "task.tracking_reward"

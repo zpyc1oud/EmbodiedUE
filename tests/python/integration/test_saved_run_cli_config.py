@@ -352,3 +352,26 @@ def test_saved_run_commands_reject_multiple_slots(
         (play.main if command == "play" else export.main)(
             ["--run", str(run), "--worker.slot_count", "2", "--session.mode", "attach"]
         )
+
+
+def test_phantomx_tracking_objective_override_survives_strict_saved_run(tmp_path: Path) -> None:
+    from uerl.application.run_config import resolve_run_config
+    from uerl.tasks.phantomx.config import PhantomXTaskConfig, PhantomXTrackingReward
+
+    cfg = build_run_config("UERL-PhantomX-Walk-v0", overrides={
+        "task.tracking_reward": "exponential",
+        "task.velocity_tracking_std": "0.5",
+        "task.linear_velocity_progress_weight": "0.0",
+        "task.yaw_rate_progress_weight": "0.0",
+    })
+    assert isinstance(cfg.task, PhantomXTaskConfig)
+    assert cfg.task.tracking_reward is PhantomXTrackingReward.EXPONENTIAL
+    snapshot = write_resolved_config(tmp_path, to_jsonable(cfg))
+    before = snapshot.read_bytes()
+    restored = resolve_run_config(None, tmp_path, {}, strict=True).config
+    assert isinstance(restored.task, PhantomXTaskConfig)
+    assert restored.task.tracking_reward is PhantomXTrackingReward.EXPONENTIAL
+    assert restored.task.velocity_tracking_std == 0.5
+    assert restored.task.linear_velocity_progress_weight == 0.0
+    assert restored.task.yaw_rate_progress_weight == 0.0
+    assert snapshot.read_bytes() == before
