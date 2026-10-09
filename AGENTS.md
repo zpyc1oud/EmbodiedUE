@@ -1,7 +1,9 @@
-# UE RL Engine
+# EmbodiedUE
 
-Train robot policies in Unreal Engine 5.8 Chaos.
-Deploy the same artifact on a Skeletal Mesh in a game.
+Build a robot training and deployment platform for Unreal Engine game developers.
+Train control policies in UE 5.8 Chaos and deploy them on physics-driven robots in games.
+Use `docs/product-direction.md` for audience, scope, and design priorities.
+Keep implemented capabilities separate from intended adaptive behavior.
 
 ## Read the applicable guide
 

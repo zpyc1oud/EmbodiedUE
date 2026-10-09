@@ -1,7 +1,9 @@
 # Documentation
 
+EmbodiedUE helps game developers train physical robot controllers and deploy them in Unreal Engine.
+Read the [product direction](product-direction.md) for the platform's purpose and scope.
 Start with the [repository README](../README.md) for prerequisites and the first training run.
-Use this index to find the guide for each topic.
+Use the [deployment guide](in-game-deployment-guide.md) to connect a trained policy to a game.
 
 | Topic | Guide |
 |---|---|
