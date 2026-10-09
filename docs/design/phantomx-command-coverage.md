@@ -148,8 +148,13 @@ speed limits for PhantomX.
 
 Before full training, verify signed X/Y command coverage, heading response,
 standing selection, sparse reset, saved configuration, and real UE execution.
-Repeat the four earlier 22-second evaluation groups. Add backward and lateral
-commands to expose the new command coverage. Report each group separately.
+Evaluate seven 22-second groups: standing; forward X=0.45; backward X=-0.3;
+lateral Y=+0.3 and Y=-0.3; and forward X=0.3 with yaw=+0.5 or yaw=-0.5.
+Unspecified command components are zero. Speeds use m/s and yaw uses rad/s.
+The maintainer removed turn-in-place from the target repertoire. Do not require
+zero-linear-speed turning for this candidate. Compare standing and forward
+with the earlier Runs, and record the other groups as new coverage. Report
+each group separately.
 Complete export, actual Demo execution, and Python/UE parity for the final
 artifact. Keep numerical execution checks separate from tracking quality.
 
