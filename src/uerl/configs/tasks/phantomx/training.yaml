@@ -29,6 +29,10 @@ task:
     resampling_time_min_s: 5.0
     resampling_time_max_s: 10.0
     standing_probability: 0.1
+    heading_command: true
+    yaw_rate_min: -0.5
+    yaw_rate_max: 0.5
+    turn_in_place_probability: 0.0
   curriculum:
     window_episodes: 512
     minimum_episodes: 128

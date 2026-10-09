@@ -80,6 +80,10 @@ class PhantomXCommandConfig:
     resampling_time_min_s: float = 5.0
     resampling_time_max_s: float = 10.0
     standing_probability: float = 0.1
+    heading_command: bool = True
+    yaw_rate_min: float = -0.5
+    yaw_rate_max: float = 0.5
+    turn_in_place_probability: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +215,10 @@ class PhantomXCommandCfg:
     resampling_time_min_s: float = spec_field(MISSING, gt=0.0, finite=True)
     resampling_time_max_s: float = spec_field(MISSING, gt=0.0, finite=True)
     standing_probability: float = spec_field(MISSING, ge=0.0, le=1.0, finite=True)
+    heading_command: bool = spec_field(MISSING)
+    yaw_rate_min: float = spec_field(MISSING, finite=True)
+    yaw_rate_max: float = spec_field(MISSING, finite=True)
+    turn_in_place_probability: float = spec_field(MISSING, ge=0.0, le=1.0, finite=True)
 
 
 @configspec
@@ -498,6 +506,10 @@ def _assemble_phantomx_training_config(cfg: PhantomXTrainingCfg) -> PhantomXTrai
             resampling_time_min_s=task_cfg.command.resampling_time_min_s,
             resampling_time_max_s=task_cfg.command.resampling_time_max_s,
             standing_probability=task_cfg.command.standing_probability,
+            heading_command=task_cfg.command.heading_command,
+            yaw_rate_min=task_cfg.command.yaw_rate_min,
+            yaw_rate_max=task_cfg.command.yaw_rate_max,
+            turn_in_place_probability=task_cfg.command.turn_in_place_probability,
         ),
         curriculum=PhantomXCurriculumConfig(
             window_episodes=task_cfg.curriculum.window_episodes,
@@ -571,7 +583,10 @@ def _validate_phantomx_invariants(cfg: PhantomXTrainingCfg) -> None:
 
     command = cfg.task.command
     if (
-        command.initial_speed_min > command.initial_speed_max
+        command.yaw_rate_min > command.yaw_rate_max
+        or command.standing_probability + command.turn_in_place_probability > 1.0
+        or (command.heading_command and command.turn_in_place_probability > 0.0)
+        or command.initial_speed_min > command.initial_speed_max
         or command.post_turn_speed_min > command.post_turn_speed_max
         or command.heading_delta_min > command.heading_delta_max
         or command.resampling_time_min_s > command.resampling_time_max_s

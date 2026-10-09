@@ -31,6 +31,8 @@ Those files are not included as experiment evidence.
 
 ## Development planning
 
+- [PhantomX command coverage](design/phantomx-command-coverage.md): Isaac Lab references and a controlled stopping/turning experiment.
+
 - [Task and runtime stabilization](design/task-runtime-stabilization.md): Isaac Lab comparison, configured input references, and bounded runtime verification.
 
 - [Repository-wide test quality design](design/test-quality-implementation.md): proposed per-layer changes, independent oracles, implementation slices, and acceptance for Issue #29.

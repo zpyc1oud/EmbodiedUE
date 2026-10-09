@@ -709,3 +709,64 @@ def test_passive_joint_observation_reference_uses_reflected_default() -> None:
     cfg = build_phantomx_observation_cfg(spec)
     defaults = cfg.groups["policy"].terms["joint_pos_rel"].params["default"]
     assert defaults == pytest.approx([0.0, 0.25, -0.30] + [0.0, 0.15, -0.30] * 5)
+
+
+def test_direct_yaw_commands_cover_turn_in_place_without_curriculum() -> None:
+    command = replace(
+        PhantomXCommandConfig(), heading_command=False, standing_probability=0.0,
+        turn_in_place_probability=1.0, yaw_rate_min=-0.5, yaw_rate_max=-0.5,
+    )
+    task = _command_task(command, batch_size=4)
+    state = _state(task, num_envs=4)
+    task.on_reset(torch.ones(4, dtype=torch.bool), state)
+    actual = task.published_velocity()
+    assert actual is not None
+    assert torch.equal(actual, torch.tensor([[0.0, 0.0, -0.5]] * 4))
+
+
+def test_direct_velocity_sampling_preserves_unreset_rows_and_completed_timer() -> None:
+    command = replace(
+        PhantomXCommandConfig(), heading_command=False, standing_probability=0.0,
+        turn_in_place_probability=0.0, yaw_rate_min=-0.5, yaw_rate_max=0.5,
+        resampling_time_min_s=0.04, resampling_time_max_s=0.04,
+    )
+    task = _command_task(command, batch_size=4)
+    state = _state(task, num_envs=4)
+    task.on_reset(torch.ones(4, dtype=torch.bool), state)
+    before_value = task.published_velocity()
+    assert before_value is not None
+    before = before_value.clone()
+    assert bool((before[:, 2] != 0).all())
+    task.refresh_command(state, dt=0.02)
+    held = task.published_velocity()
+    assert held is not None
+    assert torch.equal(held, before)
+    task.on_reset(torch.tensor([True, False, True, False]), state)
+    after_value = task.published_velocity()
+    assert after_value is not None
+    after = after_value.clone()
+    assert torch.equal(after[[1, 3]], before[[1, 3]])
+    assert not torch.equal(after[[0, 2]], before[[0, 2]])
+    task.refresh_command(state, dt=0.02)
+    final = task.published_velocity()
+    assert final is not None
+    assert torch.equal(final[[0, 2]], after[[0, 2]])
+    assert not torch.equal(final[[1, 3]], after[[1, 3]])
+
+
+def test_direct_command_mixture_contains_standing_turning_and_forward_rows() -> None:
+    command = replace(PhantomXCommandConfig(), heading_command=False,
+                      standing_probability=0.3, turn_in_place_probability=0.2,
+                      initial_speed_min=0.05, initial_speed_max=0.5)
+    task = _command_task(command, batch_size=128)
+    task.on_reset(torch.ones(128, dtype=torch.bool), _state(task, num_envs=128))
+    velocity = task.published_velocity()
+    assert velocity is not None
+    standing = (velocity == 0).all(dim=1)
+    turning = (velocity[:, 0] == 0) & (velocity[:, 2] != 0)
+    moving = velocity[:, 0] > 0
+    assert bool(standing.any()) and bool(turning.any()) and bool(moving.any())
+    assert bool((velocity[:, 1] == 0).all())
+    assert bool((velocity[:, 2].abs() <= 0.5).all())
+    assert bool((velocity[turning, 2] > 0).any()) and bool((velocity[turning, 2] < 0).any())
+    assert bool((velocity[moving, 0] >= 0.05).all()) and bool((velocity[moving, 0] <= 0.5).all())

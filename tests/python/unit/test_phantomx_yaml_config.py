@@ -184,3 +184,29 @@ def test_phantomx_discrete_terrain_rejects_inverted_grid_height_range(tmp_path: 
         load_phantomx_discrete_terrain_config(path)
     assert raised.value.code == "CONFIG_OUT_OF_RANGE"
     assert raised.value.path == "tiers[0].params.grid_height_range"
+
+
+@pytest.mark.parametrize('changes', [
+    {'yaw_rate_min: -0.5': 'yaw_rate_min: 0.6'},
+    {'heading_command: true': 'heading_command: false',
+     'standing_probability: 0.1': 'standing_probability: 0.9',
+     'turn_in_place_probability: 0.0': 'turn_in_place_probability: 0.2'},
+    {'turn_in_place_probability: 0.0': 'turn_in_place_probability: 0.2'},
+])
+def test_command_mixture_rejects_unreachable_distribution(changes: dict[str, str]) -> None:
+    document = DEFAULT_PHANTOMX_TRAINING_CONFIG.read_text(encoding='utf-8')
+    for old, new in changes.items():
+        document = document.replace(old, new)
+    with pytest.raises(ConfigError) as error:
+        parse_phantomx_training_config(document)
+    assert error.value.path == 'task.command'
+
+
+def test_direct_command_yaml_materializes_selected_distribution() -> None:
+    document = DEFAULT_PHANTOMX_TRAINING_CONFIG.read_text(encoding='utf-8')
+    document = document.replace('heading_command: true', 'heading_command: false')
+    document = document.replace('turn_in_place_probability: 0.0', 'turn_in_place_probability: 0.2')
+    cfg = parse_phantomx_training_config(document)
+    assert cfg.task.command.heading_command is False
+    assert cfg.task.command.turn_in_place_probability == 0.2
+    assert (cfg.task.command.yaw_rate_min, cfg.task.command.yaw_rate_max) == (-0.5, 0.5)
