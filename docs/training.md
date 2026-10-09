@@ -1083,3 +1083,72 @@ Include the command, Task, commit, OS, Python/UE versions, and applicable redact
 State whether the failure occurred before or after Worker initialization.
 For CUDA failures, include GPU and driver information.
 Keep credentials, private paths, and proprietary assets out of public reports.
+
+
+## Diagnose a recorded training result
+
+Use this procedure when a policy survives but does not follow its commands.
+The report reads existing files. It does not start UE or modify a Run.
+
+### Record and inspect a trace
+
+Use the existing `uerl play --trace` option to record a single-Slot evaluation.
+Keep the original Run, checkpoint and resolved configuration. Then run:
+
+```powershell
+uv run python scripts/diagnose_training_trace.py runs/example/traces/task.yaml
+uv run python scripts/diagnose_training_trace.py runs/example/traces/task.yaml --events runs/example/logs --last-iterations 100
+```
+
+Pass the actual TensorBoard directory to `--events`. Omit it if no events exist.
+Use `--body` and `--command` for a different root body or velocity-command channel.
+The body must have pose, linear velocity and angular velocity fields in the trace.
+The command must contain body-frame forward speed, lateral speed and yaw rate.
+
+The output is YAML. It reports:
+
+- Physical-time-weighted planar velocity and yaw-rate RMSE
+- Planar path length and measured displacement for each episode
+- Action RMS and successive-action change within an episode
+- Recorded force sample counts and maximum force for each available body
+- Completed termination counts and the sum of transition rewards
+- Optional TensorBoard scalar windows, including recorded reward components
+
+The position calculation uses the decision input and pre-reset transition.
+It excludes reset teleports. A report can include a partial episode.
+Action changes do not cross reset boundaries or gaps in recorded policy steps.
+The report preserves the source trace's completion status.
+
+`low_motion_speed_threshold_m_s` defaults to 0.01. The report flags a planar command
+above this threshold when measured path speed is below it. Change the threshold
+with `--low-motion-speed`. A finding is an inspection prompt, not a success criterion.
+Zero recorded force does not prove that a foot missed the ground.
+
+### Keep metric meanings separate
+
+A trace covers one recorded Slot. It is not a summary of every training environment.
+No completed episode means that an episode success rate is unavailable.
+The report does not invent a success criterion or reward components absent from the trace.
+
+TensorBoard results retain the original tag names. Each tag reports its latest
+value and mean over the requested final iteration range. Missing iterations do
+not become zeros. These means can summarize values that were already averaged
+by the training logger. Do not sum them as though they were one episode reward,
+or compare them directly with physical-time-weighted evaluation RMSE.
+
+### Check configuration before UE startup
+
+```powershell
+uv run uerl check task UERL-PhantomX-Walk-v0 --yaml --worker.physics_dt 0.005 --worker.decimation "[4, 4]"
+uv run uerl check task UERL-PhantomX-Walk-v0 --run runs/example --yaml
+uv run uerl check task UERL-PhantomX-Walk-v0 --run runs/example --artifact runs/example/exported/policy.uerlpol2 --yaml
+```
+
+The first command checks resolved defaults plus typed overrides. A saved-Run check
+uses its recorded configuration and rejects overrides. Artifact checks compare
+Task and Robot identity, physics timing and actuator configuration. They also
+check ONNX input/output dimensions against the artifact's own plans.
+
+Read `pending_host_checks` and the artifact's `pending` fields. Actual mesh topology,
+bound Task plan equality, scene binding and physical response still need the UE
+host. An offline pass does not establish those properties.

@@ -136,3 +136,9 @@ def test_angle_destination_parentheses_and_explicit_anchor(tmp_path: Path) -> No
 @pytest.mark.parametrize("tokens", [[], ["--help"], ["play", "--help"]])
 def test_help_examples_are_valid(tokens: list[str]) -> None:
     assert check_command(tokens) is None
+
+
+def test_task_preflight_overrides_are_checked_without_allowing_host_overrides() -> None:
+    assert check_command(["check", "task", "UERL-PhantomX-Walk-v0", "--worker.physics_dt", ".005"]) is None
+    assert check_command(["check", "task", "UERL-PhantomX-Walk-v0", "--typo", "value"]) is not None
+    assert check_command(["check", "host", "--worker.physics_dt", ".005"]) is not None
