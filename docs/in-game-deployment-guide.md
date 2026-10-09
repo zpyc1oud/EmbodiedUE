@@ -13,6 +13,24 @@ After [optional Fab installation and setup](how-to/optional-egypt-demo.md), `Sty
 For another game, use `BP_UERLPolicyRobot` or `UUERLPolicyComponent`.
 The host GameMode is demonstration code.
 
+## Before you deploy
+
+Prepare a trained Run, matching robot assets, and a target UE project.
+First [evaluate the policy](how-to/phantomx-robust-training.md#per-level-evaluation) against the commands and conditions you intend to use.
+Keep a version-controlled backup of the target project because deployment changes its files and settings.
+
+Follow this sequence:
+
+1. Install the runtime in the target project and build its Editor.
+2. Import the exported policy and resolve its robot mesh.
+3. Set the supported game physics configuration.
+4. Place the robot, supply every required command channel, and start the policy.
+5. Validate physical response and behavior in the target scene.
+6. Cook and test the packaged game.
+
+The sections below give the commands and component details for each step.
+Use [deployment validation](how-to/policy-deployment-validation.md) for the acceptance procedure.
+
 ## Prepare a target project
 
 Run from the repository root in PowerShell:

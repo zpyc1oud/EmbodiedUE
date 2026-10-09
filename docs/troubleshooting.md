@@ -11,6 +11,19 @@ uv run uerl check task <TaskID>
 Replace `<TaskID>` with a listed Task ID.
 These commands help separate configuration failures from UE startup failures.
 
+## Choose the failing stage
+
+| Symptom | Start here |
+|---|---|
+| Task lookup or configuration fails | [Task ID and overrides](#unknown-task-id-or-override) |
+| UE does not start | [Executable path](#ue-executable-not-found), [host plugins](#missing-host-plugin) |
+| Content cannot load | [UE assets](#missing-or-invalid-ue-assets) |
+| Policy device cannot initialize | [CUDA](#cuda-unavailable) |
+| An old Run cannot be restored | [Checkpoint compatibility](#old-phantomx-checkpoint-cannot-resume), [saved configuration](#missing-or-conflicting-saved-configuration) |
+| Evaluation reports success but the robot barely moves | [Motion and success metrics](#success-result-with-little-robot-motion) |
+| The game rejects a policy at startup | [Physics gate](#deployment-physics-gate-failure), [RobotMesh](#imported-artifact-has-no-robotmesh) |
+| Packaging fails | [Game Target](#packaged-game-cannot-find-uerlinterface) |
+
 ## Unknown Task ID or override
 
 Copy the ID from `uerl tasks`.

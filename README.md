@@ -1,5 +1,7 @@
 # EmbodiedUE — Train Robots for Unreal Games
 
+**English** | [简体中文](README.zh-CN.md)
+
 A robot training and deployment platform for **Unreal Engine game developers**.
 Train a control policy in **UE 5.8 / Chaos**, then run it on a physics-driven robot in your game.
 
@@ -193,7 +195,7 @@ See [configuration](docs/configuration.md).
 
 ## Documentation and development
 
-[Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+[Developer learning path](docs/README.md#build-your-first-game-robot) · [Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 For Python-only development after installation:
 
