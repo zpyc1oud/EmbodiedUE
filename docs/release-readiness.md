@@ -18,6 +18,20 @@ The inventory itself does not authorize publication.
 | History and LFS | Fab assets are excluded from current tree but present in tracked history and LFS metadata | Choose a rights-cleared publication snapshot or an explicitly authorized history/LFS cleanup; deleting only current paths would not clear historical distribution |
 | Security reporting | [SECURITY.md](../SECURITY.md) lacks a designated private reporting channel | Owner supplies a private contact or enables private reporting before publication |
 
+## General platform release gates
+
+The [platform roadmap](roadmap/next-release.md) defines a reusable training and
+deployment platform and reproducible reference examples.
+Completion of locomotion Issue #41 and deployment Issue #8 does not clear the
+complete release. Extension contracts, packaged execution,
+independent setup, content inventory, documentation, and presentation also require
+evidence.
+
+Keep source-release rights and packaged-game rights separate. Record the actual
+files in each deliverable and verify the applicable permissions and notices.
+The current project license does not clear an unverified asset or its history.
+The roadmap is a plan, not a new publication or security-setting authorization.
+
 ## Early-Stage validation and distribution readiness
 
 The release review still requires clean-host Windows/UE build, live Chaos training smoke, policy import, and packaged-game checks.

@@ -32,6 +32,8 @@ Those files are not included as experiment evidence.
 ## Development planning
 
 - [PhantomX command coverage](design/phantomx-command-coverage.md): Isaac Lab references and a controlled stopping/turning experiment.
+- [Platform extension architecture](design/platform-extension-architecture.md): source audit, Isaac Lab comparison, proposed interfaces, lifecycle, serialization and implementation tests.
+- [RFC 0002: Shared input providers](rfcs/0002-shared-input-providers.md): proposed public contract; not accepted or implemented.
 
 - [Task and runtime stabilization](design/task-runtime-stabilization.md): Isaac Lab comparison, configured input references, and bounded runtime verification.
 

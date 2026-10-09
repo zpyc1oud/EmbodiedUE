@@ -11,6 +11,9 @@ The C++ source directories are:
 - `engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/`
 
 `UERLRobot` cases cover topology reflection, observation plans, kinematics, contact, and provider registration.
+`UERL.Unit.Robot.GroundQuery.Bindings` checks the extracted ground-query backend
+with analytic floor/step heights, explicit owner filtering, ignored actors,
+empty ownership, and a disjoint no-hit region.
 They also cover rejected configurations and real CartPole content smoke tests.
 The content smoke requires the repository Skeletal Mesh and PhysicsAsset.
 Report missing assets as a failure or blocker, not a silent skip.
