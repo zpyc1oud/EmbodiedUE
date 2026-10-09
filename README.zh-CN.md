@@ -25,6 +25,16 @@ CartPole 是入门示例，PhantomX 六足机器人是当前的运动控制与�
 Isaac Lab 是任务配置、训练流程和测试设计的参考；项目的重点是 Unreal 游戏中的物理机器人控制。
 Isaac Sim 和 Isaac Lab 不是运行依赖。
 
+## 演示视频
+
+### 步行
+
+https://github.com/user-attachments/assets/eb8b7149-0238-4596-8da4-c0415cfd1e0b
+
+### 地形
+
+https://github.com/user-attachments/assets/54cee6e4-43f3-4293-963f-9a206a7c94d3
+
 [步行演示](docs/media/phantomx-walk.mp4) · [地形演示](docs/media/phantomx-terrain.mp4) · [项目定位](docs/product-direction.md)
 
 视频展示历史策略的表现。新策略需要在目标场景中单独评估。
