@@ -196,9 +196,12 @@ extension gaps. Final M3 acceptance uses a selected M2 artifact. M4 consumes the
 combined frozen result. Start documentation and the distribution inventory early;
 finish M5 against the accepted candidate.
 
-Use one release tracking Issue. Reuse #41 for reference learning and #8 for
-deployment. Add focused execution Issues for the extension-contract audit and
-for candidate validation/distribution. Existing completed work is a baseline to
+Use [Issue #51](https://github.com/zpyc1oud/EmbodiedUE/issues/51) as the release tracker.
+Reuse [#41](https://github.com/zpyc1oud/EmbodiedUE/issues/41) for reference learning
+and [#8](https://github.com/zpyc1oud/EmbodiedUE/issues/8) for deployment.
+[Issue #52](https://github.com/zpyc1oud/EmbodiedUE/issues/52) tracks extension and
+shared input contracts. [Issue #53](https://github.com/zpyc1oud/EmbodiedUE/issues/53)
+tracks candidate validation and distribution. Existing completed work is a baseline to
 verify, not a reason to recreate #5, #6, #7, or #29.
 
 Each execution Issue records scope, dependencies, deliverables, tests, and its
