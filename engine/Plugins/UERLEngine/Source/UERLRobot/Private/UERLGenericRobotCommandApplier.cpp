@@ -262,6 +262,17 @@ bool ApplyGenericRobotActuatorForces(
 			return false;
 		}
 
+		// Chaos owns the position drive. Its target does not depend on measured
+		// joint position/velocity or a separately computed effort. Keep the body
+		// and axis validation above, but avoid repeated state reads and unused effort arithmetic.
+		if (IsGenericRobotDriveActuator(Actuator))
+		{
+			Constraint->SetAngularOrientationTarget(FQuat(
+				GenericJointCoordinateAxis(Joint.Coordinate),
+				(*Slot.Targets)[Actuator.Index]));
+			continue;
+		}
+
 		FUERLRobotObservationPlanEntry Entry;
 		Entry.BodyIndex = Joint.ChildBodyIndex;
 		Entry.JointIndex = Actuator.JointIndex;
@@ -294,22 +305,13 @@ bool ApplyGenericRobotActuatorForces(
 		}
 		else if (Actuator.CoordinateType == TEXT("revolute"))
 		{
-			if (Actuator.TargetMode == TEXT("position"))
+			// Apply SI torque along the constraint Frame1 world axis.
+			const FVector Torque = AxisWorld * static_cast<float>(
+				ConvertGenericJointEffortToChaos(Effort, Joint.Coordinate));
+			Slot.Component->AddTorqueInRadians(Torque, ChildName, false);
+			if (bParentSimulated)
 			{
-				Constraint->SetAngularOrientationTarget(FQuat(
-					GenericJointCoordinateAxis(Joint.Coordinate),
-					(*Slot.Targets)[Actuator.Index]));
-			}
-			else
-			{
-				// Apply SI torque along the constraint Frame1 world axis.
-				const FVector Torque = AxisWorld * static_cast<float>(
-					ConvertGenericJointEffortToChaos(Effort, Joint.Coordinate));
-				Slot.Component->AddTorqueInRadians(Torque, ChildName, false);
-				if (bParentSimulated)
-				{
-					Slot.Component->AddTorqueInRadians(-Torque, ParentName, false);
-				}
+				Slot.Component->AddTorqueInRadians(-Torque, ParentName, false);
 			}
 		}
 		else

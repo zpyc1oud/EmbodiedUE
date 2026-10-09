@@ -35,8 +35,9 @@ void SampleGenericRobotContactForces(
 	const bool bSharedWorld = CollisionScope == EUERLEnvironmentCollisionScope::SharedWorld;
 	FPhysicsCommand::ExecuteRead(&Component, [&]()
 	{
-		TArray<Chaos::FGeometryParticleHandle*> RobotParticles;
-		TArray<Chaos::FPBDRigidParticleHandle*> BodyParticles;
+		// The shipped Robots fit inline. Larger topologies retain dynamic capacity.
+		TArray<Chaos::FGeometryParticleHandle*, TInlineAllocator<32>> RobotParticles;
+		TArray<Chaos::FPBDRigidParticleHandle*, TInlineAllocator<32>> BodyParticles;
 		RobotParticles.Reserve(BodyNames.Num());
 		BodyParticles.SetNumZeroed(BodyNames.Num());
 		for (int32 BodyIndex = 0; BodyIndex < BodyNames.Num(); ++BodyIndex)

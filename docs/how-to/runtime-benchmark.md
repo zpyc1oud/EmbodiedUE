@@ -68,3 +68,21 @@ The first supported parallel count is the largest measured count with sufficient
 host headroom and stable repeated timing. It is not a universal product limit.
 A small smoke training/export check can validate its separate path later; a long
 learning run is not required to collect this runtime baseline.
+
+## Compare an optimization
+
+Pin the baseline and candidate commits. Rebuild UE when native source changes.
+Use the same host, Task, map, seed, Slot counts, decimation and measurement horizon.
+Keep the raw reports from both revisions. Run the short cases three times per
+revision, then run at least 2200 measured steps at D4 for the 20-second PhantomX
+Task. Record the completed episode count and Worker resets.
+
+Compare control-step latency, Slot throughput, stage cost and process memory.
+Report the individual runs and their spread. A mean of per-run p95 values is not
+a pooled p95. Separate Python private bytes from UE private bytes and system
+commit. Configuration-only import savings do not establish lower learner memory.
+
+Before accepting a speedup, run the affected native and real UE checks. Replay
+the same bounded action sequence at both revisions. Compare physical state,
+observations, fault handling and reset behavior with the existing tolerances.
+Do not change solver settings or reduce sensing to improve this comparison.
