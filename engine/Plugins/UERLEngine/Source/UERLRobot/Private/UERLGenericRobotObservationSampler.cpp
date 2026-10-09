@@ -3,6 +3,7 @@
 #include "UERLBatchBinding.h"
 #include "UERLGenericRobotContactListener.h"
 #include "UERLGenericRobotKinematics.h"
+#include "UERLGroundQuery.h"
 #include "UERLInterfaceTypes.h"
 
 #include "Components/SkeletalMeshComponent.h"
@@ -107,74 +108,10 @@ namespace
 	 */
 	constexpr double DeploymentProbeStartHeightCm = 100.0;
 
-	bool FindGenericRobotGroundHit(
-		const FUERLRobotObservationSlotView& Slot,
-		UWorld& World,
-		const FVector& Start,
-		const FVector& End,
-		const TCHAR* QueryName,
-		FHitResult& OutHit,
-		FString& OutError)
+	FUERLGroundQueryContext GroundQueryContext(const FUERLRobotObservationSlotView& Slot)
 	{
-		const bool bSharedWorld = Slot.CollisionProfile.Scope() == EUERLEnvironmentCollisionScope::SharedWorld;
-		const bool bDeploymentWorldStatic =
-			Slot.TerrainQueryPurpose == EUERLTerrainQueryPurpose::DeploymentWorldStatic;
-		FCollisionQueryParams QueryParams(FCollisionQueryParams::DefaultQueryParam);
-		QueryParams.TraceTag = FName(QueryName);
-		QueryParams.bTraceComplex = false;
-		QueryParams.AddIgnoredActor(Slot.Owner);
-		if (!bSharedWorld)
-		{
-			if (!World.LineTraceSingleByChannel(
-				OutHit, Start, End, Slot.CollisionProfile.Channel(), QueryParams))
-			{
-				OutError = FString::Printf(
-					TEXT("generic Robot %s query found no Slot-isolated ground"), QueryName);
-				return false;
-			}
-			return true;
-		}
-		if (!bDeploymentWorldStatic && (!Slot.TerrainQueryActors || Slot.TerrainQueryActors->IsEmpty()))
-		{
-			OutError = FString::Printf(
-				TEXT("generic Robot %s query has no training terrain owner"), QueryName);
-			return false;
-		}
-
-		TArray<FHitResult> LocalHits;
-		TArray<FHitResult>* Hits = Slot.TerrainTraceHits ? Slot.TerrainTraceHits : &LocalHits;
-		Hits->Reset();
-		const bool bHit = World.LineTraceMultiByObjectType(
-			*Hits, Start, End, FCollisionObjectQueryParams(ECC_WorldStatic), QueryParams);
-		const FHitResult* MatchedHit = nullptr;
-		if (bHit)
-		{
-			for (const FHitResult& Candidate : *Hits)
-			{
-				if (!Candidate.bBlockingHit)
-				{
-					continue;
-				}
-				if (bDeploymentWorldStatic
-					|| (Slot.TerrainQueryActors && Slot.TerrainQueryActors->ContainsByPredicate(
-						[&Candidate](const TWeakObjectPtr<AActor>& Owner)
-						{
-							return Owner.Get() == Candidate.GetActor();
-						})))
-				{
-					MatchedHit = &Candidate;
-					break;
-				}
-			}
-		}
-		if (!MatchedHit)
-		{
-			OutError = FString::Printf(
-				TEXT("generic Robot %s query found no permitted WorldStatic ground"), QueryName);
-			return false;
-		}
-		OutHit = *MatchedHit;
-		return true;
+		return { Slot.Owner, Slot.CollisionProfile, Slot.TerrainQueryActors,
+			Slot.TerrainQueryPurpose, Slot.TerrainTraceHits };
 	}
 }
 
@@ -210,8 +147,8 @@ bool MeasureGenericRobotGroundClearance(
 	const FVector Start = BodyLocation + FVector::UpVector * StartHeightCm;
 	const FVector End = BodyLocation - FVector::UpVector * 200.0;
 	FHitResult Hit;
-	if (FindGenericRobotGroundHit(
-		Slot, *World, Start, End, TEXT("ground-clearance"), Hit, OutError))
+	if (QueryUERLGroundHit(
+		GroundQueryContext(Slot), *World, Start, End, TEXT("ground-clearance"), Hit, OutError))
 	{
 		(*Slot.GroundClearanceWorldHits)[BodyIndex] = Hit.ImpactPoint;
 		(*Slot.GroundClearanceHitValid)[BodyIndex] = 1;
@@ -294,8 +231,8 @@ bool MeasureGenericRobotTerrainHeightScan(
 			const FVector End = Probe - WorldUp * 10000.0;
 			FHitResult Hit;
 			FString QueryError;
-			if (FindGenericRobotGroundHit(
-				Slot, *World, Start, End, TEXT("terrain-height"), Hit, QueryError))
+			if (QueryUERLGroundHit(
+				GroundQueryContext(Slot), *World, Start, End, TEXT("terrain-height"), Hit, QueryError))
 			{
 				(*Slot.TerrainHeightWorldHits)[Index] = Hit.ImpactPoint;
 				(*Slot.TerrainHeightHitValid)[Index] = 1;
