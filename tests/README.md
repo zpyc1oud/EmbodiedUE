@@ -738,3 +738,17 @@ Before accepting a speedup, run the affected native and real UE checks. Replay
 the same bounded action sequence at both revisions. Compare physical state,
 observations, fault handling and reset behavior with the existing tolerances.
 Do not change solver settings or reduce sensing to improve this comparison.
+
+### Training debug checks
+
+The debug recorder must not change training results.
+Use real small CPU PPO models to compare model parameters, optimizer state, and RNG state
+with tracing enabled and disabled. Include capture expiry while training continues.
+Test both fixed-time PPO and TimeAwarePPO.
+
+Exercise multiple Slots with true termination, timeout, and sparse reset.
+Keep decision state, completed transition state, and post-reset state distinct.
+Reward capture must use the actual computation once; do not recompute stateful reward terms.
+Use independent NumPy calculations for normalized inputs, Gaussian likelihoods, action targets,
+timeout bootstrap, and GAE. Inject a Slot swap or an incorrect target and require a failing audit.
+A passing CPU test does not establish UE contact or actuator behavior.

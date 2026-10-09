@@ -178,6 +178,10 @@ def test_ac_py_unit_composed_002_assembly_order_obs_and_reward_depend_on_prior()
         slot_fault_code=torch.zeros(2, dtype=torch.uint16),
         episode_steps=torch.zeros(2, dtype=torch.long),
     )
+    from uerl.training.debug_audit import audit_actions
+
+    audit_actions(task.action_plan.to_json(), prev.numpy(),
+                  {key: value.numpy() for key, value in ctx.physical_command.values.items()})
     rewards = task.compute_rewards(
         ctx,
         TerminationResult(torch.tensor([True, False]), torch.zeros(2, dtype=torch.bool)),

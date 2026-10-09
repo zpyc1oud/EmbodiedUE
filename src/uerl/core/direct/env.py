@@ -15,6 +15,7 @@ from ..config.robot import RobotSpec
 from ..mdp.lib.events import RecordingEventBridge
 from ..mdp.managers.event import EventManager
 from .curriculum import CurriculumManager, CurriculumStep
+from .debug import TrainingDebugSink
 from .profiling import StageProfiler
 from .robot_observation import (
     ObservationShapeTable,
@@ -71,6 +72,7 @@ class UERLDirectEnv:
         event_manager_factory: Callable[[RobotSpec], EventManager] | None = None,
         initial_terrain_level: int | None = None,
         step_trace_callback: Callable[[Mapping[str, object]], None] | None = None,
+        training_debug: TrainingDebugSink | None = None,
     ) -> None:
         """Create, initialize, ready, and fully reset one typed environment.
 
@@ -102,6 +104,8 @@ class UERLDirectEnv:
                 diagnostics. Each callback row keeps policy inputs, the
                 pre-reset Worker transition, and any post-reset state distinct.
                 ``None`` avoids all trace-row copies.
+            training_debug: Optional bounded all-Slot observer. Records control
+                windows, not intermediate Chaos solver substeps.
 
         The Worker-provided InitialState establishes schemas and canonical
         state after UE completes its post-spawn physics stabilization frame.
@@ -124,6 +128,8 @@ class UERLDirectEnv:
         if step_trace_callback is not None and self.num_envs != 1:
             raise ValueError("policy step tracing currently supports exactly one Slot")
         self._step_trace_callback = step_trace_callback
+        self._training_debug = training_debug
+        self._debug_control_step = 0
         worker_config = None if resolved_config is None else resolved_config.worker
         self._physics_dt = float(
             _DEFAULT_PHYSICS_DT if worker_config is None else worker_config.physics_dt
@@ -341,6 +347,26 @@ class UERLDirectEnv:
         step_decimation = self._sample_step_decimation()
         transition_dt = self._physics_dt * step_decimation
         previous_state = self._current_state
+        debug = self._training_debug
+        if debug is not None and not debug.captures(self._debug_control_step):
+            debug = None
+        if self._training_debug is not None:
+            self.task.capture_reward_terms(debug is not None)
+        if debug is not None:
+            debug.record("environment_input", self._debug_control_step, {
+                "slot_ids": torch.arange(self.num_envs),
+                "episode_index": previous_state.episode_index,
+                "episode_steps": self.episode_length_buf,
+                "episode_solver_steps": self.episode_solver_steps,
+                "observation_dt": self._action_interval_dt,
+                "raw_state": previous_state.values,
+                "state_valid": previous_state.state_valid,
+                "fault_code": previous_state.slot_fault_code,
+                "observation_groups": self._last_observations,
+                "commands": self.task.command_source.current(),
+                "previous_policy_actions": self._previous_policy_actions,
+                "policy_actions": policy_actions,
+            })
         trace_input: dict[str, object] | None = None
         input_episode_step = 0
         input_episode_elapsed_s = 0.0
@@ -441,6 +467,29 @@ class UERLDirectEnv:
                 )
 
         self._episode_return += rewards
+        if debug is not None:
+            debug.record("environment_transition", self._debug_control_step, {
+                "slot_ids": torch.arange(self.num_envs),
+                "valid_slot_ids": valid_ids,
+                "slot_fault_reward": self.task.slot_fault_reward,
+                "physics_dt": self._physics_dt,
+                "step_decimation": step_decimation,
+                "transition_dt": transition_dt,
+                "physical_commands": physical_command.values,
+                "scored_command_velocity": command_velocity,
+                "previous_task_state": previous_task_state.values,
+                "reward_input_state": scored_state.values,
+                "raw_state": transition.values,
+                "state_valid": transition.state_valid,
+                "fault_code": transition.slot_fault_code,
+                "episode_index": transition.episode_index,
+                "episode_steps": self.episode_length_buf,
+                "episode_solver_steps": self.episode_solver_steps,
+                "weighted_reward_terms_compact": self.task.debug_reward_terms(),
+                "rewards": rewards,
+                "terminated": terminated,
+                "truncated": truncated,
+            })
 
         # Terminal observation backfill stays on the env (ticket 29): invalid /
         # faulted rows are Slot-lifecycle fallbacks, not observation semantics.
@@ -607,6 +656,24 @@ class UERLDirectEnv:
                     ),
                 }
             )
+        if debug is not None:
+            debug.record("environment_output", self._debug_control_step, {
+                "slot_ids": torch.arange(self.num_envs),
+                "reset_mask": reset_mask,
+                "raw_state": next_values,
+                "state_valid": next_state_valid,
+                "fault_code": next_fault_code,
+                "episode_index": next_episode_index,
+                "episode_steps": self.episode_length_buf,
+                "episode_solver_steps": self.episode_solver_steps,
+                "commands": self.task.command_source.current(),
+                "observation_groups": observations,
+                "previous_policy_actions": self._previous_policy_actions,
+                "terminal_observation": terminal_observation,
+                "termination_reason": reason,
+            })
+        if self._training_debug is not None:
+            self._debug_control_step += 1
         return observations, rewards, terminated, truncated, info
 
     def close(self, reason: str = "direct_env_close") -> None:

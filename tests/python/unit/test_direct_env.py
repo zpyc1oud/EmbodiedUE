@@ -1261,3 +1261,77 @@ def test_event_manager_factory_binds_after_reflection_and_before_startup() -> No
     assert factory_specs == [spec]
     assert session.events == ["initialize", "ready", "event:root_push", "reset"]
     env.close()
+
+
+def test_all_slot_debug_preserves_sparse_reset_and_terminal_state(tmp_path: Any) -> None:
+    """Two Slots distinguish pre-reset rewards from observations after reset."""
+    import yaml
+
+    from uerl.training.debug_audit import decode
+    from uerl.training.debug_trace import TrainingDebugRecorder
+
+    recorder = TrainingDebugRecorder(tmp_path / "steps.yaml", max_steps=1, metadata={})
+    session = _FakeDirectSession(_state([1.5, 0.2]), _post_reset([0.1, 0.3]))
+    env = UERLDirectEnv(session, _LifecycleTask(), training_debug=recorder)
+    observations, rewards, terminated, truncated, _ = env.step(torch.tensor([[0.7], [0.8]]))
+    recorder.close(complete=True)
+    rows = {r["kind"]: decode(r["values"]) for r in yaml.safe_load_all(recorder.path.read_text())
+            if "values" in r}
+    transition = rows["environment_transition"]
+    output = rows["environment_output"]
+    assert transition["slot_ids"].tolist() == [0, 1]
+    assert transition["raw_state"]["state.value"].flatten().tolist() == pytest.approx([1.5, 0.2])
+    assert transition["rewards"].tolist() == [-2., 1.]
+    assert output["reset_mask"].tolist() == [True, False]
+    assert output["raw_state"]["state.value"].flatten().tolist() == pytest.approx([0.1, 0.2])
+    assert output["previous_policy_actions"].flatten().tolist() == pytest.approx([0., 0.8])
+    torch.testing.assert_close(observations["policy"], torch.tensor([[0.1], [0.2]]))
+    torch.testing.assert_close(rewards, torch.tensor([-2., 1.]))
+    assert terminated.tolist() == [True, False]
+    assert truncated.tolist() == [False, False]
+
+
+@pytest.mark.parametrize("faulted", [False, True])
+def test_all_slot_trace_audits_real_ppo_with_terminal_and_timeout(tmp_path: Any, faulted: bool) -> None:
+    """Exercise actual DirectEnv, wrapper, PPO storage, reset, and target computation."""
+    import yaml
+    from rsl_rl.models import MLPModel
+    from rsl_rl.storage import RolloutStorage
+
+    from uerl.training.debug_audit import audit_training_trace
+    from uerl.training.debug_trace import TrainingDebugRecorder
+    from uerl.training.rsl_rl.debug_ppo import DebugTimeAwarePPO
+
+    torch.manual_seed(4)
+    path = tmp_path / "full.yaml"
+    recorder = TrainingDebugRecorder(path, max_steps=3, metadata={})
+    transition_state = _state([1.5, 0.2], valid=[not faulted, True], faults=[9 if faulted else 0, 0])
+    env = UERLDirectEnv(_FakeDirectSession(transition_state, _post_reset([0.1, 0.3])),
+                       _LifecycleTask(), training_debug=recorder)
+    wrapper = UERLVecEnvWrapper(env)
+    obs = wrapper.get_observations()
+    groups = {"actor": ["policy"], "critic": ["policy"]}
+    actor = MLPModel(obs, groups, "actor", 1, hidden_dims=[4], obs_normalization=True,
+                     distribution_cfg={"class_name": "rsl_rl.modules.distribution:GaussianDistribution",
+                                       "init_std": 0.3})
+    critic = MLPModel(obs, groups, "critic", 1, hidden_dims=[4], obs_normalization=True)
+    alg = DebugTimeAwarePPO(actor, critic, RolloutStorage("rl", 2, 3, obs, [1], "cpu"),
+                            reference_dt_s=0.02, num_learning_epochs=1, num_mini_batches=1)
+    alg.configure_debug(recorder)
+    with torch.inference_mode():
+        for _ in range(3):
+            actions = alg.act(obs)
+            obs, rewards, dones, extras = wrapper.step(actions)
+            alg.process_env_step(obs, rewards, dones, extras)
+        alg.compute_returns(obs)
+    alg.update()
+    recorder.close(complete=True)
+    assert audit_training_trace(path) == {"control_steps": 3, "rollouts": 1, "updates": 1,
+                                           "action_plan_checks": 0, "reward_decomposition_checks": 0}
+    records = list(yaml.safe_load_all(path.read_text()))
+    transition = next(r for r in records if r["kind"] == "ppo_transition")
+    transition["values"]["stored_actions"]["data"].reverse()
+    broken = tmp_path / "shuffled.yaml"
+    broken.write_text(yaml.safe_dump_all(records), encoding="utf-8")
+    with pytest.raises(ValueError, match="stored policy actions"):
+        audit_training_trace(broken)

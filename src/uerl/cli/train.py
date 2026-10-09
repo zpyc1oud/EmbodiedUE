@@ -24,6 +24,10 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--task", required=True, help="Registered Task ID.")
+    parser.add_argument("--debug-trace", type=Path,
+                        help="Stream every Slot's control-step and PPO evidence to a new YAML file.")
+    parser.add_argument("--debug-rollouts", type=int, default=2,
+                        help="Capture this many initial full rollouts (default: 2). Does not stop training.")
     add_common_flags(parser, TRAIN_FLAGS)
     parser.add_argument(
         "--run-dir",
@@ -87,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = _parser()
     args, remaining = parser.parse_known_args(argv)
+    if args.debug_rollouts < 1:
+        parser.error("--debug-rollouts must be positive")
     direct_overrides = apply_common_flags(
         parser,
         args,
@@ -166,12 +172,17 @@ def main(argv: list[str] | None = None) -> int:
     record_command(config.logging.run_directory, list(sys.argv[1:] if argv is None else argv))
     resume_text = f" resume={config.runner.checkpoint}" if config.runner.checkpoint is not None else " resume=none"
     print(f"[RUN] directory={config.logging.run_directory}{resume_text}")
+    debug_options = (
+        {} if args.debug_trace is None
+        else {"debug_trace_path": args.debug_trace, "debug_rollouts": args.debug_rollouts}
+    )
     if resume_state is None:
-        result = run_training(config, terrain_level=args.terrain_level)
+        result = run_training(config, terrain_level=args.terrain_level, **debug_options)
     else:
         result = run_training(
             config, terrain_level=resume_state.options.terrain_level,
             freeze_observation_normalization=resume_state.options.freeze_observation_normalization,
+            **debug_options,
         )
     print(
         f"[VERIFY] VC-007: task={result.task_id} iterations={result.iterations} "

@@ -1152,3 +1152,43 @@ check ONNX input/output dimensions against the artifact's own plans.
 Read `pending_host_checks` and the artifact's `pending` fields. Actual mesh topology,
 bound Task plan equality, scene binding and physical response still need the UE
 host. An offline pass does not establish those properties.
+
+## Inspect every Slot during training
+
+Use a short debug Run to check the training data path before changing rewards or PPO parameters.
+Set the Run length and capture length explicitly:
+
+```powershell
+uv run uerl train --task UERL-PhantomX-ContinuousTerrain-v0 --num-envs 2 --max-iterations 2 --debug-trace runs/debug/steps.yaml --debug-rollouts 2
+uv run python scripts/check_training_debug.py runs/debug/steps.yaml
+```
+
+The trace contains every Slot at each captured control step:
+
+- Raw state, commands, observations, and previous actions before the decision takes effect.
+- Actor and critic inputs after normalization, sampled actions, values, and action likelihoods.
+- Physical targets, completed transition state, elapsed simulated time, and decimation.
+- Weighted reward terms, rewards, termination, timeout, and sparse reset results.
+- PPO storage, timeout bootstrap, returns, advantages, and optimizer gradient statistics.
+
+The recorder streams YAML documents to disk. It saves model and optimizer snapshots in adjacent `.pt` files.
+It refuses to overwrite an existing trace or snapshot.
+`--debug-rollouts` limits the capture; it does not stop training.
+Use `--max-iterations` to limit the Run itself.
+Start with a few Slots, then repeat with the required batch size.
+Disk writes and CPU copies slow a debug Run. Do not use it as a throughput benchmark.
+
+The offline checker independently reconstructs normalized inputs, Gaussian likelihoods,
+action clipping and scaling, timeout bootstrap, and GAE targets.
+It checks Slot order, reward sums, reset mappings, physical-time discounts, and optimizer update counts.
+A mismatch fails the command. An interrupted or incomplete capture also fails.
+Custom Task methods can omit compiled plans or reward decomposition. Inspect those fields separately.
+
+### Debug limits
+
+This mode supports the pinned MLP actor and critic with PPO or TimeAwarePPO.
+A recorded step is one completed policy control window, not each internal Chaos solver substep.
+Physical targets are requested actuator commands; they are not measurements of solver torque.
+Passing the checker establishes the recorded data mappings and arithmetic.
+Use real UE contact, joint-response, and coordinate checks to verify the physical model.
+Use training and evaluation results to assess whether the policy learns the task.
