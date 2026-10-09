@@ -14,7 +14,7 @@ import torch
 from tests.python.unit.robot_shape_fixtures import generic_robot_observation_shapes
 from uerl.core.config.robot import ObsType, RobotSpec, RobotTopology, merge_robot_spec
 from uerl.core.direct.robot_observation import robot_observation_schema
-from uerl.core.direct.types import StepContext
+from uerl.core.direct.types import PhysicalCommandBatch, StepContext
 from uerl.tasks.phantomx.commands import PhantomXVelocityCommandSource
 from uerl.tasks.phantomx.config import (
     PHANTOMX_COMMAND_FIELDS,
@@ -363,6 +363,54 @@ def test_ac_py_unit_phantomx_003_metric_keys_match_task() -> None:
     assert {"Episode_Termination/base_contact", "Episode_Termination/timeout"} <= set(
         task.collect_metrics(ctx, terms)
     )
+
+
+@pytest.mark.parametrize("reverse_topology", [False, True])
+@pytest.mark.parametrize("overload", [False, True])
+def test_phantomx_effort_and_reset_metrics_use_actuator_joint_order(
+    reverse_topology: bool, overload: bool,
+) -> None:
+    from uerl.core.direct.robot_action import ROBOT_ACTUATOR_TARGET_FIELD
+
+    params = PhantomXTaskConfig()
+    original = _robot_spec()
+    topology = original.topology
+    if reverse_topology:
+        topology = replace(topology, joints=tuple(reversed(topology.joints)))
+    training = load_phantomx_training_config(TRAINING_PATH)
+    spec = merge_robot_spec(training.robot_config, topology)
+    spec = replace(spec, actuators=tuple(
+        replace(actuator, default_pos=index * 0.1, stiffness=25.0,
+                damping=0.5, effort_limit=2.8)
+        for index, actuator in enumerate(spec.actuators)
+    ))
+    task = PhantomXTask(params, robot_spec=spec, observation_shapes=SHAPES)
+    state = _state(spec)
+    ctx = task.context_with_command(_context(task, state))
+    targets = torch.tensor([[index * 0.1 for index in range(18)]])
+    for index, actuator in enumerate(spec.actuators):
+        # Different velocities expose a permutation even when positions align.
+        velocity = (index + 1) * 0.2
+        state[f"robot.joint.{actuator.joint}.joint_velocity"] = torch.tensor([[velocity]])
+        targets[0, index] += 0.02 * velocity  # 25 * offset cancels 0.5 * velocity.
+    if overload:
+        targets[0, 0] += 0.2  # One joint requests 5 Nm: 2.2 Nm above its limit.
+    ctx = replace(
+        ctx,
+        raw_state=state,
+        physical_command=PhysicalCommandBatch({ROBOT_ACTUATOR_TARGET_FIELD: targets}),
+        episode_steps=torch.tensor([1]),
+    )
+    terms = task.compute_terminations(ctx)
+    metrics = collect_phantomx_metrics(ctx, terms, config=params, robot_spec=spec)
+
+    assert float(metrics["phantomx/torque_clip_fraction"]) == pytest.approx(
+        1 / 18 if overload else 0.0, abs=1e-6,
+    )
+    assert float(metrics["phantomx/torque_over_limit"]) == pytest.approx(
+        2.2 / 18 if overload else 0.0, abs=1e-6,
+    )
+    assert float(metrics["phantomx/reset_joint_error_max"]) == pytest.approx(0.0, abs=1e-6)
 
 
 def test_registry_factories_return_direct_tasks() -> None:

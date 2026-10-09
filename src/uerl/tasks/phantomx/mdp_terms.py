@@ -217,7 +217,11 @@ def collect_phantomx_metrics(
     entity.resolve(robot_spec)
     feet = RobotEntityCfg(body_names=tuple(PHANTOMX_FEET))
     feet.resolve(robot_spec)
-    joints = RobotEntityCfg(joint_names=tuple(actuator.joint for actuator in robot_spec.actuators))
+    # Targets, gains, and reset defaults use actuator order, not topology order.
+    joints = RobotEntityCfg(
+        joint_names=tuple(actuator.joint for actuator in robot_spec.actuators),
+        preserve_order=True,
+    )
     joints.resolve(robot_spec)
 
     pose = mdp_metrics.body_pose(ctx.transition_state, entity)
