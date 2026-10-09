@@ -14,3 +14,7 @@ Complete [Getting started](../../README.md#getting-started) before you use a run
 | [In-game deployment](../in-game-deployment-guide.md) | Import a policy into a UE 5.8 project and package it |
 | [Write tests](write-tests.md) | Select a test layer, write independent assertions, and record results |
 | [Validate a feature batch](batch-validation.md) | Reuse a Windows worktree and validate reviewed features together before main integration |
+
+## Runtime measurements
+
+- [Measure runtime cost without training](runtime-benchmark.md).

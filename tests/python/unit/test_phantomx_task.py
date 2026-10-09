@@ -10,12 +10,14 @@ import pytest
 import torch
 
 from tests.python.unit.robot_shape_fixtures import generic_robot_observation_shapes
+from uerl.assets.robots.phantomx import PHANTOMX_CFG
 from uerl.core.config.robot import ObsType, RobotSpec, RobotTopology, merge_robot_spec
 from uerl.core.direct.capabilities import CapabilityStatus
 from uerl.core.direct.robot_action import ROBOT_ACTUATOR_TARGET_FIELD
 from uerl.core.direct.robot_observation import robot_observation_schema
 from uerl.core.direct.types import PhysicalCommandBatch, StepContext, TerminationResult
 from uerl.core.mdp.executor import PlanExecutor, PlanInputs
+from uerl.core.mdp.plan import ObservationPlan
 from uerl.errors import ConfigError
 from uerl.tasks.phantomx.commands import PhantomXVelocityCommandSource
 from uerl.tasks.phantomx.config import (
@@ -650,3 +652,60 @@ def test_clean_phantomx_actor_matches_export_plan_and_noise_keeps_export_unknown
     task.enable_observation_corruption(torch.Generator().manual_seed(1))
     noisy_report = task.capabilities
     assert noisy_report.export.status is CapabilityStatus.UNKNOWN
+
+
+@pytest.mark.parametrize("reverse_actuators", [False, True])
+def test_relative_joint_observations_use_configured_defaults_by_joint_name(reverse_actuators: bool) -> None:
+    """Configured reference poses must drive both actor inputs and zero-action targets."""
+    from math import prod
+
+    reference = _robot_spec()
+    expected_defaults = [0.01 * (index + 1) for index in range(18)]
+    asset = replace(PHANTOMX_CFG, init_state=replace(
+        PHANTOMX_CFG.init_state,
+        joint_pos=dict(zip(PHANTOMX_JOINTS, expected_defaults, strict=True)),
+    ))
+    config = asset.to_robot_config()
+    if reverse_actuators:
+        config = replace(config, actuators=tuple(reversed(config.actuators)))
+    spec = merge_robot_spec(config, reference.topology)
+    task = PhantomXTask(PhantomXTaskConfig(), robot_spec=spec, observation_shapes=SHAPES)
+    state = _state(task)
+    for index, joint in enumerate(PHANTOMX_JOINTS):
+        state[f"robot.joint.{joint}.joint_position"] = torch.tensor([expected_defaults[index]])
+    state["robot.joint.thigh_rf.joint_position"] = torch.tensor([0.06])
+    actions = torch.zeros(1, 18)
+    observations = task.build_observations(state, torch.ones(1, dtype=torch.bool), actions)
+    joint_start = 12 + prod(TERRAIN_SHAPE) + 1 + 6
+    expected_relative = torch.zeros(1, 18)
+    expected_relative[0, 1] = 0.04  # measured 0.06 rad minus configured 0.02 rad
+    assert torch.allclose(observations["policy"][:, joint_start:joint_start + 18], expected_relative, atol=1e-7)
+    exported_plan = ObservationPlan.from_json(task.observation_plan.to_json())
+    exported = PlanExecutor(exported_plan, command_channels=task.command_source.channels()).execute(
+        PlanInputs(
+            raw_state=state, commands=task.command_source.current(), previous_action=actions,
+            control_frame_dt=torch.full((1, 1), 0.005),
+        )
+    )
+    assert torch.allclose(exported["policy"][:, joint_start:joint_start + 18], expected_relative, atol=1e-7)
+    relative_op = next(op for op in task.observation_plan.ops if op.output == "joint_pos_rel")
+    assert relative_op.params["default"] == pytest.approx(expected_defaults)
+    target_defaults = list(reversed(expected_defaults)) if reverse_actuators else expected_defaults
+    targets = task.preprocess_actions(actions, state)
+    assert torch.allclose(targets[ROBOT_ACTUATOR_TARGET_FIELD], torch.tensor([target_defaults]), atol=1e-7)
+
+
+def test_passive_joint_observation_reference_uses_reflected_default() -> None:
+    from uerl.tasks.phantomx.composed import build_phantomx_observation_cfg
+
+    reference = _robot_spec()
+    config = PHANTOMX_CFG.to_robot_config()
+    config = replace(config, actuators=tuple(act for act in config.actuators if act.joint != "thigh_rf"))
+    topology = replace(reference.topology, joints=tuple(
+        replace(joint, default_position=0.25) if joint.name == "thigh_rf" else joint
+        for joint in reference.topology.joints
+    ))
+    spec = merge_robot_spec(config, topology)
+    cfg = build_phantomx_observation_cfg(spec)
+    defaults = cfg.groups["policy"].terms["joint_pos_rel"].params["default"]
+    assert defaults == pytest.approx([0.0, 0.25, -0.30] + [0.0, 0.15, -0.30] * 5)

@@ -5,7 +5,7 @@ The profiler measures wall-clock time for the fixed stages of
 
 * Per-step stage seconds returned to the caller, keyed as ``Perf/stage_<name>``
   so the RSL-RL logger averages them across an iteration into TensorBoard.
-* A structured JSONL record flushed once per iteration (a fixed window of
+* An optional structured JSONL record flushed once per iteration (a fixed window of
   ``rollout_length`` steps) for offline analysis.
 
 Both outputs share the same iteration boundary because the RSL-RL runner calls
@@ -49,16 +49,16 @@ _METRIC_PREFIX = "Perf/stage_"
 
 
 class StageProfiler:
-    """Accumulate per-stage step latencies and flush one JSONL row per iteration."""
+    """Accumulate stage latencies and optionally persist one row per iteration."""
 
-    def __init__(self, rollout_length: int, jsonl_path: Path) -> None:
+    def __init__(self, rollout_length: int, jsonl_path: Path | None = None) -> None:
         """Create a profiler bound to one iteration window and JSONL sink.
 
         Args:
             rollout_length: Number of ``step`` calls per learning iteration. A
                 JSONL row is flushed every ``rollout_length`` steps.
-            jsonl_path: Destination file for structured per-iteration latency
-                records. Parent directories are created on first flush.
+            jsonl_path: Optional destination for structured per-iteration latency
+                records. None keeps metrics in memory without file writes.
         """
 
         if rollout_length < 1:
@@ -119,9 +119,10 @@ class StageProfiler:
             "stage_mean_s": {name: self._window_sum[name] / steps for name in _ALL_STAGE_NAMES},
             "stage_total_s": {name: self._window_sum[name] for name in _ALL_STAGE_NAMES},
         }
-        self._jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._jsonl_path.open("a", encoding="utf-8") as sink:
-            sink.write(json.dumps(record) + "\n")
+        if self._jsonl_path is not None:
+            self._jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._jsonl_path.open("a", encoding="utf-8") as sink:
+                sink.write(json.dumps(record) + "\n")
 
         self._iteration += 1
         self._window_steps = 0

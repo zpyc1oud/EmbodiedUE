@@ -61,3 +61,10 @@ def test_partial_window_is_not_flushed(tmp_path: Path) -> None:
 def test_rejects_non_positive_rollout_length(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         StageProfiler(rollout_length=0, jsonl_path=tmp_path / "stage.jsonl")
+
+
+def test_memory_only_profiler_keeps_timing_metrics_without_a_file_sink() -> None:
+    profiler = StageProfiler(rollout_length=1)
+    profiler.record_step_details({"client_socket_send": 0.125})
+    assert profiler.commit_step()["Perf/stage_client_socket_send"] == 0.125
+    assert profiler.commit_step()["Perf/stage_client_socket_send"] == 0.0
