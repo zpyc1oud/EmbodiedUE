@@ -65,9 +65,6 @@ bool ReadGenericRobotJointScalar(
 	const FTransform ChildFrame = ComposeGenericConstraintFrameWorld(
 		Constraint->GetRefFrame(EConstraintFrame::Frame1),
 		ChildInstance->GetUnrealWorldTransform());
-	const FTransform ParentFrame = ComposeGenericConstraintFrameWorld(
-		Constraint->GetRefFrame(EConstraintFrame::Frame2),
-		ParentInstance->GetUnrealWorldTransform());
 	const FVector AxisWorld = ChildFrame.TransformVectorNoScale(GenericJointCoordinateAxis(Coordinate)).GetSafeNormal();
 	if (AxisWorld.IsNearlyZero())
 	{
@@ -83,6 +80,9 @@ bool ReadGenericRobotJointScalar(
 		}
 		else
 		{
+			const FTransform ParentFrame = ComposeGenericConstraintFrameWorld(
+				Constraint->GetRefFrame(EConstraintFrame::Frame2),
+				ParentInstance->GetUnrealWorldTransform());
 			const FVector RelativeLinearVelocity = ChildInstance->GetUnrealWorldVelocityAtPoint(
 				ChildFrame.GetLocation())
 				- ParentInstance->GetUnrealWorldVelocityAtPoint(ParentFrame.GetLocation());
@@ -90,6 +90,9 @@ bool ReadGenericRobotJointScalar(
 		}
 		return true;
 	}
+	const FTransform ParentFrame = ComposeGenericConstraintFrameWorld(
+		Constraint->GetRefFrame(EConstraintFrame::Frame2),
+		ParentInstance->GetUnrealWorldTransform());
 	OutValue = static_cast<float>(MeasureGenericJointPosition(
 		ChildFrame, ParentFrame, Coordinate));
 	return true;
