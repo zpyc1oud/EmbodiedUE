@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/eb8b7149-0238-4596-8da4-c0415cfd1e0b
 
 https://github.com/user-attachments/assets/54cee6e4-43f3-4293-963f-9a206a7c94d3
 
-[步行演示](docs/media/phantomx-walk.mp4) · [地形演示](docs/media/phantomx-terrain.mp4) · [项目定位](docs/product-direction.md)
+[步行演示](docs/media/phantomx-walk.mp4) · [地形演示](docs/media/phantomx-terrain.mp4) · [项目定位](README.md#from-training-to-gameplay)
 
 视频展示历史策略的表现。新策略需要在目标场景中单独评估。
 
@@ -49,7 +49,7 @@ https://github.com/user-attachments/assets/54cee6e4-43f3-4293-963f-9a206a7c94d3
 发布前还需要验证策略质量、目标场景表现，以及独立环境下的构建和打包。
 详见[发布准备](docs/release-readiness.md)。
 
-Egypt 游戏场景需要自行完成[可选 Fab 内容安装](docs/how-to/optional-egypt-demo.md)。
+Egypt 游戏场景需要自行完成[可选 Fab 内容安装](docs/deployment.md#optional-egypt-demo)。
 请通过自己的账号获取 [Stylized Egypt](https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd)，以页面实际条款为准。
 该场景的源资产不在当前源码树中。
 默认游戏地图是空的 Engine Entry 地图；使用 Egypt 演示时，需要明确打开已安装的地图。
@@ -85,7 +85,7 @@ Chaos 仿真在 UE 中运行。选择 CPU 策略执行仍然需要 UE。
 目前没有已验证的最低内存、显存或吞吐保证。
 
 宿主项目启用 `UERLEngine`、`ProceduralMeshComponent` 和 `NNERuntimeORT`。
-构建前请确认引擎提供后两个插件。遇到问题可查阅[故障排查](docs/troubleshooting.md)。
+构建前请确认引擎提供后两个插件。遇到问题可查阅[故障排查](docs/training.md#troubleshooting)。
 
 ### 安装与构建
 
@@ -114,7 +114,7 @@ uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
 
 Task 检查验证 Python 声明，不验证 UE 二进制、内容加载或 GPU 可用性。
 `uv run uerl check host` 提供静态 CartPole 宿主文件检查。
-使用[宿主配置](docs/how-to/ue-host-profile.md)保存引擎与项目路径。
+使用[宿主配置](docs/training.md#ue-host-profile)保存引擎与项目路径。
 
 ### 运行最小训练验证
 
@@ -143,7 +143,7 @@ uv run uerl train --task UERL-PhantomX-ContinuousTerrain-v0 --run-name terrain
 
 连续地形任务默认使用 64 个 Slot，平地步行任务默认使用 512 个 Slot。
 一个 Slot 表示一个机器人实例及其任务状态。
-调整并行数量或恢复旧 checkpoint 前，阅读[训练与评估指南](docs/how-to/phantomx-robust-training.md)。
+调整并行数量或恢复旧 checkpoint 前，阅读[训练与评估指南](docs/training.md#phantomx-robust-training)。
 
 ### 评估与录制
 
@@ -160,7 +160,7 @@ uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terra
 
 评估时同时查看实际速度、指令误差、摔倒和完成的 episode 数。
 机器人不摔倒，并不代表能够跟踪运动指令。
-录制及键盘控制请看[回放与视频指南](docs/how-to/record-video.md)。
+录制及键盘控制请看[回放与视频指南](docs/training.md#record-video)。
 
 ### 导出并接入游戏
 
@@ -174,8 +174,8 @@ uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task
 目标 Editor 构建成功后，可以添加 `--import` 执行导入；只读检查使用 `deploy --check`。
 
 游戏代码提供目标与指令，策略负责对应的物理控制。
-有关 Blueprint、物理设置和打包，请看[游戏部署指南](docs/in-game-deployment-guide.md)。
-在目标地图中按[部署验证流程](docs/how-to/policy-deployment-validation.md)检查结果。
+有关 Blueprint、物理设置和打包，请看[游戏部署指南](docs/deployment.md#in-game-deployment-guide)。
+在目标地图中按[部署验证流程](docs/deployment.md#policy-deployment-validation)检查结果。
 
 ## 参考任务
 
@@ -189,11 +189,20 @@ uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task
 
 用 `uerl config --task <TaskID>` 查看实际解析后的默认配置。
 机器人声明位于 `src/uerl/assets/robots/`。Task 工厂可以覆盖基础 YAML 设置。
-详见[配置指南](docs/configuration.md)。
+详见[配置指南](docs/training.md#configuration)。
 
 ## 文档与贡献
 
-[开发者学习路径](docs/README.md#build-your-first-game-robot) · [文档索引](docs/README.md) · [添加机器人](docs/how-to/add-a-robot.md) · [外部任务](docs/how-to/external-tasks.md) · [架构](docs/architecture.md) · [术语](CONTEXT.md)
+| 我想做什么 | 阅读文档 |
+|---|---|
+| 配置宿主、添加机器人或任务、训练、评估与录制 | [训练指南](docs/training.md) |
+| 导入策略、接入游戏指令、验证与打包 | [部署指南](docs/deployment.md) |
+| 理解接口、单位、时序与扩展约定 | [架构说明](docs/architecture.md) |
+| 编写测试、执行检查或测量运行开销 | [测试指南](tests/README.md) |
+| 提出、审阅、验证与合并改动 | [贡献指南](CONTRIBUTING.md) |
+
+开发计划、审查记录和实验进度放在 [Issues](https://github.com/zpyc1oud/EmbodiedUE/issues) 与 PR 中。
+仓库文档保留可复用的使用与维护说明，不为每一步开发新增记录文件。
 
 安装依赖后，可运行纯 Python 测试：
 
@@ -202,11 +211,8 @@ uv run pytest -q
 ```
 
 UE Automation、端到端训练、录制和打包需要 Windows/UE 宿主环境。
-根据改动范围选择[验证层级](docs/contribution-workflow.md)，并阅读[测试编写指南](docs/how-to/write-tests.md)。
 软件测试通过与策略行为达到预期，是两项不同的检查。
-
-参与开发请阅读[贡献指南](CONTRIBUTING.md)。
-其他文档：[测试](tests/README.md)、[安全](SECURITY.md)、[变更记录](CHANGELOG.md)。
+其他项目说明：[安全](SECURITY.md)、[变更记录](CHANGELOG.md)、[发布准备](docs/release-readiness.md)。
 
 ## 许可证与资产
 

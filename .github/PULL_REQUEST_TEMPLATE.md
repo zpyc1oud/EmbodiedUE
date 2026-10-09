@@ -29,5 +29,5 @@ For an integration batch, identify the batch PR and pending UE acceptance.
 List blockers, remaining work, and the owner of each missing result.
 Confirm that shared logs are redacted and contributed assets have redistribution permission.
 
-Use the [contribution workflow](../docs/contribution-workflow.md) and [test guide](../tests/README.md).
+Use the [contribution workflow](../CONTRIBUTING.md#contribution-workflow) and [test guide](../tests/README.md#test-suites).
 Keep this PR in Draft until its required evidence is ready.

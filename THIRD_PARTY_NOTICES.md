@@ -54,5 +54,5 @@ Examples provisions are distinct; directory names alone do not determine rights.
 The current tree excludes the Fab collection and its text map export.
 The removal did not change third-party rights.
 Original integration code remains. See the
-[asset exclusion and history plan](docs/asset-publication-plan.md) and
+[asset exclusion and history plan](docs/release-readiness.md#remaining-publication-decisions) and
 [remaining release decisions](docs/release-readiness.md).

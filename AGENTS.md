@@ -2,19 +2,19 @@
 
 Build a robot training and deployment platform for Unreal Engine game developers.
 Train control policies in UE 5.8 Chaos and deploy them on physics-driven robots in games.
-Use `docs/product-direction.md` for audience, scope, and design priorities.
+Use `README.md` for audience, scope, and design priorities.
 Keep implemented capabilities separate from intended adaptive behavior.
 
 ## Read the applicable guide
 
 - For installation, commands, and directory layout, read `README.md`.
-- For domain contracts or timing changes, read `CONTEXT.md`.
+- For domain contracts or timing changes, read `docs/architecture.md`.
 - For system boundaries and design decisions, read `docs/architecture.md`.
-- For topic-specific documentation, use `docs/README.md`.
-- For proposals, validation, review, merge, and release, use `docs/contribution-workflow.md`.
-- For shared UE validation, use `docs/how-to/batch-validation.md`.
-- For robot integration, video, and deployment, use `docs/how-to/README.md`.
-- Before you add or change tests, read `docs/how-to/write-tests.md` and `tests/README.md`.
+- For topic-specific documentation, use `README.md`.
+- For proposals, validation, review, merge, and release, use `CONTRIBUTING.md`.
+- For shared UE validation, use `CONTRIBUTING.md`.
+- For robot integration, video, and deployment, use `docs/training.md` and `docs/deployment.md`.
+- Before you add or change tests, read `tests/README.md`.
 
 The contribution workflow does not extend the user's action authorization.
 

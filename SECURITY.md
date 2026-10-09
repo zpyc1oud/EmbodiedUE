@@ -24,7 +24,7 @@ Keep exploit details and secret values out of the public request.
 
 Include the affected version or commit, component, impact, and a minimal reproduction.
 Remove sensitive data from the report.
-For ordinary bugs, use [Contributing](CONTRIBUTING.md).
+For ordinary bugs, use [Contributing](CONTRIBUTING.md#contributing).
 
 If a credential is exposed, the owner should revoke or rotate it.
 The owner should also examine the affected repository history.
