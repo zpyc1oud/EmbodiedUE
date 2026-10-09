@@ -11,7 +11,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace UERLGroundQueryTest
 {
 	AActor* SpawnWorldStaticBox(UWorld& World, const FVector& Location, const FVector& Scale)
 	{
@@ -59,8 +59,8 @@ bool FUERLGroundQueryBindingsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	// The engine cube is 100 cm wide. These top surfaces are exactly 0 and 50 cm.
-	AActor* Floor = SpawnWorldStaticBox(*World, FVector(0.0, 0.0, -25.0), FVector(10.0, 10.0, 0.5));
-	AActor* Step = SpawnWorldStaticBox(*World, FVector(75.0, 0.0, 25.0), FVector(1.0, 1.0, 0.5));
+	AActor* Floor = UERLGroundQueryTest::SpawnWorldStaticBox(*World, FVector(0.0, 0.0, -25.0), FVector(10.0, 10.0, 0.5));
+	AActor* Step = UERLGroundQueryTest::SpawnWorldStaticBox(*World, FVector(75.0, 0.0, 25.0), FVector(1.0, 1.0, 0.5));
 	if (!TestNotNull(TEXT("floor exists"), Floor) || !TestNotNull(TEXT("step exists"), Step))
 	{
 		return false;
