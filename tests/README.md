@@ -194,6 +194,8 @@ The delay is test instrumentation, not a product setting or wire configuration.
 Manager cases use fixed inputs and independent expected constants.
 DirectEnv cases cover termination, reward, curriculum, reset, commands, interval events, and the next observation in their required order.
 Sparse reset assertions use stable Slot IDs.
+Command-clock cases check that a new reset command receives its full interval.
+The completed window advances continuing Slots, but does not age a new episode command.
 Event cases use distinct fixed intervals to expose timer interference.
 Reset events create Session reset payloads.
 Interval events run after reset.
