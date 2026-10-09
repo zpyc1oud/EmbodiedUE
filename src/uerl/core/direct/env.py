@@ -553,7 +553,6 @@ class UERLDirectEnv:
             post_reset = post_reset_state
             if self.event_manager is not None:
                 self.event_manager.reset(reset_mask)
-            self.task.on_reset(reset_mask, post_reset_state.values)
             for name, value in next_values.items():
                 value[reset_mask] = post_reset_state.values[name][reset_mask]
             next_state_valid[reset_mask] = post_reset_state.state_valid[reset_mask]
@@ -563,13 +562,19 @@ class UERLDirectEnv:
             next_episode_index = _merge_metadata_rows(
                 next_episode_index, post_reset_state.episode_index, reset_mask
             )
+            # Consume the completed window before reset installs new command timers.
+            # Use merged valid state so faulted rows do not reach command math.
+            self.task.refresh_command(next_values, dt=transition_dt)
+            self.task.on_reset(reset_mask, post_reset_state.values)
             self.episode_length_buf[reset_mask] = 0
             self.episode_solver_steps[reset_mask] = 0
             self._episode_return[reset_mask] = 0.0
             next_policy_actions[reset_mask] = 0.0
             next_action_interval_dt[reset_mask] = self._physics_dt * self._decimation_range[0]
 
-        self.task.refresh_command(next_values, dt=transition_dt)
+        self.task.refresh_command(
+            next_values, dt=None if bool(reset_mask.any()) else transition_dt
+        )
         if self.event_manager is not None:
             self.event_manager.apply("interval", dt=transition_dt)
             self._flush_event_effects()

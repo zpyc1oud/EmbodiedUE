@@ -559,6 +559,81 @@ def test_ac_py_unit_env_003_resampled_command_scores_only_the_next_action() -> N
     assert torch.equal(curriculum.steps[0].command_velocity, torch.tensor([[0.25, 0.0], [0.25, 0.0]]))
 
 
+
+@pytest.mark.parametrize("reset_reason", ["timeout", "termination", "fault"])
+@pytest.mark.parametrize("control_dt", [0.02, 0.035])
+def test_reset_command_clock_excludes_the_previous_episode_window(
+    reset_reason: str, control_dt: float,
+) -> None:
+    """A new command gets its full interval; other Slots consume the completed dt."""
+
+    class TimedCommand:
+        def __init__(self) -> None:
+            self.remaining = torch.zeros(2, dtype=torch.float64)
+            self.velocity = torch.zeros(2, 3)
+            self.pending_dt = 0.0
+
+        def channels(self) -> Mapping[str, int]:
+            return {"velocity": 3}
+
+        def current(self) -> Mapping[str, torch.Tensor]:
+            return {"velocity": self.velocity}
+
+        def reset(self, mask: torch.Tensor, _state: Mapping[str, torch.Tensor]) -> None:
+            self.remaining[mask] = 1.0
+            self.velocity[mask, 0] += 1.0
+
+        def note_control_dt(self, dt: float) -> None:
+            self.pending_dt = dt
+
+        def update(self, _state: Mapping[str, torch.Tensor]) -> None:
+            assert torch.isfinite(_state["state.value"]).all()
+            self.remaining -= self.pending_dt
+            self.pending_dt = 0.0
+
+    class CommandTask(_LifecycleTask):
+        def __init__(self) -> None:
+            super().__init__(max_episode_steps=100)
+            self.use_command_source(TimedCommand())
+
+        def compute_rewards(self, context: StepContext, _terminations: TerminationResult) -> torch.Tensor:
+            return context.transition_state["velocity"][:, 0].clone()
+
+        def build_observations(
+            self, raw_state: Mapping[str, torch.Tensor], state_valid: torch.Tensor,
+            previous_policy_actions: torch.Tensor, control_frame_dt: torch.Tensor | None = None,
+        ) -> Mapping[str, torch.Tensor]:
+            del raw_state, state_valid, previous_policy_actions, control_frame_dt
+            velocity = self.published_velocity()
+            assert velocity is not None
+            return {"policy": velocity[:, :1].clone()}
+
+    transition = _state(
+        [float("nan") if reset_reason == "fault" else 1.2 if reset_reason == "termination" else 0.2, 0.2],
+        faults=[1 if reset_reason == "fault" else 0, 0],
+    )
+    session = _FakeDirectSession(transition, _post_reset([0.1, 0.1]))
+    task = CommandTask()
+    env = UERLDirectEnv(
+        session, task, resolved_config=_resolved_config(0, physics_dt=control_dt),
+    )
+    source = cast(TimedCommand, task.command_source)
+    assert source.remaining.tolist() == [1.0, 1.0]
+    if reset_reason == "timeout":
+        env.episode_length_buf[0] = 99
+
+    observations, rewards, terminated, truncated, info = env.step(torch.zeros(2, 1))
+
+    assert (terminated | truncated).tolist() == [True, False]
+    assert source.remaining.tolist() == pytest.approx([1.0, 1.0 - control_dt])
+    assert observations["policy"].flatten().tolist() == [2.0, 1.0]
+    assert info["terminal_observation"]["policy"].flatten().tolist() == [1.0, 1.0]
+    assert rewards.tolist() == [task.slot_fault_reward if reset_reason == "fault" else 1.0, 1.0]
+    session.transition = _state([0.2, 0.2])
+    env.step(torch.zeros(2, 1))
+    assert source.remaining.tolist() == pytest.approx([1.0 - control_dt, 1.0 - 2 * control_dt])
+    env.close()
+
 def test_ac_py_unit_env_004_restoring_terrain_curriculum_starts_on_saved_levels() -> None:
     session = _FakeDirectSession(_state([0.2, 0.2]), _post_reset([0.1, 0.2]))
     env = UERLDirectEnv(
