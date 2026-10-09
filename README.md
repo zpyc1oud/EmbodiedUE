@@ -1,29 +1,56 @@
-# EmbodiedUE · UE RL Engine
+# EmbodiedUE — Train Robots for Unreal Games
 
-Train robot control policies in **Unreal Engine 5.8 / Chaos**.
-Then run the exported policies on Skeletal Mesh robots in a UE game.
-Python owns the Task and PPO training.
-The UE plugin owns physics, observations, and in-game inference.
+**English** | [简体中文](README.zh-CN.md)
 
-The project includes CartPole and PhantomX hexapod Tasks.
-It uses **rsl-rl**.
-Python training and C++ deployment share observation and action plans.
-Isaac Sim and Isaac Lab are not runtime dependencies.
+A robot training and deployment platform for **Unreal Engine game developers**.
+Train a control policy in **UE 5.8 / Chaos**, then run it on a physics-driven robot in your game.
 
-<video src="docs/media/phantomx-walk.mp4" controls muted playsinline width="720"></video>
+The goal is to give game robots movement that responds to their physical state and surroundings.
+Developers define the robot, the training task, and the gameplay commands.
+A learned policy controls the robot's joints while Chaos simulates its bodies and contacts.
+
+## From training to gameplay
+
+1. **Build a robot.** Define its bodies, joints, collision geometry, and actuators.
+2. **Teach a behavior.** Define observations, commands, rewards, and training conditions in Python.
+3. **Measure the result.** Evaluate command tracking, stability, and performance in the target conditions.
+4. **Use it in a game.** Export the policy and connect the UE runtime to gameplay commands.
+
+Game code decides what the robot should do.
+The policy handles the trained physical control task.
+The game runs the exported network; training uses Python and **rsl-rl**.
+Training and deployment share observation and action plans and use the same physics backend.
+
+CartPole provides a small starting example.
+PhantomX provides the current locomotion and game-deployment example.
+They exercise reusable platform interfaces for future robot integrations.
+See [product direction](docs/product-direction.md) for the intended audience, current scope, and design priorities.
+
+## Demos
+
+### Walking
+
+https://github.com/user-attachments/assets/eb8b7149-0238-4596-8da4-c0415cfd1e0b
+
+### Terrain
+
+https://github.com/user-attachments/assets/54cee6e4-43f3-4293-963f-9a206a7c94d3
 
 [Watch the walking demo](docs/media/phantomx-walk.mp4) · [Terrain demo](docs/media/phantomx-terrain.mp4)
 
-These videos show sample policies.
-They do not guarantee the performance of a new model.
+These videos show sample policies from earlier runs.
+Use them to see the intended interaction; evaluate each new policy in its target scene.
 
 ## Project status: Early-Stage
 
-EmbodiedUE is an early-stage project.
-APIs, artifact formats, and procedures can change.
-The project does not guarantee backward compatibility or readiness for production.
-Python checks do not establish UE runtime compatibility.
-The release review still requires build, training, import, and packaging validation on a clean Windows/UE host.
+EmbodiedUE is in active development.
+The repository contains training, evaluation, export, and in-game inference paths.
+Reliable adaptive robot behavior across game scenes remains a development goal.
+A completed training run or a successful import does not establish that behavior.
+
+APIs, artifact formats, and procedures can change without backward compatibility.
+Production readiness requires measured policy quality, target-scene behavior, and clean-host build and packaging results.
+See [release readiness](docs/release-readiness.md) for the remaining release requirements.
 
 The Egypt gameplay scene is an [optional Fab installation](docs/how-to/optional-egypt-demo.md).
 Acquire [Stylized Egypt](https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd)
@@ -176,7 +203,7 @@ See [configuration](docs/configuration.md).
 
 ## Documentation and development
 
-[Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+[Developer learning path](docs/README.md#build-your-first-game-robot) · [Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 For Python-only development after installation:
 
@@ -185,8 +212,8 @@ uv run pytest -q
 ```
 
 UE Automation, end-to-end training, recording, and packaging require the Windows/UE host.
-This documentation update does not include new Windows/UE execution evidence.
-Python-only validation does not establish runtime compatibility or policy performance.
+Select validation for the changed behavior with the [contribution workflow](docs/contribution-workflow.md).
+Measure policy quality in addition to software correctness.
 Use [Write tests](docs/how-to/write-tests.md) for project-specific test implementation and review.
 
 ## License

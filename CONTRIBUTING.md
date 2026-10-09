@@ -1,6 +1,8 @@
 # Contributing
 
-EmbodiedUE contains Python training code, a UE 5.8 C++ plugin, and binary content.
+EmbodiedUE helps game developers train and deploy physics-driven robots in Unreal Engine.
+It contains Python training code, a UE 5.8 C++ plugin, and binary content.
+Read the [product direction](docs/product-direction.md) before proposing a new feature.
 Start with [setup](README.md#getting-started), [architecture](docs/architecture.md), and the [domain glossary](CONTEXT.md).
 
 Original project code, documentation, and configuration use [Apache-2.0](LICENSE).
@@ -50,7 +52,9 @@ Report an unavailable runtime check as blocked.
 
 ## Documentation and examples
 
-Write public documentation in English.
+Write the main documentation in English.
+Keep `README.zh-CN.md` aligned with the English README when first-use steps or product claims change.
+Both READMEs must use the same commands, Task IDs, defaults, and support scope.
 Use short sentences and consistent project terms.
 Put prerequisites before instructions.
 Put expected results next to the related action.
@@ -69,6 +73,31 @@ For documentation changes, do these checks:
 - Compare defaults with resolved configurations.
 
 Do not start training solely for a documentation change.
+
+### Organize documentation for the reader
+
+Keep four kinds of content easy to find:
+
+- The README explains the product and gives a small first-use path.
+- Procedure guides state prerequisites, actions, expected results, and the next step.
+- Technical references define configuration, interfaces, and ownership.
+- Design records state their status and link to implementation work.
+
+Keep the game developer's workflow visible in the documentation index.
+Use existing guides for details instead of repeating long procedures on several pages.
+A recording illustrates behavior; measurements establish the result for a specified setup.
+
+The following official projects provide useful documentation patterns:
+
+| Reference | Pattern used here |
+|---|---|
+| [Isaac Lab README](https://github.com/isaac-sim/IsaacLab) | A clear product introduction with separate installation, learning, and task entry points |
+| [Unity ML-Agents getting started](https://unity-technologies.github.io/ml-agents/Getting-Started/) | A complete example that connects training to a model running in a game environment |
+| [MuJoCo documentation](https://mujoco.readthedocs.io/en/stable/overview.html) | Separate overview, modeling, programming, and technical reference sections |
+| [Godot documentation introduction](https://docs.godotengine.org/en/stable/about/introduction.html#organization-of-the-documentation) | Distinct paths for new users, feature lookup, and engine contributors |
+
+Use these structural ideas with EmbodiedUE's supported commands and behavior.
+Write project-specific explanations rather than copy another project's prose or capability claims.
 
 ## Review evidence
 

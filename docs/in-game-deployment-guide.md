@@ -1,5 +1,9 @@
 # In-game policy deployment
 
+Use a trained robot controller as part of your Unreal game.
+Gameplay code supplies commands; the policy controls the robot through its physics setup.
+Evaluate its response in the target map before using it as a gameplay feature.
+
 Deploy a `.uerlpol2` policy on a Skeletal Mesh Actor in UE 5.8.
 Inference uses the imported `UUERLPolicyArtifactAsset`, its mesh, and its PhysicsAsset.
 Editor import and reimport require the source `.uerlpol2`.
@@ -8,6 +12,24 @@ The packaged game does not need that source as a loose file.
 After [optional Fab installation and setup](how-to/optional-egypt-demo.md), `Stylized_Egypt_Demo` gameplay spawns PhantomX to pursue the player.
 For another game, use `BP_UERLPolicyRobot` or `UUERLPolicyComponent`.
 The host GameMode is demonstration code.
+
+## Before you deploy
+
+Prepare a trained Run, matching robot assets, and a target UE project.
+First [evaluate the policy](how-to/phantomx-robust-training.md#per-level-evaluation) against the commands and conditions you intend to use.
+Keep a version-controlled backup of the target project because deployment changes its files and settings.
+
+Follow this sequence:
+
+1. Install the runtime in the target project and build its Editor.
+2. Import the exported policy and resolve its robot mesh.
+3. Set the supported game physics configuration.
+4. Place the robot, supply every required command channel, and start the policy.
+5. Validate physical response and behavior in the target scene.
+6. Cook and test the packaged game.
+
+The sections below give the commands and component details for each step.
+Use [deployment validation](how-to/policy-deployment-validation.md) for the acceptance procedure.
 
 ## Prepare a target project
 

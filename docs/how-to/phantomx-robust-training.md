@@ -4,6 +4,17 @@ This guide describes the current objective for `UERL-PhantomX-ContinuousTerrain-
 Flat-ground, discrete-terrain, and Pursuit Tasks use the same physical-time reward and episode rules.
 The terrain-level curriculum applies to Tasks with procedural terrain.
 
+## Before you train
+
+Complete [installation and the small smoke test](../../README.md#getting-started).
+Save the UE paths in a [host profile](ue-host-profile.md).
+Choose the commands and terrain conditions that your game needs, then inspect the resolved Task configuration.
+
+Use [Start and resume a Run](#start-and-resume-a-run) for the commands.
+Keep the printed Run directory for evaluation and export.
+Use [Per-level evaluation](#per-level-evaluation) to measure behavior before deployment.
+After evaluation, follow [in-game deployment](../in-game-deployment-guide.md).
+
 ## Terrain configuration and parallel Slots
 
 [continuous.yaml](../../src/uerl/configs/environments/terrains/phantomx/continuous.yaml) defines eight difficulty levels and their generation parameters.

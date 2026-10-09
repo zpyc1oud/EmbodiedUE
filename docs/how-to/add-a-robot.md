@@ -5,6 +5,18 @@ Supported robots share the existing UE runtime, action schema, and reset path.
 CartPole and PhantomX are the reference integrations.
 See [architecture](../architecture.md#robot-integration) for the supported boundaries.
 
+## Before you start
+
+Complete the [host setup](../../README.md#getting-started).
+Prepare a robot asset with body and joint names that you can match to its Python declaration.
+For a game-deployable Task, choose an exportable observation and action path before training.
+See [external Tasks](external-tasks.md) if you want to keep your Task in a separate package.
+
+The result of this guide is a registered integration ready for training and physical validation.
+Generating files alone does not validate the robot's dynamics.
+
+## Create starter files
+
 To create starter files, run:
 
 ```powershell
