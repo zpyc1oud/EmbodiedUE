@@ -32,7 +32,7 @@ class PhantomXCommandCurriculum(CurriculumTerm):
         self._stage = 0
         self._turn_enabled = torch.zeros(num_envs, dtype=torch.bool, device=self.device)
         self._error_sum = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
-        self._valid_steps = torch.zeros(num_envs, dtype=torch.long, device=self.device)
+        self._valid_seconds = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
         self._straight_history: deque[bool] = deque(maxlen=curriculum.window_episodes)
         self._turn_history: deque[bool] = deque(maxlen=curriculum.window_episodes)
 
@@ -50,17 +50,18 @@ class PhantomXCommandCurriculum(CurriculumTerm):
             error = step.metrics["phantomx/linear_velocity_error"]
             if not isinstance(error, torch.Tensor):
                 raise TypeError("phantomx linear velocity error metric must be a tensor")
-            self._error_sum[valid] += error[valid].to(device=self.device, dtype=torch.float32)
-            self._valid_steps[valid] += 1
+            self._error_sum[valid] += error[valid].to(device=self.device, dtype=torch.float32) * step.transition_dt
+            self._valid_seconds[valid] += step.transition_dt
 
         completed = step.terminated | step.truncated
         for slot_id in torch.nonzero(completed, as_tuple=False).flatten().tolist():
-            mean_error = self._error_sum[slot_id] / self._valid_steps[slot_id].clamp_min(1)
+            mean_error = self._error_sum[slot_id] / self._valid_seconds[slot_id].clamp_min(1e-12)
             # Only a pure timeout is a successful curriculum episode; a
             # physical failure must not be upgraded by an overlapping timeout.
             succeeded = (
                 bool(step.truncated[slot_id])
                 and not bool(step.terminated[slot_id])
+                and bool(self._valid_seconds[slot_id] > 0.0)
                 and bool(mean_error < self.config.velocity_error_threshold)
             )
             history = self._turn_history if bool(self._turn_enabled[slot_id]) else self._straight_history
@@ -93,7 +94,7 @@ class PhantomXCommandCurriculum(CurriculumTerm):
         del post_reset_state
         self._turn_enabled[reset_mask] = self._stage == 1
         self._error_sum[reset_mask] = 0.0
-        self._valid_steps[reset_mask] = 0
+        self._valid_seconds[reset_mask] = 0
 
     def state_dict(self) -> Mapping[str, object]:
         """Persist global stage and rolling promotion evidence."""
@@ -125,7 +126,7 @@ class PhantomXCommandCurriculum(CurriculumTerm):
         self._turn_history = deque(turn_history, maxlen=self.config.window_episodes)
         self._turn_enabled.fill_(self._stage == 1)
         self._error_sum.zero_()
-        self._valid_steps.zero_()
+        self._valid_seconds.zero_()
 
 
 def create_phantomx_curriculum(

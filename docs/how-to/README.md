@@ -5,6 +5,7 @@ Complete [Getting started](../../README.md#getting-started) before you use a run
 | Guide | Purpose |
 |---|---|
 | [Reusable host profile](ue-host-profile.md) | Save host paths and do static CartPole checks |
+| [PhantomX flat-ground baseline](phantomx-flat-baseline.md) | Fix the initial task, measure tracking, and separate smoke from learning acceptance |
 | [PhantomX training and evaluation](phantomx-robust-training.md) | Configure terrain, physical-time objectives, checkpoints, and evaluation |
 | [Static-ground policy deployment validation](policy-deployment-validation.md) | Separate numerical parity, fixed-action response, target-scene behavior, and fault recovery |
 | [Record video](record-video.md) | Record UE viewport inference and use keyboard commands |
