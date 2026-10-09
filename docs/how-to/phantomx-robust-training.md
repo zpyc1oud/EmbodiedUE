@@ -117,10 +117,13 @@ $runDir = 'runs/UERL-PhantomX-ContinuousTerrain-v0/<run-directory>'
 }
 ```
 
-Compare completed episodes, success and fall rates, forward velocity, speed error, and body vibration.
-The metric `success_rate` counts completed episodes without base contact.
+Compare completed episodes, survival and fall rates, velocity RMSE, and body vibration.
+The metric `survival_rate` counts completed timeout episodes without base contact.
+It replaces the misleading `success_rate` output name.
 It does not establish command tracking.
 A stationary robot can have a high survival rate.
 The mean curriculum level or a video alone is also insufficient evidence.
+
+Start with the [flat-ground baseline](phantomx-flat-baseline.md) before terrain training.
 
 See [recording](record-video.md) and [test boundaries](../../tests/README.md).

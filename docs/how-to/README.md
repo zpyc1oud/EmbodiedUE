@@ -21,6 +21,7 @@ See [external Tasks](external-tasks.md#create-a-directtask-python-hooks-package)
 
 | I want to… | Guide | Result |
 |---|---|---|
+| Establish a bounded flat-ground reference | [Flat-ground baseline](phantomx-flat-baseline.md) | Separate tracking and survival measurements |
 | Train, resume, and evaluate PhantomX | [Training and evaluation](phantomx-robust-training.md) | A saved Run and per-condition measurements |
 | Record playback or use keyboard commands | [Record video](record-video.md) | An MP4 of the selected Run |
 | Measure simulation cost separately from learning | [Runtime benchmark](runtime-benchmark.md) | Runtime measurements for a declared setup |

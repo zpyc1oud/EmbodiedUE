@@ -320,3 +320,46 @@ def test_command_channel_matches_recorded_injection_sequence() -> None:
         promote.update(_completed_step(success=(True, True)))
     expected_turn = expected_commands(episode_counts=(1, 1), turn=True)
     assert_matches(_sample(promote, promote_command, reset_mask, _state()), expected_turn)
+
+
+def test_promotion_weights_tracking_error_by_completed_physical_time() -> None:
+    """A long poorly tracked interval must not be hidden by a short good one."""
+    from dataclasses import replace
+
+    config = PhantomXCurriculumConfig(window_episodes=2, minimum_episodes=2,
+                                     promotion_success_rate=1.0, velocity_error_threshold=0.3)
+    term = PhantomXCommandCurriculum(config, _commands(), num_envs=2, device="cpu", run_seed=0)
+    base = _completed_step(success=(True, True))
+    term.update(replace(base, metrics={"phantomx/linear_velocity_error": torch.tensor([0.0, 0.4])},
+                        truncated=torch.zeros(2, dtype=torch.bool), transition_dt=0.005))
+    result = term.update(replace(base, metrics={"phantomx/linear_velocity_error": torch.tensor([0.4, 0.0])},
+                                 transition_dt=0.035))
+    # Errors are .35 and .05 m/s. Only one episode qualifies; no promotion.
+    assert result["stage"] == 0.0
+    assert result["success_rate"] == 0.5
+
+
+def test_time_weighted_curriculum_sparse_reset_preserves_other_episode() -> None:
+    from dataclasses import replace
+
+    config = PhantomXCurriculumConfig(window_episodes=4, minimum_episodes=4,
+                                     promotion_success_rate=1.0, velocity_error_threshold=0.3)
+    term = PhantomXCommandCurriculum(config, _commands(), num_envs=2, device="cpu", run_seed=0)
+    base = _completed_step(success=(True, True))
+    term.update(replace(base, metrics={"phantomx/linear_velocity_error": torch.tensor([0.4, 0.4])},
+                        truncated=torch.tensor([True, False]), transition_dt=0.035))
+    term.reset(torch.tensor([True, False]), _state())
+    term.update(replace(base, metrics={"phantomx/linear_velocity_error": torch.tensor([0.0, 0.0])},
+                        transition_dt=0.005))
+    assert term.state_dict()["straight_history"] == [False, True, False]
+
+
+def test_curriculum_timeout_without_valid_physical_samples_is_not_success() -> None:
+    from dataclasses import replace
+
+    config = PhantomXCurriculumConfig(window_episodes=2, minimum_episodes=2, promotion_success_rate=1.0)
+    term = PhantomXCommandCurriculum(config, _commands(), num_envs=2, device="cpu", run_seed=0)
+    result = term.update(replace(_completed_step(success=(True, True)),
+                                 state_valid=torch.zeros(2, dtype=torch.bool)))
+    assert result["stage"] == 0.0
+    assert result["success_rate"] == 0.0

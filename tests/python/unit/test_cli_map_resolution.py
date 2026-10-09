@@ -78,7 +78,7 @@ def test_play_map_flag_sets_expected_map_in_attach_mode(
                 completed_episodes=0,
                 mean_forward_velocity=0.0,
                 mean_speed_error=0.0,
-                success_rate=0.0,
+                survival_rate=0.0,
                 fall_rate=0.0,
             base_contact_rate=0.0,
             mean_episode_length=0.0,
