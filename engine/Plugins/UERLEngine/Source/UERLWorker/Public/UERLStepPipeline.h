@@ -7,6 +7,7 @@
 #include "UERLStepPipeline.generated.h"
 
 class UUERLStepPipeline;
+class FUERLWorkerSolverScheduling;
 
 struct FUERLPrePhysicsTickFunction final : public FTickFunction
 {
@@ -95,6 +96,9 @@ private:
 	int32 LastAckSolverFrame = 0;
 	double LastAckSolverTime = 0.0;
 	int64 CompletedSteps = 0;
+
+	/** Scoped outer dispatch for a headless Worker; restored at deactivation. */
+	TUniquePtr<FUERLWorkerSolverScheduling> SolverScheduling;
 
 	/** Viewport-only observation layer; never constructed in headless sessions. */
 	TUniquePtr<FUERLViewportObserver> ViewportObserver;

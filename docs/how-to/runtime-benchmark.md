@@ -86,3 +86,22 @@ Before accepting a speedup, run the affected native and real UE checks. Replay
 the same bounded action sequence at both revisions. Compare physical state,
 observations, fault handling and reset behavior with the existing tolerances.
 Do not change solver settings or reduce sensing to improve this comparison.
+
+## Inspect the physics phase
+
+The Worker `physics_frame` timer spans its PrePhysics and PostPhysics hooks.
+It includes the solver task wait and game-thread result synchronization.
+Use a bounded CPU trace to separate these costs before changing the solver.
+[Unreal Insights](https://dev.epicgames.com/documentation/unreal-engine/using-the-timers-and-counters-tabs-in-unreal-insights-for-unreal-engine)
+can export timer statistics for a selected time interval without opening its UI.
+Exclude initialization and warmup. Do not add parent/child inclusive timers or
+concurrent worker-thread time to the game-thread wait. Measure throughput again
+without tracing when comparing revisions.
+
+A headless Worker uses Scene-local synchronous outer solver dispatch. It calls
+the same Chaos advancement code and retains the normal per-frame result sync.
+The scheduling scope restores the previous mode when the Worker deactivates.
+It does not change the buffer mode, fixed dt, substep configuration, solver
+iterations or collision settings. Rendered Workers and game deployment retain
+their existing scheduling. A changed dispatch order still requires trajectory,
+reset and lifecycle validation on the matching UE build.

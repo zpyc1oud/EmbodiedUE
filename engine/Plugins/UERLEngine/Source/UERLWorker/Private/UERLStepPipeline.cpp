@@ -4,6 +4,9 @@
 #include "UERLPhysicsSnapshot.h"
 #include "UERLWorkerLog.h"
 #include "UERLWorkerRuntime.h"
+#include "UERLWorkerSolverScheduling.h"
+
+#include "Misc/App.h"
 
 #include "Engine/Level.h"
 #include "Engine/World.h"
@@ -52,12 +55,28 @@ bool UUERLStepPipeline::ActivateForWorker()
 	}
 
 	RunStartupGateChecks();
+	if (bGatePassed && !FApp::CanEverRender()
+		&& FUERLWorkerRuntime::Get().GetConfig().PresentationMode == EUERLPresentationMode::None)
+	{
+		SolverScheduling = MakeUnique<FUERLWorkerSolverScheduling>();
+		if (!SolverScheduling->Acquire(*BoundWorld, GateFailure))
+		{
+			bGatePassed = false;
+			SolverScheduling.Reset();
+		}
+		else
+		{
+			UE_LOG(LogUERLWorker, Display,
+				TEXT("[FLOW] headless Worker advances the Scene solver on the GameThread"));
+		}
+	}
 	RegisterPhysicsTicks();
 	bReady = bTicksRegistered;
 	if (!FUERLWorkerRuntime::Get().BindPipeline(this))
 	{
 		bReady = false;
 		UnregisterPhysicsTicks();
+		SolverScheduling.Reset();
 		return false;
 	}
 
@@ -80,6 +99,7 @@ void UUERLStepPipeline::DeactivateForWorker()
 		ViewportObserver.Reset();
 	}
 	UnregisterPhysicsTicks();
+	SolverScheduling.Reset();
 	FUERLWorkerRuntime::Get().UnbindPipeline(this);
 	bReady = false;
 	bGatePassed = false;
