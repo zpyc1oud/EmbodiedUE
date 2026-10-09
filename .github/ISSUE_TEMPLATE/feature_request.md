@@ -31,4 +31,4 @@ Keep core behavior and external-content evidence separate.
 
 Describe existing options and why they do not meet the need.
 Link related Issues, Discussions, or RFCs.
-For architecture or public-contract changes, follow the [contribution workflow](../../docs/contribution-workflow.md).
+For architecture or public-contract changes, follow the [contribution workflow](../../CONTRIBUTING.md#contribution-workflow).

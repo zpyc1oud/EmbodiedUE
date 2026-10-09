@@ -24,7 +24,7 @@ Training and deployment share observation and action plans and use the same phys
 CartPole provides a small starting example.
 PhantomX provides the current locomotion and game-deployment example.
 They exercise reusable platform interfaces for future robot integrations.
-See [product direction](docs/product-direction.md) for the intended audience, current scope, and design priorities.
+See [product direction](README.md#from-training-to-gameplay) for the intended audience, current scope, and design priorities.
 
 ## Demos
 
@@ -52,7 +52,7 @@ APIs, artifact formats, and procedures can change without backward compatibility
 Production readiness requires measured policy quality, target-scene behavior, and clean-host build and packaging results.
 See [release readiness](docs/release-readiness.md) for the remaining release requirements.
 
-The Egypt gameplay scene is an [optional Fab installation](docs/how-to/optional-egypt-demo.md).
+The Egypt gameplay scene is an [optional Fab installation](docs/deployment.md#optional-egypt-demo).
 Acquire [Stylized Egypt](https://www.fab.com/listings/c935ca3e-dbb1-4b7d-a080-65de129c60bd)
 through your own account.
 The listing displayed Free on 2026-10-03.
@@ -96,7 +96,7 @@ The project has no established minimum RAM, GPU memory, or throughput guarantee.
 
 The host enables the bundled `UERLEngine` plugin and its engine dependencies, `ProceduralMeshComponent` and `NNERuntimeORT`.
 Before the build, make sure that these engine plugins are available.
-See [troubleshooting](docs/troubleshooting.md).
+See [troubleshooting](docs/training.md#troubleshooting).
 
 ### Install and build
 
@@ -130,7 +130,7 @@ uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
 The Task check validates Python declarations.
 It does not validate the installed UE binary, content loading, or GPU readiness.
 Use `uv run uerl check host` for static CartPole host file checks.
-Use a [host profile](docs/how-to/ue-host-profile.md) to save reusable paths.
+Use a [host profile](docs/training.md#ue-host-profile) to save reusable paths.
 
 ### Run a small training smoke test
 
@@ -140,7 +140,7 @@ After the Editor build succeeds:
 uv run uerl train --task UERL-CartPole-Direct-v0 --num-envs 2 --max-iterations 1 --device cpu --run-name smoke
 ```
 
-Save custom engine and project paths in the [host profile](docs/how-to/ue-host-profile.md).
+Save custom engine and project paths in the [host profile](docs/training.md#ue-host-profile).
 The commands `train`, `play`, and `export` use these paths in launch mode.
 The options `--ue-executable` and `--project` replace individual profile fields.
 These commands do not automatically read `UE_ROOT`.
@@ -157,7 +157,7 @@ Keep that directory with its resolved configuration, logs, and checkpoints.
 Generated `runs/` output is not distributed with the source.
 Continuous-terrain training defaults to 64 Slots.
 Flat-ground walking defaults to 512 Slots.
-Before you change parallelism or resume an older checkpoint, read [training and evaluation](docs/how-to/phantomx-robust-training.md).
+Before you change parallelism or resume an older checkpoint, read [training and evaluation](docs/training.md#phantomx-robust-training).
 
 ### Evaluate and record
 
@@ -170,7 +170,7 @@ uv run uerl play --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir --terra
 Playback uses one robot and starts with the registered Task curriculum.
 Use `--terrain-level` to select a procedural tier for evaluation.
 With variable decimation, a control-step count does not specify a fixed duration.
-See [recording and playback](docs/how-to/record-video.md) for keyboard control, recording options, and result interpretation.
+See [recording and playback](docs/training.md#record-video) for keyboard control, recording options, and result interpretation.
 
 ### Export and deploy
 
@@ -184,7 +184,7 @@ It is not an offline checkpoint conversion.
 Deployment copies the runtime, changes target project settings, and prints an import command.
 After the target Editor build succeeds, add `--import` to execute that import.
 Use `deploy --check` for read-only preflight.
-Use the [deployment guide](docs/in-game-deployment-guide.md) for Blueprint setup, physics settings, and packaging.
+Use the [deployment guide](docs/deployment.md#in-game-deployment-guide) for Blueprint setup, physics settings, and packaging.
 
 ## Tasks
 
@@ -199,11 +199,20 @@ Use the [deployment guide](docs/in-game-deployment-guide.md) for Blueprint setup
 Use `uerl config --task <TaskID>` for resolved defaults.
 Robot declarations are in `src/uerl/assets/robots/`.
 Task factories can replace base YAML settings.
-See [configuration](docs/configuration.md).
+See [configuration](docs/training.md#configuration).
 
 ## Documentation and development
 
-[Developer learning path](docs/README.md#build-your-first-game-robot) · [Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+| I want to… | Read |
+|---|---|
+| Configure a host, add a robot or Task, train, evaluate, or record | [Training guide](docs/training.md) |
+| Import a policy, connect gameplay commands, validate, and package | [Deployment guide](docs/deployment.md) |
+| Understand interfaces, units, timing, and extension contracts | [Architecture](docs/architecture.md) |
+| Write tests, run checks, or measure runtime cost | [Testing](tests/README.md) |
+| Propose, review, validate, or merge a contribution | [Contributing](CONTRIBUTING.md) |
+
+Use [Issues](https://github.com/zpyc1oud/EmbodiedUE/issues) and PRs for development plans, review records, and experiment progress.
+Maintain reusable instructions in these guides instead of adding a document for each development step.
 
 For Python-only development after installation:
 
@@ -212,9 +221,8 @@ uv run pytest -q
 ```
 
 UE Automation, end-to-end training, recording, and packaging require the Windows/UE host.
-Select validation for the changed behavior with the [contribution workflow](docs/contribution-workflow.md).
 Measure policy quality in addition to software correctness.
-Use [Write tests](docs/how-to/write-tests.md) for project-specific test implementation and review.
+See [Security](SECURITY.md), [Changelog](CHANGELOG.md), and [release readiness](docs/release-readiness.md) for project policy.
 
 ## License
 
