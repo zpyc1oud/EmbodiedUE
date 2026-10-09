@@ -21,9 +21,9 @@ The inventory itself does not authorize publication.
 ## General platform release gates
 
 The [platform roadmap](roadmap/next-release.md) defines a reusable training and
-deployment platform, reproducible examples, and a separate public game demo.
+deployment platform and reproducible reference examples.
 Completion of locomotion Issue #41 and deployment Issue #8 does not clear the
-complete release. Extension contracts, physical hit recovery, packaged execution,
+complete release. Extension contracts, packaged execution,
 independent setup, content inventory, documentation, and presentation also require
 evidence.
 

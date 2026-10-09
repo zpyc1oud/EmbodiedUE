@@ -1,292 +1,219 @@
 # General platform release roadmap
 
-Status: release plan proposed on 2026-10-09. Implementation is incomplete.
-The version number and release date are not assigned.
+Status: proposed release plan, updated 2026-10-09.
+The release version and date are not assigned.
 
-## Product and release outcome
+## Release goal
 
-EmbodiedUE is a reusable platform for robot policy training in Unreal Engine and
-policy deployment into games. The public demo is a reference application of this
-platform. It must not determine robot-specific behavior inside the framework.
+Release a reusable platform for robot policy training in Unreal Engine and
+policy deployment into independent UE projects. An external developer must be
+able to add supported Robots, Tasks, and inputs through documented interfaces,
+without maintaining a fork of framework internals.
 
-An external developer must be able to configure a host, add a Robot and Task,
-select supported inputs, train and evaluate, restore a saved Run, export, and
-integrate the policy into a separate UE scene. A game developer must be able to
-supply commands and physical interactions without running the Python trainer.
+The release includes the Python package, UE plugin, reference examples,
+documentation, and validation evidence. A public game demo can use the platform
+later. Its gameplay, content, interaction, and presentation choices are separate
+product decisions and are not requirements in this roadmap.
 
-The first release has three deliverables:
-
-1. The Python package and UE plugin, with documented extension contracts.
-2. Reproducible CartPole and PhantomX examples, configurations, and policy evidence.
-3. An original playable game demo and a short real-time demonstration video.
-
-This is an Early-Stage release with a bounded support statement. Generality means
-reusable interfaces with tested extension paths. It does not mean automatic
-support for every robot, sensor, Python function, UE version, or game world.
-
-Completing Issue #41, PR #50, and Issue #8 is necessary for the active PhantomX
-path, but does not complete platform extension, disturbance recovery, independent
-setup, packaged runtime, content clearance, or public delivery.
+Completing Issue #41, PR #50, and Issue #8 does not by itself establish release
+readiness. Extension contracts, independent reproduction, packaged runtime,
+distribution checks, and developer documentation must also pass.
 
 [RFC 0001](../rfcs/0001-developer-workflow.md) remains the accepted developer
-workflow. Use a focused RFC before a new input-provider or other public contract
-changes. Reuse existing interfaces where they already meet the requirements.
+workflow. Reuse working interfaces. Write a focused RFC before changing a public
+Task, input-provider, timing, Run, or artifact contract.
 
-## Architecture boundaries
+## Meaning of a general platform
 
-| Layer | Owns | Must not depend on |
+Generality means reusable and tested extension paths within a declared support
+matrix. It does not mean automatic support for every robot, sensor, Python
+function, UE version, or game world.
+
+| Layer | Responsibility | Required boundary |
 |---|---|---|
-| Framework and UE runtime | Session timing, physics stepping, layouts, reset, plans, inference, lifecycle | PhantomX Task names, a particular map, or the demo's objective |
-| Robot and input integrations | Topology, reference pose, actuators, sensor bindings, units and frames | One training objective or the demo's player logic |
-| Task package | Commands, observations, rewards, termination, events, curriculum, evaluation | A private copy of the simulation loop |
-| Game integration | Navigation, player detection, target selection, interaction, UI, velocity commands | A running Python trainer or direct access to training-only observations |
-| Reference applications | CartPole examples, PhantomX examples, the public demo | Undocumented edits to framework internals |
+| Framework and runtime | Session timing, physics stepping, reset, layouts, plans, inference, lifecycle | No dependency on a particular Robot, Task, map, or application objective |
+| Robot integration | Topology, actuators, reference pose, input bindings | Add supported Robots through declarations and generic interfaces |
+| Input provider | State or sensor collection, units, frames, sampling, reset | The same policy input contract in training and deployment |
+| Task package | Commands, observations, rewards, termination, events, curriculum, evaluation | Use the shared runtime rather than a copied simulation loop |
+| Game integration | Application commands, scene binding, policy lifecycle | No Python trainer required for deployed inference |
+| Reference examples | Demonstrate and test public interfaces | No undocumented framework modifications |
 
-The policy controls joint targets through the exported action plan and Chaos.
-Game code can choose routes and commands. It must not silently replace learned
-locomotion with root translation or recorded animation in the reference demo.
+Minimal Direct Tasks and Manager-composed Tasks use the same step/reset path.
+Export is a separately checked capability. Arbitrary Python observation/action
+code is not exportable unless a supported implementation and evidence establish it.
 
-## Supported first release
+## Initial support boundary
 
-Start with the documented Windows x64 and UE 5.8 setup, CartPole and PhantomX,
-static ground, and declared control timing. Freeze exact tested versions before
-the release candidate. Keep Python-only checks available without UE.
+Start with the documented Windows x64 and UE 5.8 setup. Use CartPole and PhantomX
+as distinct Robot examples. Declare the supported input providers, static-ground
+scenes, control timing, Task entry styles, and export path.
 
-The platform supports minimal Direct Tasks and Manager-composed Tasks through the
-same step/reset path. Export remains a separately checked capability. Arbitrary
-Python observation/action code must not be described as exportable without a
-supported implementation and cross-language evidence.
+Freeze exact tested versions before the release candidate. Keep Python-only
+checks available without UE. Unsupported combinations must be visible before
+an expensive training run. New Robot or sensor support follows the same admission
+and validation procedure; it does not inherit support from interface compatibility.
 
-Required inputs initially include robot state, commands, contact, and supported
-ground queries. The extension design must allow later sensor providers, including
-vision, without a Task-specific transport path. A camera implementation or a
-vision policy is not a first-release requirement.
+The input design must permit future providers without a Task-specific transport
+path. A particular future sensor implementation is not required for this release.
+Broader environments, distributed training, new solvers, and game-specific
+features remain separate proposals.
 
-PhantomX must stand, move forward/backward/laterally, turn while moving, and
-recover from defined non-terminal physical hits. Turn-in-place and a new Catch
-training Task are outside the selected scope. Full recovery from a fallen pose
-is separate from recovering a disturbed walking gait and is not implied.
+## Current baseline
 
-## Public reference application
+This snapshot records state on 2026-10-09, not release certification.
 
-Use an original compact industrial map, a third-person player, one PhantomX enemy,
-one item, and one exit. The player avoids the robot, retrieves the item, and
-reaches the exit. Include clear instructions, a result, and reliable retry.
-The selected first version has no shooting system. A simple interaction can
-apply a documented physical hit so the viewer can see gait recovery.
-
-The robot can patrol, approach or intercept while moving, stop, and return to its
-route. Keep those decisions in the game controller. Define detection, loss, retry,
-and navigation-failure rules in the demo design. A simple authored encounter
-rule does not require a contact-trained capture policy.
-
-The presentation can evoke a small extraction-game encounter. Use original or
-rights-cleared names, layout, art, audio, and interface. Do not distribute another
-game's content or imply affiliation. Target a one-to-two-minute playable loop
-and a 60-to-90-second real-time video. These are presentation targets, not evidence
-that the controller works.
-
-## Existing evidence and gaps
-
-This snapshot records state on 2026-10-09. It is not release certification.
-
-| Area | Current evidence | Remaining gate |
+| Work | Recorded state | Remaining platform gate |
 |---|---|---|
-| Host, external Tasks, saved Runs | Issues #5, #6, #7 are closed | Independent end-to-end reproduction and current extension-contract audit |
-| Tests | Issue #29 is closed | Applicable tests on the exact release candidate |
-| Runtime cost | PR #45 is merged | Profile the actual packaged application and supported robot count |
-| Evaluation | PR #47 is Ready with runtime evidence | Merge reviewed metrics; keep survival separate from tracking |
-| Locomotion | Issue #41 is open; PR #50 is the current candidate | A selected policy with independent seeds and held-out behavior evidence |
-| Deployment | Issue #8 has parity and physical-response evidence | Held-out scene, interaction, timing, and packaged-runtime acceptance |
-| Shared inputs | Shared plans and current robot/ground inputs exist | Audit provider extension and cross-map binding; close measured gaps |
-| Hit recovery | No accepted recovery envelope is established | Matched physical perturbations, controlled training, and held-out recovery tests |
-| Public delivery | Code license and preliminary inventory exist | Complete demo, independent setup, actual bundle clearance and documentation |
+| Host configuration | Issue #5 closed | Reproduce setup and diagnostics on the release host matrix |
+| External Tasks | Issue #6 closed | Audit extension documentation and repeat the independent installed-package path |
+| Saved Runs | Issue #7 closed | Verify continuation, evaluation, and export on the release candidate |
+| Test quality | Issue #29 closed | Run applicable suites against the final source and artifacts |
+| Runtime performance | PR #45 merged | Measure supported training and packaged deployment separately |
+| Evaluation | PR #47 Ready, not merged | Integrate reviewed metrics without equating survival and tracking |
+| Learned reference | Issue #41 open, PR #50 active | Select a validated policy and document its operating envelope |
+| Deployment | Issue #8 open | Held-out scene and actual packaged-runtime acceptance |
+| Distribution | Preliminary inventory exists | Complete the actual release bundle and independent installation checks |
 
-PR #48 is currently a dependency of #50. Its earlier turn-in-place experiment is
-not a release requirement. Preserve evidence while consolidating the final code.
-PRs #42, #43, #46, and #49 are closed and unmerged. Do not restore cancelled or
-unsuccessful work as required implementation.
+PR #48 is currently a dependency of #50. Consolidate the final code without
+breaking active dependencies or losing experiment evidence. Reconcile overlapping
+or obsolete Issue #40 scope before using it as a release checklist.
 
-Issue #40 still contains cancelled Catch work and overlaps #41. Reconcile its
-remaining delivery scope with this plan before using it as an execution checklist.
-No issue closes merely because a dependent PR merges.
+## M0 Freeze contracts and the support matrix
 
-## Milestones
+Audit Robot, Task, input, Run, artifact, and game-control interfaces. Classify each
+finding as working behavior, a documentation gap, a defect, or a missing extension.
+Avoid broad rewrites where the current interface meets the requirements.
 
-### M0 Freeze the platform contract and release matrix
+Publish the supported host versions, Robot examples, Task styles, input providers,
+control timing, maps, and export capabilities. Map each supported combination to
+its tests. Define compatibility and migration expectations for this Early-Stage
+release. Preserve the shared Session clock and completed-window semantics.
 
-Audit the existing Robot, Task, input, Run, artifact, and game-control boundaries.
-Record which interfaces already work, which need a repair, and which need a new
-extension. Avoid a broad rewrite where the existing contract is sufficient.
+Exit: reviewed contracts and support matrix, with an accepted RFC for each public
+contract change. Assign an owner and evidence location to every release gate.
 
-Define the supported host, robot examples, input providers, Task entry styles,
-export capabilities, maps, timing, and game integration. Record the exact tests
-for each supported combination. Make unsupported combinations explicit before
-long training. Preserve the shared Session clock and completed-window semantics.
+## M1 Prove the extension paths
 
-Define the demo's game-level design separately. Freeze its objective, state
-transitions, interaction rules, and test scenarios. Record a target host,
-resolution, quality preset, robot count, frame-time budget, memory budget, and
-soak duration before final performance tests. Assign owners when work is scheduled.
+Verify independent installation and registration of external Tasks. Demonstrate
+both Direct and Manager composition, a reward change, and configuration overrides
+outside the repository checkout. Retain early capability checks for export.
 
-Exit: reviewed support matrix and extension contracts, plus a bounded reference
-application design. Public-contract changes have an accepted RFC.
-
-### M1 Prove extension without framework forks
-
-Use external packages and documented registration. Show both a minimal Direct
-Task and Manager composition through the common runtime. Change a reward and
-configuration from outside the checkout. Retain early capability checks so
-unsupported export fails before an expensive training run.
-
-Verify Robot integration by declaration and generic UE components, using CartPole
-and PhantomX as distinct reference topologies. A new example must not require a
-robot-name branch in the Worker or policy controller.
+Verify Robot integration through declarations and generic UE interfaces. The
+CartPole and PhantomX examples must not require Robot-name branches in the Worker
+or policy controller. Document which native integration work a new provider needs.
 
 For each supported input provider, define name, shape, type, units, frame,
 configuration, sampling time, reset behavior, missing-data behavior, and deployment
-binding. Distinguish ground geometry from the sensor that queries it. Training
-and game maps can differ while keeping the policy input contract identical.
-Record provider requirements in the artifact or its validated integration contract.
+binding. Keep ground geometry separate from the sensor that queries it. Different
+training and deployment maps must preserve the policy input contract.
 
-Prove the extension path with an independent example and tests. Check two static
-maps with different geometry/bindings. A new native sensor can require a UE plugin
-implementation; it must not require a Task-specific core dispatcher. Define how
-future image inputs would be admitted without claiming that vision is implemented.
+Prove provider reuse with an independent extension example and distinct static
+scene bindings. Check configuration, reset, isolation, capability reporting, and
+export/runtime behavior where applicable. An unsupported provider must produce a
+useful diagnostic rather than silently produce a different observation.
 
-Exit: a developer adds a Task and input integration through documented seams,
-with reset/isolation, configuration, capability, export and actual UE evidence
-where applicable. Dependency tests prevent reference applications entering core.
+Exit: a developer can extend the declared interfaces without changing core
+application dispatch. Tests prevent concrete examples from becoming core dependencies.
 
-### M2 Establish the learned reference behavior
+## M2 Complete the reference training workflow
 
-Use Issue #41. Finish the current command-distribution experiment before changing
-its parameters. Select feasible velocity ranges for PhantomX from measured
-behavior; reference-task ranges do not prove a feasible operating envelope.
+Use Issue #41 for the learned reference and the existing public workflow for
+host setup, training, saved-Run continuation, evaluation, and export. Complete the
+current PR #50 experiment before changing its parameters.
 
-Keep Runs, exact source/configuration, seeds, checkpoints, transitions, physical
-time, and optimizer budgets. Report standing, forward, backward, lateral, and
-moving-turn behavior separately. Include planar/yaw RMSE, signed velocities,
-stopping drift, falls, and action saturation. Do not treat survival as success.
+Keep exact source, resolved YAML, seeds, checkpoints, transition counts, optimizer
+budgets, physical time, and per-behavior results. Separate runtime correctness,
+survival, and learned quality. Select feasible operating bounds from evidence.
 
-Use at least three training seeds for the final selected candidate and separate
-held-out evaluation seeds and commands. Freeze behavior thresholds before the
-acceptance measurements. Keep failures. Evaluate the exported artifact as well
-as the training path. Do not tune acceptance criteria to the final results.
+For the selected learned candidate, use independent training and evaluation seeds
+as required by #41. Freeze behavior thresholds before held-out acceptance tests.
+Keep failures and limitations. Do not tune the threshold to the acceptance result.
 
-Exit: a named policy and its declared motion envelope pass the frozen protocol.
-The complete train, saved-Run, evaluation, export, and game-inference path works.
+Exit: reproducible reference Runs and policies pass their declared behavior
+protocol and can be restored, evaluated, and exported through the public commands.
 
-### M3 Add bounded physical hit recovery
+## M3 Prove independent game deployment
 
-After basic walking is stable, define a reusable perturbation event. Specify the
-body, application point, world/body frame, impulse units, direction, magnitude,
-timing, and duration or repetition. An impulse at a point can produce translation
-and rotation. A velocity assignment or increment is a different operation;
-do not call those equivalent without measured evidence.
+Use Issue #8. Integrate the artifact into a separate target UE project or scene
+through public interfaces. The deployment path must not depend on training
+processes, private checkout paths, or a specific reference application.
 
-Use the same declared perturbation meaning in training and game validation.
-Select a bounded curriculum from tolerable disturbances. Compare with the
-undisturbed baseline so increased robustness does not hide lost locomotion.
-Keep the present unperturbed PR #50 experiment unchanged.
+Check units, frames, terrain queries, joint defaults, command timing, history,
+reset, lifecycle, and missing-input behavior. Run same-input numerical parity and
+separate closed-loop behavior tests. Test supported timing variation, stale
+commands, faults, stop/restart, unload/reload, and repeated reset.
 
-Define recovery as return to a specified tracking, attitude, and height band for
-a sustained interval after the hit. Freeze bands, timeout, impulse envelope, and
-separate safety/fall conditions before held-out tests. Measure recovery rate,
-recovery time, peak orientation/position deviation, falls, and velocity error.
-Include no-hit controls, both hit sides, different gait phases, and held-out
-magnitudes and starts. Report failures outside the supported envelope explicitly.
+Use held-out static-ground starts and scene bindings. Preserve the distinction
+between a reference controller's learning quality and the runtime's correctness.
+Test the actual packaged UE executable, not only the Editor.
 
-Exit: actual UE traces show a physical disturbance and sustained recovery under
-the declared conditions in both training and the target game. No teleport reset,
-animation switch, or hidden root correction counts as gait recovery.
+Exit: a named artifact works in the documented independent deployment procedure,
+with reproducible runtime, scene, and supported-behavior evidence.
 
-### M4 Validate the independent game integration
+## M4 Validate the frozen release candidate
 
-Use Issue #8 and the reference-application Issue. Build a greybox first. Connect
-patrol and player-response commands to the frozen policy. Clamp commands to its
-supported envelope. Define expired-command, navigation-failure, policy-fault,
-out-of-domain and restart behavior.
+Freeze source, assets, policies, dependencies, versions, and reference maps.
+Run applicable Python, native, E2E, parity, package, and lifecycle checks against
+that exact candidate. Recheck affected gates after repairs.
 
-Verify world/body transforms, terrain queries, joint defaults, history, timing,
-and reset on held-out static-ground starts and routes. Run same-input parity and
-separate closed-loop tests. Test frame-rate variation within supported timing,
-player appearance/disappearance, repeated retry, unload/reload, and physical hits.
-
-Complete pickup, exit, loss, result, and retry in the game layer. Test repeated
-triggers and cleanup. Add lighting, camera, visual feedback and audio after the
-loop passes. A new tester must understand and complete the encounter without
-help from the implementation author.
-
-Exit: the reference game uses public platform interfaces, the released policy
-controls the robot, and locomotion plus declared hit recovery pass in the actual
-map. Preserve the distinction between platform tests and game objective tests.
-
-### M5 Verify the release candidate and public deliverables
-
-Freeze source, assets, policy, dependencies, versions, and maps. Build the real
-Windows package. End-user inference must work without a Python trainer or Editor
-session. Measure frame-time median/p95/p99, missed control windows, system memory,
-GPU memory, and repeated-reset stability against the M0 budgets.
-
-Run applicable Python, native, E2E, parity, lifecycle and packaged-game tests on
-the exact candidate. Recheck affected gates after repairs. Training throughput
-is not game frame rate. Keep performance, learning quality, recovery, and runtime
-correctness as separate results.
+Define target hardware, workload, robot count, frame-time and memory budgets,
+and soak duration before final measurements. Report training throughput separately
+from deployed frame time. Include latency percentiles, missed control windows,
+system/GPU memory, and repeated-reset stability where applicable.
 
 Use an independent Windows setup and a developer who did not write the changes.
-They must launch the demo and follow the source guide to create an external Task,
-change one reward, train the reference, export, and deploy into the named separate
-scene. Keep failures and corrective steps. If that setup or tester is unavailable,
-the gate stays blocked rather than being replaced with another original-host run.
+They must install the platform, create an external Task, change one reward, train
+the reference, restore a Run, export, and deploy through the documentation.
+Record failures and corrections. If the host or tester is unavailable, the gate
+remains blocked. Repeating the original setup does not replace this evidence.
 
-Complete the [release inventory](../release-readiness.md). Verify the actual
-source and binary bundles, including robot assets, policies, media, dependency
-notices, historical content, and the documented security channel. UE is a
-separately acquired development prerequisite. Do not bundle its installation.
-A code license does not clear every content file. Any destructive history change
-or new security setting requires separate authorization.
+Exit: all required candidate checks pass, the independent procedure completes,
+and no release-blocking defect remains.
 
-Deliver platform setup/extension guides, supported versions, reproducible training
-recipes, game controls, hardware requirements, known limitations, and release
-notes. Test downloads and instructions against the candidate. Record an honest
-real-time demo with an uncut encounter and hit-recovery segment. Label time
-compression or debug views. Do not claim untested capabilities in the trailer.
+## M5 Prepare verified distribution
 
-Exit: platform packages, examples, game build, documentation and media are verified
-and ready for the maintainer's separate tagging/publication decision.
+Complete the [release inventory](../release-readiness.md) for the actual source
+and binary bundles. Verify Robot assets, policy artifacts, media, dependencies,
+notices, historical content, and the documented security-reporting channel.
+Keep source-asset rights separate from packaged-game rights. A code license does
+not clear every content file. UE remains a separately acquired development
+prerequisite; do not distribute its installation.
 
-## Order and issue structure
+Provide installation and extension guides, supported versions, reference training
+recipes, artifact/deployment instructions, known limitations, and release notes.
+Test downloads and instructions using the candidate package. Record the complete
+file list and exact source/policy versions. Destructive history changes and new
+security settings require separate authorization.
 
-M0 and the current M2 experiment can proceed together. M1 closes platform gaps
-without waiting for polished game art. Asset inventory and greybox design can
-start early. M3 requires stable locomotion; final M4 acceptance requires the
-selected policy and hit-recovery envelope. M5 consumes the frozen combined result.
+Exit: packages, reference examples, documentation, and evidence are ready for a
+separate maintainer decision to tag and publish. Readiness does not itself perform
+publication or change repository visibility.
 
-Use one release tracking Issue and reuse #41 for locomotion and #8 for deployment.
-Create focused execution Issues for:
+## Dependencies and tracking
 
-1. Platform extension and shared input contracts, covering M0 and M1.
-2. Physical perturbation and gait recovery, covering M3.
-3. The separate playable reference application, covering game work in M0 and M4.
-4. Independent packaged validation and public delivery, covering M5.
+M0 and the current M2 experiment can proceed together. M1 addresses measured
+extension gaps. Final M3 acceptance uses a selected M2 artifact. M4 consumes the
+combined frozen result. Start documentation and the distribution inventory early;
+finish M5 against the accepted candidate.
 
-Each Issue records dependencies, deliverables, tests, and exit conditions. Link
-implementation PRs there. Consolidate obsolete #40/#48 scope without losing the
-recorded experiments or breaking active PR dependencies.
+Use one release tracking Issue. Reuse #41 for reference learning and #8 for
+deployment. Add focused execution Issues for the extension-contract audit and
+for candidate validation/distribution. Existing completed work is a baseline to
+verify, not a reason to recreate #5, #6, #7, or #29.
 
-Optimize when a measured release budget fails. A new Chaos solver, distributed
-training, all terrain variants, full combat, and a vision policy are not required
-for this bounded release. Keep them as separate future proposals.
+Each execution Issue records scope, dependencies, deliverables, tests, and its
+exit condition. Implementation PRs link to those Issues. Keep application-specific
+ideas outside platform acceptance until their scope is separately agreed.
 
 ## Release-ready decision
 
-The release tracking Issue must link evidence for reusable extension, learned
-behavior, bounded recovery, independent game integration, packaged execution,
-independent developer reproduction, and cleared public delivery. All required
-gates must pass and no release-blocking defect may remain.
+The tracking Issue must link evidence for supported extension, reproducible
+training/Run operations, independent game deployment, packaged execution,
+independent developer reproduction, and cleared distribution. Every required
+gate must pass. Open blocking defects, unresolved bundle rights, and unexecuted
+required gates prevent the release-ready claim.
 
-A successful demo alone cannot establish a general platform. Passing platform
-unit tests alone cannot establish a working game or learned controller. The
-release requires both, with explicit supported boundaries. Set a version and
-date only after the candidate and publication decisions are ready.
+A successful reference demo alone cannot establish a general platform. Platform
+unit tests alone cannot establish a working deployed controller. Require both
+reusable interfaces and complete reference paths, with explicit support bounds.
+Set the version and date after the candidate and publication decisions are ready.
