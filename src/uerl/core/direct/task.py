@@ -599,6 +599,16 @@ class DirectTask:
             return {}
         return manager.update(step)
 
+    def capture_reward_terms(self, enabled: bool) -> None:
+        """Capture actual manager outputs without evaluating reward terms twice."""
+        if self._rewards is not None:
+            self._rewards.capture_step_values = enabled
+            self._rewards.debug_step_values = None
+
+    def debug_reward_terms(self) -> Mapping[str, torch.Tensor] | None:
+        """Return weighted terms, or None for custom Tasks without decomposition."""
+        return None if self._rewards is None else self._rewards.debug_step_values
+
     def episode_reward_log(self, reset_mask: torch.Tensor) -> Mapping[str, float]:
         """Read completed episode reward totals before selected Slots reset."""
 

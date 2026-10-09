@@ -748,3 +748,52 @@ def test_default_host_map_does_not_require_optional_fab_content() -> None:
     root = Path(__file__).resolve().parents[3]
     text = (root / "engine/Config/DefaultEngine.ini").read_text()
     assert "GameDefaultMap=/Engine/Maps/Entry" in text
+
+
+@pytest.mark.parametrize("failure", ["existing_file", "custom_actor", "custom_algorithm", "zero_rollouts"])
+def test_training_debug_rejects_invalid_capture_before_worker_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    import uerl.training.runner as module
+
+    config = _config(tmp_path / "run")
+    path = tmp_path / "trace.yaml"
+    options = dict(config.runner.parameters)
+    if failure == "existing_file":
+        path.write_text("keep", encoding="utf-8")
+    elif failure == "custom_actor":
+        options["actor_class_name"] = "example:CustomModel"
+    elif failure == "custom_algorithm":
+        options["algorithm_class_name"] = "example:CustomPPO"
+    config = replace(config, runner=replace(config.runner, parameters=options))
+    opened = Mock()
+    monkeypatch.setattr(cast(Any, module).UERLSession, "open", opened)
+    with pytest.raises((ValueError, FileExistsError)):
+        run_training(config, debug_trace_path=path, debug_rollouts=0 if failure == "zero_rollouts" else 1)
+    opened.assert_not_called()
+    if failure == "existing_file":
+        assert path.read_text() == "keep"
+
+
+def test_training_debug_marks_setup_failure_incomplete_and_closes_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import yaml
+
+    import uerl.training.runner as module
+
+    config = _config(tmp_path / "run")
+    config = replace(config, runner=replace(config.runner, checkpoint=None))
+    registry = Mock()
+    raw = Mock()
+    monkeypatch.setattr(module, "create_default_registry", lambda: registry)
+    monkeypatch.setattr(cast(Any, module).UERLSession, "open", Mock(return_value=raw))
+    monkeypatch.setattr(module, "UERLSessionAdapter", Mock())
+    monkeypatch.setattr(module, "UERLDirectEnv", Mock(side_effect=RuntimeError("env setup failed")))
+    path = tmp_path / "trace.yaml"
+    with pytest.raises(RuntimeError, match="env setup failed"):
+        run_training(config, debug_trace_path=path)
+    raw.close.assert_called_once_with("training_setup_failed")
+    records = list(yaml.safe_load_all(path.read_text()))
+    assert records[-1]["kind"] == "footer"
+    assert records[-1]["complete"] is False

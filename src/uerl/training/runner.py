@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -150,6 +150,8 @@ def run_training(
     event_manager_factory: Callable[[RobotSpec], EventManager] | None = None,
     restore_curriculum: bool = True,
     freeze_observation_normalization: bool = False,
+    debug_trace_path: Path | None = None,
+    debug_rollouts: int = 2,
 ) -> TrainingResult:
     """Run the resolved Task and close all acquired resources on every exit path.
 
@@ -158,12 +160,35 @@ def run_training(
         terrain_level: Optional zero-based terrain level fixed for every Slot.
             When set, automatic terrain promotion/demotion is disabled.
         freeze_observation_normalization: Keep checkpoint-loaded actor and
-            critic observation statistics fixed during warm-start training.
+            critic observation statistics fixed during continuation.
+        debug_trace_path: Stream bounded all-Slot control-step evidence to this new YAML file.
+        debug_rollouts: Number of initial full rollouts to capture. Training can continue after capture.
     """
 
     import torch
+
+    from .debug_trace import TrainingDebugRecorder
+
     if config.runner.max_iterations < 1:
         raise ValueError("config.runner.max_iterations must be positive")
+    if debug_rollouts < 1:
+        raise ValueError("debug_rollouts must be positive")
+    train_config = build_rsl_rl_train_config(config)
+    if debug_trace_path is not None:
+        if debug_trace_path.exists():
+            raise FileExistsError(debug_trace_path)
+        debug_algorithms = {
+            "rsl_rl.algorithms.ppo:PPO": "uerl.training.rsl_rl.debug_ppo:DebugPPO",
+            "uerl.training.rsl_rl.time_aware_ppo:TimeAwarePPO":
+                "uerl.training.rsl_rl.debug_ppo:DebugTimeAwarePPO",
+        }
+        algorithm_name = train_config["algorithm"]["class_name"]
+        if algorithm_name not in debug_algorithms:
+            raise ValueError("training debug supports the pinned PPO and TimeAwarePPO algorithms")
+        for model_name in ("actor", "critic"):
+            if train_config[model_name]["class_name"] != "rsl_rl.models.mlp_model:MLPModel":
+                raise ValueError("training debug requires the pinned MLPModel actor and critic")
+        train_config["algorithm"]["class_name"] = debug_algorithms[algorithm_name]
     torch.manual_seed(config.worker.run_seed)
 
     registry = create_default_registry()
@@ -223,7 +248,20 @@ def run_training(
     metrics_directory = config.logging.run_directory / "rsl_rl"
     direct_env: UERLDirectEnv | None = None
     vec_env: UERLVecEnvWrapper | None = None
+    debug_recorder: TrainingDebugRecorder | None = None
+    debug_complete = False
     try:
+        if debug_trace_path is not None:
+            from ..core.config.snapshot import resolved_config_to_yaml
+
+            debug_recorder = TrainingDebugRecorder(
+                debug_trace_path,
+                max_steps=min(debug_rollouts, config.runner.max_iterations) * config.runner.rollout_length,
+                metadata={"task_id": config.task_id, "num_slots": config.worker.slot_count,
+                          "resolved_config_yaml": resolved_config_to_yaml(config),
+                          "rsl_rl_train_config": train_config,
+                          "step_unit": "policy control window; no intermediate solver substeps"},
+            )
         stage_profiler = StageProfiler(
             rollout_length=config.runner.rollout_length,
             jsonl_path=config.logging.run_directory / "stage_latency.jsonl",
@@ -243,11 +281,11 @@ def run_training(
             curriculum_manager=curriculum_manager,
             event_manager_factory=event_manager_factory,
             initial_terrain_level=terrain_level,
+            training_debug=debug_recorder,
         )
         capabilities = task.capabilities
         capabilities.require("train")
         print(f"[CAPABILITY] {capabilities.format()}")
-        train_config = build_rsl_rl_train_config(config)
         vec_env = UERLVecEnvWrapper(direct_env, cfg=config)
         runner = UERLOnPolicyRunner(
             vec_env,
@@ -256,6 +294,18 @@ def run_training(
             device=config.runner.device,
         )
         runner.resolved_config = config
+        if debug_recorder is not None:
+            runner.alg.configure_debug(debug_recorder)
+            try:
+                plans: dict[str, object] = {"observations": task.observation_plan.to_json(),
+                                           "actions": task.action_plan.to_json()}
+            except RuntimeError:
+                plans = {"observations": None, "actions": None}
+            plans["schema"] = task.schema.as_request()
+            if task.robot_spec is not None:
+                plans["actuators"] = [asdict(actuator) for actuator in task.robot_spec.actuators]
+                plans["topology"] = asdict(task.robot_spec.topology)
+            debug_recorder.record("task_plans", 0, plans)
         runner.training_options = TrainingOptions(terrain_level, freeze_observation_normalization).to_dict()
         if resume_checkpoint is not None and resume_checkpoint.is_file():
             runner.load(
@@ -269,13 +319,18 @@ def run_training(
         runner.learn(config.runner.max_iterations, init_at_random_ep_len=True)
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         runner.save(str(checkpoint_path))
+        debug_complete = True
     finally:
-        if vec_env is not None:
-            vec_env.close("training_complete")
-        elif direct_env is not None:
-            direct_env.close("training_setup_failed")
-        else:
-            raw_session.close("training_setup_failed")
+        try:
+            if vec_env is not None:
+                vec_env.close("training_complete")
+            elif direct_env is not None:
+                direct_env.close("training_setup_failed")
+            else:
+                raw_session.close("training_setup_failed")
+        finally:
+            if debug_recorder is not None:
+                debug_recorder.close(complete=debug_complete)
 
     return TrainingResult(
         task_id=config.task_id,

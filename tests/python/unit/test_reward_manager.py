@@ -517,3 +517,25 @@ def test_reward_manager_distinct_rows_keep_weights_and_sparse_episode_sums() -> 
         "Episode_Reward/track": 0.0,
         "Episode_Reward/cost": 0.0,
     }
+
+
+def test_debug_reward_capture_observes_actual_single_evaluation() -> None:
+    calls = 0
+
+    def term(ctx: StepContext) -> torch.Tensor:
+        nonlocal calls
+        calls += 1
+        return torch.arange(1, len(ctx.episode_steps) + 1, dtype=torch.float32)
+
+    manager = RewardManager(RewardCfg(terms={"counted": RewTermCfg(func=term, weight=3.)}),
+                            _tiny_spec(), batch_size=2, device="cpu")
+    manager.capture_step_values = True
+    reward = manager.compute(_context(), _empty_terminations())
+    assert calls == 1
+    assert manager.debug_step_values is not None
+    torch.testing.assert_close(reward, torch.tensor([3., 6.]))
+    torch.testing.assert_close(manager.debug_step_values["counted"], reward)
+    manager.capture_step_values = False
+    manager.compute(_context(), _empty_terminations())
+    assert calls == 2
+    assert manager.debug_step_values is None

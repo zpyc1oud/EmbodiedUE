@@ -95,6 +95,8 @@ class RewardManager:
                 path="reference_dt_s",
             )
         self._terms = tuple(prepared)
+        self.capture_step_values = False
+        self.debug_step_values: Mapping[str, torch.Tensor] | None = None
         self._term_names = tuple(term.name for term in self._terms)
         torch_device = torch.device(device)
         self._episode_sums = {
@@ -134,6 +136,7 @@ class RewardManager:
 
         rows = ctx.episode_steps.shape[0]
         parts = self.term_step_values(ctx, terminations)
+        self.debug_step_values = parts if self.capture_step_values else None
         total = torch.zeros(rows, device=ctx.episode_steps.device, dtype=torch.float32)
         slot_ids = ctx.slot_ids
         if slot_ids is None:
