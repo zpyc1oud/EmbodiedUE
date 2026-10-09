@@ -67,7 +67,8 @@ def audit_actions(plan: Mapping[str, Any], actions: Any, commands: Mapping[str, 
         else:
             raise ValueError(f"unsupported action audit operator: {name}")
         slots[operation["output"]] = result
-    _same("physical action targets", commands, {key: slots[key] for key in plan["command_fields"]})
+    packed = np.concatenate([slots[key] for key in plan["command_fields"]], axis=-1)
+    _same("physical action targets", commands, {"robot.actuator.target": packed})
 
 
 def audit_returns(values: Mapping[str, Any]) -> None:

@@ -140,8 +140,8 @@ def test_independent_action_audit_catches_clip_scale_and_offset_errors() -> None
         "command_fields": ["target"],
     }
     actions = np.array([[3.0, -2.0], [0.2, 0.3]])
-    commands = {"target": np.array([[0.6, -2.2], [0.2, 0.4]])}
+    commands = {"robot.actuator.target": np.array([[0.6, -2.2], [0.2, 0.4]])}
     audit_actions(plan, actions, commands)
-    commands["target"][0, 0] = 1.6
+    commands["robot.actuator.target"][0, 0] = 1.6
     with pytest.raises(ValueError, match="physical action targets"):
         audit_actions(plan, actions, commands)
