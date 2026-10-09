@@ -197,7 +197,7 @@ def check_command(tokens: list[str]) -> str | None:
     diagnostic = io.StringIO()
     try:
         with contextlib.redirect_stderr(diagnostic), contextlib.redirect_stdout(diagnostic):
-            if command in {"train", "play", "export", "config"}:
+            if command in {"train", "play", "export", "config"} or (command == "check" and arguments[:1] == ["task"]):
                 from uerl.cli.boundary import parse_overrides
 
                 _, remaining = parser.parse_known_args(arguments)
