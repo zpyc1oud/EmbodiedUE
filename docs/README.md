@@ -31,6 +31,9 @@ Those files are not included as experiment evidence.
 
 ## Development planning
 
+- [Platform extension architecture](design/platform-extension-architecture.md): source audit, Isaac Lab comparison, proposed interfaces, lifecycle, serialization and implementation tests.
+- [RFC 0002: Shared input providers](rfcs/0002-shared-input-providers.md): proposed public contract; not accepted or implemented.
+
 - [Task and runtime stabilization](design/task-runtime-stabilization.md): Isaac Lab comparison, configured input references, and bounded runtime verification.
 
 - [Repository-wide test quality design](design/test-quality-implementation.md): proposed per-layer changes, independent oracles, implementation slices, and acceptance for Issue #29.

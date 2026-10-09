@@ -80,6 +80,12 @@ or obsolete Issue #40 scope before using it as a release checklist.
 
 ## M0 Freeze contracts and the support matrix
 
+For code changes, complete a detailed architecture design before implementation.
+Include source-level gaps, responsibilities, interfaces, data flow, configuration,
+lifecycle, failures, compatibility, tests, and staged rollout. Use the
+[platform extension design](../design/platform-extension-architecture.md) and
+[proposed input RFC](../rfcs/0002-shared-input-providers.md) for the current audit.
+
 Audit Robot, Task, input, Run, artifact, and game-control interfaces. Classify each
 finding as working behavior, a documentation gap, a defect, or a missing extension.
 Avoid broad rewrites where the current interface meets the requirements.
