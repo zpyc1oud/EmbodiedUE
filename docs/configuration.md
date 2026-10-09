@@ -13,6 +13,17 @@ uv run uerl check task UERL-PhantomX-ContinuousTerrain-v0
 These commands do not start UE.
 A successful Task check validates declarations, not physical asset contents or runtime performance.
 
+## Choose what to change
+
+- Change mesh geometry, body mass, or joint limits in UE assets.
+- Change actuator selection, gains, or reference pose in the robot declaration.
+- Change commands, observations, rewards, or termination rules in the Task.
+- Change parallelism and training duration with supported CLI overrides.
+- Use the saved Run configuration when evaluating or exporting an existing policy.
+
+For a new behavior, follow [external Tasks](how-to/external-tasks.md).
+For a new physical robot, follow [add a robot](how-to/add-a-robot.md).
+
 ## Sources of truth
 
 | Source | Owns |

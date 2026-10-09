@@ -1,5 +1,7 @@
 # EmbodiedUE — Train Robots for Unreal Games
 
+**English** | [简体中文](README.zh-CN.md)
+
 A robot training and deployment platform for **Unreal Engine game developers**.
 Train a control policy in **UE 5.8 / Chaos**, then run it on a physics-driven robot in your game.
 
@@ -24,7 +26,15 @@ PhantomX provides the current locomotion and game-deployment example.
 They exercise reusable platform interfaces for future robot integrations.
 See [product direction](docs/product-direction.md) for the intended audience, current scope, and design priorities.
 
-<video src="docs/media/phantomx-walk.mp4" controls muted playsinline width="720"></video>
+## Demos
+
+### Walking
+
+https://github.com/user-attachments/assets/eb8b7149-0238-4596-8da4-c0415cfd1e0b
+
+### Terrain
+
+https://github.com/user-attachments/assets/54cee6e4-43f3-4293-963f-9a206a7c94d3
 
 [Watch the walking demo](docs/media/phantomx-walk.mp4) · [Terrain demo](docs/media/phantomx-terrain.mp4)
 
@@ -193,7 +203,7 @@ See [configuration](docs/configuration.md).
 
 ## Documentation and development
 
-[Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+[Developer learning path](docs/README.md#build-your-first-game-robot) · [Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Domain glossary](CONTEXT.md) · [Add a robot](docs/how-to/add-a-robot.md) · [Tests](tests/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 For Python-only development after installation:
 
