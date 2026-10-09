@@ -1,5 +1,9 @@
 # In-game policy deployment
 
+Use a trained robot controller as part of your Unreal game.
+Gameplay code supplies commands; the policy controls the robot through its physics setup.
+Evaluate its response in the target map before using it as a gameplay feature.
+
 Deploy a `.uerlpol2` policy on a Skeletal Mesh Actor in UE 5.8.
 Inference uses the imported `UUERLPolicyArtifactAsset`, its mesh, and its PhysicsAsset.
 Editor import and reimport require the source `.uerlpol2`.

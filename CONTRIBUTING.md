@@ -1,6 +1,8 @@
 # Contributing
 
-EmbodiedUE contains Python training code, a UE 5.8 C++ plugin, and binary content.
+EmbodiedUE helps game developers train and deploy physics-driven robots in Unreal Engine.
+It contains Python training code, a UE 5.8 C++ plugin, and binary content.
+Read the [product direction](docs/product-direction.md) before proposing a new feature.
 Start with [setup](README.md#getting-started), [architecture](docs/architecture.md), and the [domain glossary](CONTEXT.md).
 
 Original project code, documentation, and configuration use [Apache-2.0](LICENSE).

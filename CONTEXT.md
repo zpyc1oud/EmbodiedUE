@@ -1,4 +1,4 @@
-# UE RL Engine Context
+# EmbodiedUE Context
 
 This glossary defines Sessions, Environments, Robots, assets, semantics, and the boundary between training and simulation.
 Use these terms consistently.

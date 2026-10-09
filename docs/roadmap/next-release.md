@@ -5,8 +5,12 @@ The version number and release date are not assigned.
 
 ## Goal
 
-An external developer can install EmbodiedUE and create a Task outside this repository.
-The developer can then train and evaluate a policy and deploy it into a supported UE game scene.
+A game developer can use EmbodiedUE to train a physical robot controller and deploy it into a supported Unreal game scene.
+The developer can create a Task outside this repository and evaluate the trained behavior before deployment.
+The [product direction](../product-direction.md) defines the audience and long-term goal.
+
+The release must demonstrate a reusable path from robot assets to useful in-game behavior.
+A showcase scene makes that path visible; the platform interfaces must also serve other supported projects.
 
 The maintainer completed the training procedure on one Windows machine.
 This release extends that working path.

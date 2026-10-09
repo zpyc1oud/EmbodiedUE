@@ -1,10 +1,12 @@
 # Architecture and design rationale
 
-UE RL Engine trains robot policies in Unreal Engine 5.8 Chaos.
-It deploys observation and action plans with an exported network into the same physics backend.
-The product includes CartPole and PhantomX.
+EmbodiedUE is a robot training and deployment platform for Unreal Engine game developers.
+Its [product direction](product-direction.md) puts in-game physical behavior at the center of the design.
+It trains policies in UE 5.8 Chaos and deploys observation and action plans with the exported network.
+CartPole and PhantomX are the current reference integrations.
 Python owns training semantics.
 The UE plugin owns physical execution.
+Gameplay code supplies task-level commands to the controller.
 
 Use the [README](../README.md), [configuration guide](configuration.md), [training guide](how-to/phantomx-robust-training.md), [recording guide](how-to/record-video.md), and [deployment guide](in-game-deployment-guide.md) for executable procedures.
 For scene comparisons, use a fixed map, start, command sequence, and seed.
