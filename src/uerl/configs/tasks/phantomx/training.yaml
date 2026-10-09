@@ -20,6 +20,9 @@ task:
   turn_start_distance: 0.5
   turn_completion_tolerance: 0.1
   command:
+    sampling: staged
+    lateral_speed_min: 0.0
+    lateral_speed_max: 0.0
     initial_speed_min: 0.4
     initial_speed_max: 0.5
     post_turn_speed_min: 0.4

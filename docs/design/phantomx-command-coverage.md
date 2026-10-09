@@ -100,3 +100,59 @@ separate from command coverage; do not attribute a combined change to one cause.
 Do not add effort or foot-air-time penalties without matching measured inputs.
 After pilots, freeze quality criteria and evaluate separate seeds before a
 repeatability or deployment-quality claim.
+
+## Uniform planar velocity comparison
+
+The next candidate uses the command distribution in the pinned Isaac Lab Go1
+configuration above. Select `sampling: uniform_velocity` for this experiment.
+The source samples independent body-frame X and Y velocities. Heading targets
+are absolute world angles and apply from the first reset, without command
+curriculum promotion. The existing `heading_delta_min/max` fields specify the
+absolute heading range in this mode. They remain relative deltas in `staged` mode.
+
+Use these overrides with the unperturbed flat baseline:
+
+```powershell
+uv run uerl config --task UERL-PhantomX-Walk-v0 `
+  --task.command.sampling uniform_velocity `
+  --task.command.initial_speed_min -1.0 `
+  --task.command.initial_speed_max 1.0 `
+  --task.command.lateral_speed_min -1.0 `
+  --task.command.lateral_speed_max 1.0 `
+  --task.command.heading_command true `
+  --task.command.heading_delta_min -3.141592653589793 `
+  --task.command.heading_delta_max 3.141592653589793 `
+  --task.command.standing_probability 0.02 `
+  --task.command.turn_in_place_probability 0.0 `
+  --task.command.resampling_time_min_s 10.0 `
+  --task.command.resampling_time_max_s 10.0 `
+  --task.heading_control_stiffness 0.5 `
+  --task.max_yaw_rate 1.0
+```
+
+`initial_speed_min/max` set the body-frame X range. `lateral_speed_min/max`
+set the Y range. In heading mode, `max_yaw_rate` caps the proportional heading
+response. The direct-yaw range is used only when `heading_command` is false.
+Standing selection zeros X, Y, and yaw commands. Its probability is 2 percent
+at each resample, not an exact quota in each batch. There is no separate
+turn-in-place quota. Non-standing commands can combine translation and turning.
+The command curriculum's stage metrics do not measure competence in this mode.
+
+Start a new Run, with a fresh policy and optimizer. Use 64 Slots, seed 0, fixed
+D4, and 1000 PPO loops for the first comparison. Retain the original shifted
+reward, 128/128/128 network, and all PPO settings. Retain `action_clip: 2.0`
+from the preceding clip-range experiment. Compare against that experiment's
+1000-loop checkpoint, not only its later 2000-loop checkpoint.
+The wider command ranges are part of this experiment; they are not established
+speed limits for PhantomX.
+
+Before full training, verify signed X/Y command coverage, heading response,
+standing selection, sparse reset, saved configuration, and real UE execution.
+Repeat the four earlier 22-second evaluation groups. Add backward and lateral
+commands to expose the new command coverage. Report each group separately.
+Complete export, actual Demo execution, and Python/UE parity for the final
+artifact. Keep numerical execution checks separate from tracking quality.
+
+This comparison matches the referenced command distribution, not the complete
+Isaac Lab task. Robot geometry, Chaos dynamics, rewards, action processing,
+parallel environment count, and sample budget remain different.

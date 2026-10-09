@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -67,10 +68,18 @@ class PhantomXCurriculumConfig:
     velocity_error_threshold: float = 0.20
 
 
+class PhantomXCommandSampling(StrEnum):
+    STAGED = "staged"
+    UNIFORM_VELOCITY = "uniform_velocity"
+
+
 @dataclass(frozen=True, slots=True)
 class PhantomXCommandConfig:
     """Configure episode-boundary command sampling owned by Python."""
 
+    sampling: PhantomXCommandSampling = PhantomXCommandSampling.STAGED
+    lateral_speed_min: float = 0.0
+    lateral_speed_max: float = 0.0
     initial_speed_min: float = 0.4
     initial_speed_max: float = 0.5
     post_turn_speed_min: float = 0.4
@@ -206,7 +215,10 @@ class PhantomXIdentityCfg:
 class PhantomXCommandCfg:
     """Episode-boundary command sampling ranges."""
 
-    initial_speed_min: float = spec_field(MISSING, ge=0.0, finite=True)
+    sampling: Literal["staged", "uniform_velocity"] = spec_field(MISSING)
+    lateral_speed_min: float = spec_field(MISSING, finite=True)
+    lateral_speed_max: float = spec_field(MISSING, finite=True)
+    initial_speed_min: float = spec_field(MISSING, finite=True)
     initial_speed_max: float = spec_field(MISSING, finite=True)
     post_turn_speed_min: float = spec_field(MISSING, ge=0.0, finite=True)
     post_turn_speed_max: float = spec_field(MISSING, finite=True)
@@ -497,6 +509,9 @@ def _assemble_phantomx_training_config(cfg: PhantomXTrainingCfg) -> PhantomXTrai
         turn_start_distance=task_cfg.turn_start_distance,
         turn_completion_tolerance=task_cfg.turn_completion_tolerance,
         command=PhantomXCommandConfig(
+            sampling=PhantomXCommandSampling(task_cfg.command.sampling),
+            lateral_speed_min=task_cfg.command.lateral_speed_min,
+            lateral_speed_max=task_cfg.command.lateral_speed_max,
             initial_speed_min=task_cfg.command.initial_speed_min,
             initial_speed_max=task_cfg.command.initial_speed_max,
             post_turn_speed_min=task_cfg.command.post_turn_speed_min,
@@ -582,8 +597,14 @@ def _validate_phantomx_invariants(cfg: PhantomXTrainingCfg) -> None:
     """Enforce command/curriculum cross-field rules after configspec parse."""
 
     command = cfg.task.command
+    if command.sampling == "staged" and command.initial_speed_min < 0.0:
+        raise ConfigError("Staged speed must be non-negative", code="CONFIG_OUT_OF_RANGE",
+                          path="task.command.initial_speed_min")
     if (
-        command.yaw_rate_min > command.yaw_rate_max
+        command.lateral_speed_min > command.lateral_speed_max
+        or (command.sampling == "uniform_velocity" and command.turn_in_place_probability > 0.0)
+        or (command.sampling == "staged" and (command.lateral_speed_min != 0.0 or command.lateral_speed_max != 0.0))
+        or command.yaw_rate_min > command.yaw_rate_max
         or command.standing_probability + command.turn_in_place_probability > 1.0
         or (command.heading_command and command.turn_in_place_probability > 0.0)
         or command.initial_speed_min > command.initial_speed_max

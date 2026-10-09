@@ -210,3 +210,32 @@ def test_direct_command_yaml_materializes_selected_distribution() -> None:
     assert cfg.task.command.heading_command is False
     assert cfg.task.command.turn_in_place_probability == 0.2
     assert (cfg.task.command.yaw_rate_min, cfg.task.command.yaw_rate_max) == (-0.5, 0.5)
+
+
+def test_uniform_velocity_yaml_accepts_signed_planar_ranges() -> None:
+    from uerl.tasks.phantomx.config import PhantomXCommandSampling
+
+    document = DEFAULT_PHANTOMX_TRAINING_CONFIG.read_text(encoding="utf-8")
+    document = document.replace("sampling: staged", "sampling: uniform_velocity")
+    document = document.replace("initial_speed_min: 0.4", "initial_speed_min: -1.0")
+    document = document.replace("lateral_speed_min: 0.0", "lateral_speed_min: -1.0")
+    document = document.replace("lateral_speed_max: 0.0", "lateral_speed_max: 1.0")
+    cfg = parse_phantomx_training_config(document)
+    assert cfg.task.command.sampling is PhantomXCommandSampling.UNIFORM_VELOCITY
+    assert cfg.task.command.initial_speed_min == -1.0
+    assert cfg.task.command.lateral_speed_min == -1.0
+
+
+@pytest.mark.parametrize("changes", [
+    {"lateral_speed_min: 0.0": "lateral_speed_min: 1.0"},
+    {"lateral_speed_max: 0.0": "lateral_speed_max: 1.0"},
+    {"sampling: staged": "sampling: uniform_velocity", "heading_command: true": "heading_command: false",
+     "turn_in_place_probability: 0.0": "turn_in_place_probability: 0.2"},
+])
+def test_uniform_command_invalid_ranges_and_mixtures_are_rejected(changes: dict[str, str]) -> None:
+    document = DEFAULT_PHANTOMX_TRAINING_CONFIG.read_text(encoding="utf-8")
+    for old, new in changes.items():
+        document = document.replace(old, new)
+    with pytest.raises(ConfigError) as error:
+        parse_phantomx_training_config(document)
+    assert error.value.path == "task.command"

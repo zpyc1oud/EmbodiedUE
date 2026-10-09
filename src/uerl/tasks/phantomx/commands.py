@@ -14,6 +14,7 @@ from uerl.errors import ConfigError
 from uerl.tasks.phantomx.config import (
     PHANTOMX_COMMAND_FIELDS,
     PhantomXCommandConfig,
+    PhantomXCommandSampling,
     PhantomXTaskConfig,
 )
 from uerl.tasks.phantomx.pursuit import (
@@ -218,8 +219,11 @@ class PhantomXVelocityCommandSource:
 
     def _sample_rows(self, mask: torch.Tensor, pose: torch.Tensor, *, new_episode: bool) -> None:
         ranges = self._ranges()
+        uniform_velocity = ranges.sampling == PhantomXCommandSampling.UNIFORM_VELOCITY
         if (
-            ranges.resampling_time_min_s <= 0.0
+            ranges.lateral_speed_min > ranges.lateral_speed_max
+            or (uniform_velocity and ranges.turn_in_place_probability > 0.0)
+            or ranges.resampling_time_min_s <= 0.0
             or ranges.resampling_time_min_s > ranges.resampling_time_max_s
             or not 0.0 <= ranges.standing_probability <= 1.0
             or not 0.0 <= ranges.turn_in_place_probability <= 1.0
@@ -234,7 +238,7 @@ class PhantomXVelocityCommandSource:
             )
         current_heading = _quat_heading(pose[:, 3:7])
         if new_episode:
-            self._turn_enabled[mask] = self._turn_flags()[mask]
+            self._turn_enabled[mask] = True if uniform_velocity else self._turn_flags()[mask]
             self._episode_counts[mask] += 1
             self._resample_counts[mask] = 0
         else:
@@ -271,6 +275,13 @@ class PhantomXVelocityCommandSource:
             )
             if not ranges.heading_command:
                 self._sampled_yaw[slot_id] = generator.uniform(ranges.yaw_rate_min, ranges.yaw_rate_max)
+            if uniform_velocity:
+                self._initial_linear[slot_id, 1] = generator.uniform(
+                    ranges.lateral_speed_min, ranges.lateral_speed_max
+                )
+                self._post_turn_linear[slot_id] = self._initial_linear[slot_id]
+                # This mode samples an absolute world heading, as UniformVelocityCommand does.
+                self._target_heading[slot_id, 0] = heading_delta
 
     def _velocity_from_own_samples(self, pose: torch.Tensor) -> torch.Tensor:
         if not self._ranges().heading_command:
@@ -280,7 +291,10 @@ class PhantomXVelocityCommandSource:
                 self._standing | self._turn_in_place, 0.0, self._initial_linear[:, 0]
             )
             yaw = torch.where(self._standing, 0.0, self._sampled_yaw)
-            return torch.stack((speed, torch.zeros_like(speed), yaw), dim=1)
+            lateral = torch.where(
+                self._standing | self._turn_in_place, 0.0, self._initial_linear[:, 1]
+            )
+            return torch.stack((speed, lateral, yaw), dim=1)
         current_heading = _quat_heading(pose[:, 3:7])
         target = self._target_heading.reshape(-1)
         heading_error = torch.atan2(
@@ -299,7 +313,8 @@ class PhantomXVelocityCommandSource:
             torch.zeros_like(self._initial_linear[:, 0]),
             self._initial_linear[:, 0],
         )
-        return torch.stack((speed, torch.zeros_like(speed), yaw), dim=1)
+        lateral = torch.where(self._standing, 0.0, self._initial_linear[:, 1])
+        return torch.stack((speed, lateral, yaw), dim=1)
 
     def episode_latches(self) -> Mapping[str, torch.Tensor]:
         """Return the published episode latches, including pose-relative heading."""
