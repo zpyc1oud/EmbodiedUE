@@ -8,6 +8,31 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+PHYSICS_RESPONSE_CASES: tuple[str, ...] = (
+    'UERL.Integration.PhysicsResponse.Contact.RestitutionAndCollisionImpulse',
+    'UERL.Integration.PhysicsResponse.Contact.StaticAndSlidingFriction',
+    'UERL.Integration.PhysicsResponse.Contact.StaticWeightAndImpulseBalance',
+    'UERL.Integration.PhysicsResponse.Contact.ZeroFrictionPreservesMomentum',
+    'UERL.Integration.PhysicsResponse.FreeBody.AsymmetricPrincipalInertia',
+    'UERL.Integration.PhysicsResponse.FreeBody.COMAndPointVelocityIdentity',
+    'UERL.Integration.PhysicsResponse.FreeBody.ForceMassTrajectoryAndOracleSensitivity',
+    'UERL.Integration.PhysicsResponse.FreeBody.GravityAndSelectedCompensation',
+    'UERL.Integration.PhysicsResponse.FreeBody.ImpulseAndForceLifetime',
+    'UERL.Integration.PhysicsResponse.FreeBody.OffsetForceWorldAndLocalFrames',
+    'UERL.Integration.PhysicsResponse.FreeBody.TorqueInertiaTrajectoryAndOracleSensitivity',
+    'UERL.Integration.PhysicsResponse.Joint.AngularDampingDecay',
+    'UERL.Integration.PhysicsResponse.Joint.CoordinateSignAndLockedAxes',
+    'UERL.Integration.PhysicsResponse.Joint.HardLimitsAndDisabledDrive',
+    'UERL.Integration.PhysicsResponse.Joint.LoadedPositionDriveEquilibrium',
+    'UERL.Integration.PhysicsResponse.Joint.PositionDriveTorqueSaturation',
+    'UERL.Integration.PhysicsResponse.Joint.UnderdampedAndOverdampedStepResponse',
+    'UERL.Integration.PhysicsResponse.PhantomX.AssetAndLiveParameterInventory',
+    'UERL.Integration.PhysicsResponse.PhantomX.FixedTargetPositionVelocityConsistency',
+    'UERL.Integration.PhysicsResponse.PhantomX.TotalMomentumUnderExternalImpulse',
+    'UERL.Integration.PhysicsResponse.PhantomX.NamedRoutingAndIndependentState',
+    'UERL.Integration.PhysicsResponse.PhantomX.WholeBodyWeightSupport',
+)
+
 # PIEAttach is run by the E2E suite, which supplies its required loopback port
 # and Python client. Keep the remaining Automation filters complete for the
 # currently registered Unit and Integration families. Run the added terrain
@@ -42,7 +67,7 @@ UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
     (
         "quantitative physics response",
         "UERL.Integration.PhysicsResponse",
-        5,
+        len(PHYSICS_RESPONSE_CASES),
     ),
 )
 
@@ -77,7 +102,10 @@ def main(argv: list[str] | None = None) -> int:
         status = run.run(index, command)
         if status:
             return status
-        status = run.check_automation(index, log, minimum)
+        status = run.check_automation(
+            index, log, minimum,
+            required_names=PHYSICS_RESPONSE_CASES if filters == "UERL.Integration.PhysicsResponse" else (),
+        )
         if status:
             return status
     return run.run(len(names) - 1, pytest_command("all"))

@@ -189,7 +189,9 @@ class TestRun:
         print(f"{stage.name}: {stage.status}" + (f" — {stage.detail}" if stage.detail else ""), flush=True)
         return status
 
-    def check_automation(self, index: int, log: Path, minimum_completed: int) -> int:
+    def check_automation(
+        self, index: int, log: Path, minimum_completed: int, *, required_names: tuple[str, ...] = (),
+    ) -> int:
         stage = self.stages[index]
         try:
             text = log.read_text(encoding="utf-8", errors="replace")
@@ -208,6 +210,8 @@ class TestRun:
                 stage.detail = "UE Automation reported unsuccessful tests: " + ", ".join(failed)
             elif len(set(names)) != completed:
                 stage.detail = "UE Automation reported duplicate test completions."
+            elif missing := sorted(set(required_names) - set(names)):
+                stage.detail = "UE Automation did not complete required tests: " + ", ".join(missing)
             elif completed < minimum_completed:
                 stage.detail = f"Only {completed} tests completed; expected at least {minimum_completed}."
             else:

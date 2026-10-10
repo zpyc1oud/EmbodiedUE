@@ -181,7 +181,8 @@ The delay is test instrumentation, not a product setting or wire configuration.
 ### Quantitative physics response
 
 Run `UERL.Integration.PhysicsResponse` in a fresh Editor process.
-The complete test runner includes this group and requires all five cases.
+The complete test runner includes this group and requires each named case in `PHYSICS_RESPONSE_CASES` in `scripts/run_all_tests.py`.
+An unrelated passing case cannot replace a missing physical test.
 These cases use real Chaos simulation. They do not train a policy.
 The analytical bodies disable sleep and body inertia conditioning.
 Their predictions use the declared geometric inertia, not a solver-adjusted inertia.
@@ -195,6 +196,39 @@ Use an independent physical prediction for each case:
 | Fixed-base hinge with a position drive | Constant external torque below the drive limit | `q = target + τ / Kp`; position and angular velocity settle |
 | Fixed-base hinge with a damping-only drive | Initial angular velocity, no external load | `ω(t) = ω(0) exp(-Kd t / I)`; kinetic energy decreases |
 | Fixed-base hinge with a saturated drive | External torque above the opposing drive limit | `Δω = (τ_external - τ_limit) t / I`, with the signed counterpart |
+
+The additional native cases cover these boundaries:
+
+- Input lifetime, one-shot impulses, offset forces, rotated local/world frames, asymmetric inertia, and gravity
+- Signed free coordinates, locked axes, hard stops, disabled drives, and underdamped/overdamped trajectories
+- Static support, contact impulse balance, restitution, and static/sliding friction
+- Actual PhantomX body inventory, reordered named actuators, completed joint state, whole-body momentum, and weight support
+
+The PhantomX fixed-target case saves bounded CSV traces under `Saved/Automation/PhysicsResponse`.
+Each row records the completed solver frame, time, dt, joint name, target, position, and velocity.
+Compare unwrapped position change with the trapezoidal velocity integral.
+Use an absolute drift budget plus `dt / 2` times total velocity variation.
+A stationary position with a persistent nonzero velocity must fail.
+Keep D1 solver-step consistency separate from D4 control-window comparisons.
+
+`tests/e2e/test_phantomx_physical_response.py` runs real Workers without a learner.
+It checks Session wire values against named Python fields and policy-observation slices.
+It also compares fresh D1/D4 runs and two-Slot sparse-reset trajectories.
+The trace oracle lives in `tests/e2e/support/physical_oracles.py`.
+Its unit cases reject missing input, reversed input, wrong units, stale forces, swapped rows, and shifted velocity samples.
+These unit cases establish oracle sensitivity, not physical correctness.
+
+Run only these real-process cases with:
+
+```powershell
+uv run python scripts/run_e2e.py --suite ue -k physical
+```
+
+Keep measured contact impulse, mean support, and the published final-step force separate.
+For D4, the final-step force is that step's impulse divided by physics dt.
+An interval momentum balance needs the sum of all solver-step impulses.
+Do not infer contact torque from a force magnitude or assume equal loading on all six feet.
+Use [Issue #67](https://github.com/zpyc1oud/EmbodiedUE/issues/67) for the remaining acceptance scope and reviewed evidence.
 
 The free-body cases vary mass and physics step duration.
 They use rotated bodies and a multi-axis input to expose frame errors.
