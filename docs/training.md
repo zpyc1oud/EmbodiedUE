@@ -743,6 +743,24 @@ Keep the printed Run directory for evaluation and export.
 Use [Per-level evaluation](training.md#phantomx-robust-training-per-level-evaluation) to measure behavior before deployment.
 After evaluation, follow [in-game deployment](deployment.md#in-game-deployment-guide).
 
+### Velocity command sampling
+
+Set `task.command.sampling` to `staged` for the reference command curriculum or
+`uniform_velocity` for independent signed forward and lateral speeds.
+The uniform mode uses `initial_speed_min/max` for body-frame X and
+`lateral_speed_min/max` for body-frame Y. It samples both components at reset and
+at each configured `resampling_time_min_s/max_s` interval.
+
+Set `heading_command: false` to sample yaw rate directly from `yaw_rate_min/max`.
+With heading control enabled, uniform sampling uses an absolute world heading
+from `heading_delta_min/max`; the heading controller computes the yaw rate.
+`standing_probability` zeros all command components. Uniform sampling requires
+`turn_in_place_probability: 0`. The default remains the staged reference.
+
+Inspect the resolved configuration before training. Measure each required
+command separately after training. A supported sampling mode does not establish
+that a policy has learned the selected command range.
+
 <a id="phantomx-robust-training-terrain-configuration-and-parallel-slots"></a>
 ### Terrain configuration and parallel Slots
 
