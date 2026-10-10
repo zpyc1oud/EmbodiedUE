@@ -68,16 +68,25 @@ def test_generic_phantomx_training_retains_position_targets(tmp_path: Path) -> N
 
 
 
-def test_phantomx_contact_force_fields_round_trip_as_nonnegative_finite_values(tmp_path: Path) -> None:
-    """The generic PhantomX schema returns all declared contact-force scalars."""
+@pytest.mark.parametrize(
+    ("task_id", "map_name"),
+    [
+        pytest.param(PHANTOMX_TERRAIN_TASK_ID, "/Engine/Maps/Entry", id="procedural"),
+        pytest.param("UERL-PhantomX-Walk-v0", "/Game/Maps/NewMap", id="authored"),
+    ],
+)
+def test_phantomx_contact_force_fields_round_trip_as_nonnegative_finite_values(
+    tmp_path: Path, task_id: str, map_name: str,
+) -> None:
+    """Both procedural and authored floors produce a measured foot force."""
     run_directory = tmp_path / "phantomx-contact-force"
     config = build_run_config(
-        PHANTOMX_TERRAIN_TASK_ID,
+        task_id,
         overrides={
             **build_launch_overrides(
                 ue_executable=Path(UE_CMD),
                 project=Path(UPROJECT),
-                map_name="/Engine/Maps/Entry",
+                map_name=map_name,
                 presentation=PresentationMode.NONE,
             ),
             "worker.slot_count": "64",
@@ -121,7 +130,9 @@ def test_phantomx_contact_force_fields_round_trip_as_nonnegative_finite_values(t
         values = torch.cat([terminal_raw_state[name].reshape(64, -1) for name in contact_force_names], dim=1)
         assert torch.isfinite(values).all()
         assert (values >= 0.0).all()
-        assert bool((values[:, 1:] > 0.0).any())
+        assert bool((values[:, 1:] > 0.0).any()), (
+            f"{task_id} on {map_name}: every measured foot force is zero after landing"
+        )
         print(
             f"[VERIFY] contact_force base_max={values[:, 0].max().item():.6f} "
             f"foot_max={values[:, 1:].max().item():.6f}"

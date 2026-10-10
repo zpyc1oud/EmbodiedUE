@@ -1453,7 +1453,14 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 	USkeletalMeshComponent* AuthoredMesh = NewObject<USkeletalMeshComponent>(ClaimHost);
 	AuthoredMesh->SetSkeletalMesh(LoadObject<USkeletalMesh>(nullptr, PhantomXRobotAsset));
 	ClaimHost->SetRootComponent(AuthoredMesh);
+	AuthoredMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	AuthoredMesh->RegisterComponent();
+	AuthoredMesh->SetSimulatePhysics(true);
+	if (!TestEqual(TEXT("authored claim fixture has all physical bodies before capture"), AuthoredMesh->Bodies.Num(), 19)
+		|| !TestEqual(TEXT("authored claim fixture has all joints before capture"), AuthoredMesh->Constraints.Num(), 18))
+	{
+		return false;
+	}
 	auto CountBodiesWithSleepType = [AuthoredMesh](Chaos::ESleepType SleepType)
 	{
 		int32 Count = 0;

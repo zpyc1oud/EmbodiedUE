@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Chaos/Particle/ObjectState.h"
 #include "Components/ActorComponent.h"
 #include "Engine/HitResult.h"
 #include "UERLInterfaceTypes.h"
@@ -24,6 +25,11 @@ UERLROBOT_API bool ResolveGenericRobotContactBodyIndex(
 	const TMap<FName, int32>& BodyIndexByName,
 	FName BodyName,
 	int32& OutBodyIndex);
+
+/** Shared-world force includes static and kinematic supports, not simulated other bodies. */
+UERLROBOT_API bool IsGenericRobotContactForceStateAccepted(
+	EUERLEnvironmentCollisionScope CollisionScope,
+	Chaos::EObjectStateType OtherState);
 
 /** Convert one completed solver-step Chaos impulse from UE centimetres to SI force. */
 UERLROBOT_API float ConvertGenericRobotAccumulatedImpulseToForceNewtons(
