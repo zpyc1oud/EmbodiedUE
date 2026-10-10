@@ -97,6 +97,23 @@ namespace UERLPhantomXPhysicsTests
 		return FString::Printf(TEXT("(%.9f,%.9f,%.9f)"), V.X, V.Y, V.Z);
 	}
 
+	void ReportInitialPose(FAutomationTestBase& Test, USkeletalMeshComponent& Mesh, const TCHAR* Stage)
+	{
+		FBodyInstance* Root = Mesh.GetBodyInstance(FName(TEXT("base_link")));
+		FPhysicsActorHandle Handle = Root ? Root->GetPhysicsActorHandle() : nullptr;
+		if (!Handle) { Test.AddError(TEXT("initial-pose diagnostic requires root actor")); return; }
+		FPhysicsCommand::ExecuteRead(Handle, [&](const FPhysicsActorHandle& ReadHandle)
+		{
+			auto* Particle = ReadHandle->GetHandle_LowLevel()
+				? ReadHandle->GetHandle_LowLevel()->CastToRigidParticle() : nullptr;
+			Test.AddInfo(FString::Printf(TEXT("[PHYSICS_LIFECYCLE] stage=%s component_cm=%s body_cm=%s com_cm=%s gt_cm=%s solver_exists=%d solver_cm=%s"),
+				Stage, *PreciseVector(Mesh.GetComponentLocation()),
+				*PreciseVector(Root->GetUnrealWorldTransform().GetLocation()),
+				*PreciseVector(Root->GetCOMPosition()), *PreciseVector(ReadHandle->GetGameThreadAPI().X()),
+				Particle != nullptr, *PreciseVector(Particle ? FVector(Particle->X()) : FVector::ZeroVector)));
+		});
+	}
+
 	void SetDiagnosticConditioning(USkeletalMeshComponent& Mesh, int32 Mode)
 	{
 		// Product configuration is mode zero. Separate the two conditioning
@@ -381,19 +398,21 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 Mode : { 0, 1, 2, 3, 4, 5 })
+	for (int32 Mode : { 0, 1, 2, 3, 4, 5, 6 })
 	for (double Sign : { -1.0, 0.0, 1.0 })
 	{
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World) { return false; }
-		if (Mode >= 4 && !Tick(*this, *World, 0.005)) { return false; }
+		if ((Mode == 4 || Mode == 5) && !Tick(*this, *World, 0.005)) { return false; }
 		const auto RobotConfig = Config(3.0);
 		FUERLSkeletalMeshRobotRuntime Runtime;
 		FString Error;
 		if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 		USkeletalMeshComponent* Mesh = FindMesh(*World);
 		if (!Mesh) { AddError(TEXT("momentum test requires the actual PhantomX")); return false; }
+		const bool bReportLifecycle = Sign == 0.0 && (Mode == 0 || Mode == 6);
+		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("initialized")); }
 		Mesh->SetCollisionResponseToAllChannels(ECR_Ignore);
 		for (FBodyInstance* Body : Mesh->Bodies)
 		{
@@ -404,10 +423,40 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 			Body->UpdateDampingProperties();
 		}
 		SetDiagnosticConditioning(*Mesh, Mode == 5 ? 2 : Mode >= 4 ? 0 : Mode);
+		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("configured")); }
 		const FVector InitialCOM = Mesh->GetBodyInstance(FName(TEXT("base_link")))->GetCOMPosition();
+		TArray<FTransform> InitialTransforms;
+		TArray<FVector> InitialLinearVelocities, InitialAngularVelocities;
+		if (Mode == 6)
+		{
+			for (FBodyInstance* Body : Mesh->Bodies)
+			{
+				InitialTransforms.Add(Body->GetUnrealWorldTransform());
+				InitialLinearVelocities.Add(Body->GetUnrealWorldVelocity());
+				InitialAngularVelocities.Add(Body->GetUnrealWorldAngularVelocityInRadians());
+			}
+		}
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
-		if (!Runtime.ApplyActuatorTargets(Targets, Error) || !Tick(*this, *World, 0.005)) { AddError(Error); return false; }
+		if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
+		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("targets_applied")); }
+		if (!Tick(*this, *World, 0.005)) { return false; }
+		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("first_tick")); }
+		if (Mode == 6)
+		{
+			// Diagnostic only: repeat the exact pre-step state after registration.
+			// The formal mode-zero acceptance remains unchanged.
+			for (int32 Index = 0; Index < Mesh->Bodies.Num(); ++Index)
+			{
+				FBodyInstance* Body = Mesh->Bodies[Index];
+				Body->SetBodyTransform(InitialTransforms[Index], ETeleportType::TeleportPhysics, false);
+				Body->SetLinearVelocity(InitialLinearVelocities[Index], false);
+				Body->SetAngularVelocityInRadians(InitialAngularVelocities[Index], false);
+			}
+			if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("state_replayed")); }
+			if (!Tick(*this, *World, 0.005)) { return false; }
+			if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("replay_tick")); }
+		}
 		FBodyInstance* Root = Mesh->GetBodyInstance(FName(TEXT("base_link")));
 		if (!Root) { AddError(TEXT("missing PhantomX root body")); return false; }
 		const FMomentum Before = Momentum(*Mesh);
