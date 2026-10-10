@@ -62,6 +62,7 @@ struct FUERLGenericRobotSpawnedSlot
 	FTransform ClaimedRelativeTransform = FTransform::Identity;
 	bool bClaimedSimulatePhysics = false;
 	TArray<TPair<FName, Chaos::ESleepType>> ClaimedSleepTypes;
+	TArray<TPair<int32, bool>> ClaimedProjection;
 	TStrongObjectPtr<UPhysicalMaterial> ClaimedPhysMaterialOverride;
 };
 

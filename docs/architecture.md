@@ -230,8 +230,11 @@ The torque limit is converted from N·m to UE units without gain scaling.
 Keep these engine scale factors positive and constant during a Robot's lifetime.
 
 A constraint drive and an explicit PD calculation can have different discrete-time responses.
-Body or joint inertia conditioning, projection, and other solver settings can also change the
-physical response. Check measured trajectories and loads with the physical test fixtures.
+Body or joint inertia conditioning and other solver settings can change the physical response.
+The Robot runtime disables joint position projection in training and deployment.
+Projection can change pose without matching physical velocity and can change total momentum.
+A claimed component regains its original projection settings when released.
+Check measured trajectories and loads with the physical test fixtures.
 A calculated PD effort is not measured solver torque.
 The current actuator is an idealized simulation drive with an effort cap.
 It does not model servo voltage, temperature, a torque-speed curve, or communication delay.

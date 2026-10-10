@@ -255,6 +255,7 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 		FVector SolverTarget;
 		FPhysicsInterface::GetDriveAngularVelocity(C->GetPhysicsConstraintRef(), SolverTarget);
 		TestTrue(TEXT("zero requested drive speed reaches the solver"), SolverTarget.Size() < 1.0e-8);
+		TestFalse(TEXT("Robot physics disables position-only joint projection"), C->IsProjectionEnabled());
 		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] joint=%s child=%s parent=%s twist_motion=%d twist_limit_deg=%.6f projection=%d mass_conditioning=%d frame1=%s frame2=%s"),
 			*C->JointName.ToString(), *C->ConstraintBone1.ToString(), *C->ConstraintBone2.ToString(),
 			static_cast<int32>(C->GetAngularTwistMotion()), C->GetAngularTwistLimit(), C->IsProjectionEnabled(),
@@ -275,12 +276,8 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
 	TArray<float> D1Final;
-	// The authored run remains the acceptance gate. Controlled D1 repeats
-	// localize position-only projection and nonphysical mass conditioning.
-	for (int32 DiagnosticMode : { 0, 1, 2, 3 })
 	for (int32 Decimation : { 1, 4 })
 	{
-		if (DiagnosticMode != 0 && Decimation != 1) { continue; }
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World || !Ground(*World)) { AddError(TEXT("missing state-consistency World")); return false; }
@@ -290,19 +287,6 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 		if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 		USkeletalMeshComponent* Mesh = FindMesh(*World);
 		if (!Mesh) { AddError(TEXT("missing consistency mesh")); return false; }
-		for (FConstraintInstance* C : Mesh->Constraints)
-		{
-			if (!C) { AddError(TEXT("missing consistency constraint")); return false; }
-			if (DiagnosticMode & 1) { C->DisableProjection(); }
-			if (DiagnosticMode & 2) { C->DisableMassConditioning(); }
-		}
-		if (DiagnosticMode & 2)
-		{
-			for (FBodyInstance* Body : Mesh->Bodies)
-			{
-				if (Body) { Body->SetInertiaConditioningEnabled(false); }
-			}
-		}
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
 		TArray<double> DeltaQ, IntegratedW, Variation, MaximumPrefixError, MaximumPrefixExcess;
@@ -339,7 +323,7 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 			}
 			Previous = State;
 		}
-		if (!SaveTrace(*this, FString::Printf(TEXT("phantomx-fixed-target-mode%d-D%d"), DiagnosticMode, Decimation), Trace)) { return false; }
+		if (!SaveTrace(*this, FString::Printf(TEXT("phantomx-fixed-target-D%d"), Decimation), Trace)) { return false; }
 		for (int32 J = 0; J < 18; ++J)
 		{
 			// Include a first-order variation budget and an absolute six-second
@@ -348,9 +332,9 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 			const FString Label = FString::Printf(TEXT("%s D%d position change agrees with solver-step velocity integral"),
 				*RobotConfig.Actuators[J].JointName.ToString(), Decimation);
 			// A later opposite error or noisy section cannot erase an earlier failure.
-			if (DiagnosticMode == 0) { TestTrue(*Label, MaximumPrefixExcess[J] <= 0.0); }
-			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] mode=%d joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f max_prefix_error=%.9f max_prefix_excess=%.9f"),
-				DiagnosticMode, *RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance,
+			TestTrue(*Label, MaximumPrefixExcess[J] <= 0.0);
+			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f max_prefix_error=%.9f max_prefix_excess=%.9f"),
+				*RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance,
 				MaximumPrefixError[J], MaximumPrefixExcess[J]));
 		}
 		if (Decimation == 1) { D1Final = State; }
@@ -375,7 +359,6 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 DiagnosticMode : { 0, 1, 2, 3 })
 	for (double Sign : { -1.0, 0.0, 1.0 })
 	{
 		auto Scene = MakeScene();
@@ -395,13 +378,6 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 			Body->LinearDamping = 0.0f;
 			Body->AngularDamping = 0.0f;
 			Body->UpdateDampingProperties();
-			if (DiagnosticMode & 2) { Body->SetInertiaConditioningEnabled(false); }
-		}
-		for (FConstraintInstance* C : Mesh->Constraints)
-		{
-			if (!C) { AddError(TEXT("missing momentum constraint")); return false; }
-			if (DiagnosticMode & 1) { C->DisableProjection(); }
-			if (DiagnosticMode & 2) { C->DisableMassConditioning(); }
 		}
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
@@ -418,15 +394,12 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 		}
 		const FMomentum After = Momentum(*Mesh);
 		const FVector ExpectedAngular = FVector::CrossProduct(At, Impulse);
-		if (DiagnosticMode == 0)
-		{
 		TestTrue(TEXT("internal articulation forces preserve total linear momentum"),
 			Matches(After.Linear - Before.Linear, Impulse, 0.001 + Impulse.Size() * 0.02));
 		TestTrue(TEXT("internal articulation torques preserve total angular momentum about the fixed world origin"),
 			Matches(After.Angular - Before.Angular, ExpectedAngular, 0.0001 + ExpectedAngular.Size() * 0.02));
-		}
-		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] phantomx_momentum mode=%d sign=%.0f expected_dp=%s actual_dp=%s expected_dL=%s actual_dL=%s"),
-			DiagnosticMode, Sign, *Impulse.ToString(), *(After.Linear - Before.Linear).ToString(),
+		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] phantomx_momentum sign=%.0f expected_dp=%s actual_dp=%s expected_dL=%s actual_dL=%s"),
+			Sign, *Impulse.ToString(), *(After.Linear - Before.Linear).ToString(),
 			*ExpectedAngular.ToString(), *(After.Angular - Before.Angular).ToString()));
 	}
 	return true;

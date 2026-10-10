@@ -105,6 +105,14 @@ void DestroyGenericRobotSpawnedSlots(TArray<FUERLGenericRobotSpawnedSlot>& Slots
 				Component->SetCollisionProfileName(Slot.ClaimedCollisionProfile);
 			}
 			Component->SetMobility(Slot.ClaimedMobility);
+			for (const TPair<int32, bool>& Projection : Slot.ClaimedProjection)
+			{
+				if (FConstraintInstance* Constraint = Component->GetConstraintInstanceByIndex(Projection.Key))
+				{
+					if (Projection.Value) { Constraint->EnableProjection(); }
+					else { Constraint->DisableProjection(); }
+				}
+			}
 			if (Slot.ClaimedAttachParent.IsValid())
 			{
 				Component->AttachToComponent(
@@ -377,6 +385,13 @@ bool SpawnGenericRobotSlots(
 		{
 			FConstraintInstance* Constraint = Component->GetConstraintInstanceByIndex(ConstraintIndex);
 			checkf(Constraint, TEXT("generic Robot runtime constraint %d is missing"), ConstraintIndex);
+			if (!bOwnsActor)
+			{
+				Slot.ClaimedProjection.Emplace(ConstraintIndex, Constraint->IsProjectionEnabled());
+			}
+			// Projection changes joint poses outside the velocity solve. Robot
+			// feedback must describe one physical trajectory in train and deploy.
+			Constraint->DisableProjection();
 			Constraint->SetLinearPositionDrive(false, false, false);
 			Constraint->SetLinearVelocityDrive(false, false, false);
 			Constraint->SetOrientationDriveTwistAndSwing(false, false);

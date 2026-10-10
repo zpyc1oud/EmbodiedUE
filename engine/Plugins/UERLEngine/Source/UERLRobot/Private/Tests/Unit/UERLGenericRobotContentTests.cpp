@@ -1464,6 +1464,14 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 		}
 		return Count;
 	};
+	TArray<bool> AuthoredProjection;
+	for (int32 Index = 0; Index < AuthoredMesh->Constraints.Num(); ++Index)
+	{
+		FConstraintInstance* C = AuthoredMesh->Constraints[Index];
+		if (!C) { AddError(TEXT("missing authored claim constraint")); return false; }
+		if (Index % 2 == 0) { C->EnableProjection(); } else { C->DisableProjection(); }
+		AuthoredProjection.Add(C->IsProjectionEnabled());
+	}
 	TWeakObjectPtr<UPhysicalMaterial> AuthoredMaterial = NewObject<UPhysicalMaterial>(GetTransientPackage());
 	AuthoredMesh->SetPhysMaterialOverride(AuthoredMaterial.Get());
 	FUERLSkeletalMeshRobotRuntimeConfig ClaimConfig = PhantomXRuntimeConfig(FVector(300.0, 0.0, -25.0));
@@ -1476,6 +1484,10 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	TestTrue(TEXT("claimed robot has physics bodies"), AuthoredMesh->Bodies.Num() > 0);
+	for (const FConstraintInstance* C : AuthoredMesh->Constraints)
+	{
+		TestTrue(TEXT("claimed Robot disables position projection while controlled"), C && !C->IsProjectionEnabled());
+	}
 	TestEqual(TEXT("claimed robot bodies never sleep while controlled"),
 		CountBodiesWithSleepType(Chaos::ESleepType::NeverSleep), AuthoredMesh->Bodies.Num());
 	// Material replacement uses the same component API as ground-friction events.
@@ -1486,6 +1498,12 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 	Runtime.Reset();
 	TestTrue(TEXT("claim release restores the original material after garbage collection"),
 		AuthoredMaterial.IsValid() && AuthoredMesh->GetPhysicsMaterialOverride() == AuthoredMaterial.Get());
+	for (int32 Index = 0; Index < AuthoredProjection.Num(); ++Index)
+	{
+		const FConstraintInstance* C = AuthoredMesh->GetConstraintInstanceByIndex(Index);
+		TestTrue(TEXT("claim release restores each authored projection setting"),
+			C && C->IsProjectionEnabled() == AuthoredProjection[Index]);
+	}
 	TestEqual(TEXT("release restores the authored material sleep type"),
 		CountBodiesWithSleepType(Chaos::ESleepType::MaterialSleep), AuthoredMesh->Bodies.Num());
 
