@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 
+#include "Chaos/ChaosEngineInterface.h"
 #include "Chaos/RigidParticles.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -135,6 +136,28 @@ namespace UERLPhysicsResponseTests
 		return MeasureGenericJointPosition(
 			Joint.GetRefFrame(EConstraintFrame::Frame1) * Cube.GetBodyInstance()->GetUnrealWorldTransform(),
 			Joint.GetRefFrame(EConstraintFrame::Frame2), EUERLJointCoordinate::Twist);
+	}
+
+
+	void ReportHinge(FAutomationTestBase& Test, UStaticMeshComponent& Cube,
+		FConstraintInstance& Joint, const TCHAR* Trial, int32 Step)
+	{
+		FBodyInstance* Body = Cube.GetBodyInstance();
+		const FVector W = Body->GetUnrealWorldAngularVelocityInRadians();
+		const FVector I = Body->GetBodyInertiaTensor() / 10000.0;
+		FVector ReactionForce, ReactionTorque;
+		Joint.GetConstraintForce(ReactionForce, ReactionTorque);
+		const FVector ProfileTarget = Joint.GetAngularVelocityTarget();
+		FVector SolverTarget = FVector::ZeroVector;
+		FPhysicsInterface::GetDriveAngularVelocity(Joint.GetPhysicsConstraintRef(), SolverTarget);
+		const auto& Drive = Joint.ProfileInstance.AngularDrive;
+		Test.AddInfo(FString::Printf(
+			TEXT("[PHYSICS_DIAGNOSTIC] trial=%s step=%d mass=%.9f I_si=(%.9f,%.9f,%.9f) q=%.9f w=(%.9f,%.9f,%.9f) reaction_nm=(%.9f,%.9f,%.9f) kp_si=%.9f kd_si=%.9f limit_nm=%.9f acceleration=%d projection=%d profile_target_rev_s=(%.9f,%.9f,%.9f) solver_target_rad_s=(%.9f,%.9f,%.9f)"),
+			Trial, Step, Body->GetBodyMass(), I.X, I.Y, I.Z, JointPosition(Cube, Joint),
+			W.X, W.Y, W.Z, ReactionTorque.X / 10000.0, ReactionTorque.Y / 10000.0, ReactionTorque.Z / 10000.0,
+			Drive.TwistDrive.Stiffness / 10000.0, Drive.TwistDrive.Damping / 10000.0,
+			Drive.TwistDrive.MaxForce / 10000.0, Drive.bAccelerationMode, Joint.IsProjectionEnabled(),
+			ProfileTarget.X, ProfileTarget.Y, ProfileTarget.Z, SolverTarget.X, SolverTarget.Y, SolverTarget.Z));
 	}
 
 	bool RunFreeBody(FAutomationTestBase& Test, bool Angular)
@@ -278,6 +301,10 @@ bool FUERLLoadedPositionDriveResponseTest::RunTest(const FString& Parameters)
 					MaxRestFiniteDifference = FMath::Max(MaxRestFiniteDifference, FMath::Abs(LastQ - PreviousQ) / Dt);
 				}
 				PreviousQ = LastQ;
+				if (Step == 0 || Step == 799)
+				{
+					ReportHinge(*this, *Cube, Joint->ConstraintInstance, TEXT("equilibrium"), Step);
+				}
 			}
 			// Static balance: Kp * (target - q) + external_torque = 0.
 			const double ExpectedQ = Target + LoadNm / 2.0;
@@ -323,6 +350,7 @@ bool FUERLSaturatedPositionDriveResponseTest::RunTest(const FString& Parameters)
 			// The drive must oppose the external load at its 0.2 Nm cap.
 			Cube->AddTorqueInRadians(FVector::XAxisVector * (Sign * 0.4 * 10000.0), NAME_None, false);
 			if (!Tick(*this, *World, Dt)) { return false; }
+			ReportHinge(*this, *Cube, Joint->ConstraintInstance, TEXT("saturation"), Step);
 		}
 		constexpr double InertiaSi = 10.0 * 0.2 * 0.2 / 6.0;
 		const double ExpectedW = Sign * (0.4 - 0.2) / InertiaSi * (20 * Dt);
