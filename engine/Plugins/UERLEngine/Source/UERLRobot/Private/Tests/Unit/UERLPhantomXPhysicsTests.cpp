@@ -398,9 +398,10 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 Mode : { 0, 1, 2, 3, 4, 5, 6 })
+	for (int32 Mode : { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 })
 	for (double Sign : { -1.0, 0.0, 1.0 })
 	{
+		if (Mode >= 7 && Sign != 0.0) { continue; }
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World) { return false; }
@@ -411,7 +412,7 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 		if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 		USkeletalMeshComponent* Mesh = FindMesh(*World);
 		if (!Mesh) { AddError(TEXT("momentum test requires the actual PhantomX")); return false; }
-		const bool bReportLifecycle = Sign == 0.0 && (Mode == 0 || Mode == 6);
+		const bool bReportLifecycle = Sign == 0.0 && (Mode == 0 || Mode >= 6);
 		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("initialized")); }
 		Mesh->SetCollisionResponseToAllChannels(ECR_Ignore);
 		for (FBodyInstance* Body : Mesh->Bodies)
@@ -427,7 +428,7 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 		const FVector InitialCOM = Mesh->GetBodyInstance(FName(TEXT("base_link")))->GetCOMPosition();
 		TArray<FTransform> InitialTransforms;
 		TArray<FVector> InitialLinearVelocities, InitialAngularVelocities;
-		if (Mode == 6)
+		if (Mode == 6 || Mode == 8)
 		{
 			for (FBodyInstance* Body : Mesh->Bodies)
 			{
@@ -436,16 +437,8 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 				InitialAngularVelocities.Add(Body->GetUnrealWorldAngularVelocityInRadians());
 			}
 		}
-		TArray<float> Targets;
-		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
-		if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
-		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("targets_applied")); }
-		if (!Tick(*this, *World, 0.005)) { return false; }
-		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("first_tick")); }
-		if (Mode == 6)
+		const auto ReplayInitialBodies = [&]()
 		{
-			// Diagnostic only: repeat the exact pre-step state after registration.
-			// The formal mode-zero acceptance remains unchanged.
 			for (int32 Index = 0; Index < Mesh->Bodies.Num(); ++Index)
 			{
 				FBodyInstance* Body = Mesh->Bodies[Index];
@@ -453,6 +446,44 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 				Body->SetLinearVelocity(InitialLinearVelocities[Index], false);
 				Body->SetAngularVelocityInRadians(InitialAngularVelocities[Index], false);
 			}
+		};
+		TArray<float> Targets;
+		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
+		if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
+		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("targets_applied")); }
+		if (Mode == 7)
+		{
+			for (FBodyInstance* Body : Mesh->Bodies)
+			{
+				FPhysicsCommand::ExecuteWrite(Body->GetPhysicsActorHandle(), [](const FPhysicsActorHandle& Handle)
+				{
+					auto& GT = Handle->GetGameThreadAPI();
+					GT.SetX(GT.X());
+					GT.SetR(GT.R());
+				});
+			}
+			ReportInitialPose(*this, *Mesh, TEXT("same_pose_marked"));
+		}
+		if (Mode == 8)
+		{
+			FUERLSolverClockSnapshot BeforeFlush, AfterFlush;
+			if (!ReadUERLSolverClock(*World, BeforeFlush, Error)) { AddError(Error); return false; }
+			World->GetPhysicsScene()->Flush();
+			if (!ReadUERLSolverClock(*World, AfterFlush, Error)) { AddError(Error); return false; }
+			AddInfo(FString::Printf(TEXT("[PHYSICS_LIFECYCLE] flush_delta_frame=%lld flush_delta_time=%.9f"),
+				static_cast<long long>(AfterFlush.Frame - BeforeFlush.Frame), AfterFlush.SolverTime - BeforeFlush.SolverTime));
+			ReportInitialPose(*this, *Mesh, TEXT("zero_dt_flush"));
+			ReplayInitialBodies();
+			ReportInitialPose(*this, *Mesh, TEXT("flushed_state_replayed"));
+		}
+		if (Mode == 9) { Mesh->SetComponentTickEnabled(false); }
+		if (!Tick(*this, *World, 0.005)) { return false; }
+		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("first_tick")); }
+		if (Mode == 6)
+		{
+			// Diagnostic only: repeat the exact pre-step state after registration.
+			// The formal mode-zero acceptance remains unchanged.
+			ReplayInitialBodies();
 			if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("state_replayed")); }
 			if (!Tick(*this, *World, 0.005)) { return false; }
 			if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("replay_tick")); }
