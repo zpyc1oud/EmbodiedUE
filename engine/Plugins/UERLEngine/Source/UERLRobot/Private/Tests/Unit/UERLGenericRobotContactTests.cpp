@@ -5,6 +5,32 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUERLGenericRobotContactForceStateTest,
+	"UERL.Unit.Robot.GenericContact.ForceObjectState",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLGenericRobotContactForceStateTest::RunTest(const FString& Parameters)
+{
+	const auto Shared = EUERLEnvironmentCollisionScope::SharedWorld;
+	const auto Isolated = EUERLEnvironmentCollisionScope::SlotIsolated;
+	TestTrue(TEXT("static terrain contributes shared-world force"),
+		IsGenericRobotContactForceStateAccepted(Shared, Chaos::EObjectStateType::Static));
+	TestTrue(TEXT("movable non-simulated terrain contributes shared-world force"),
+		IsGenericRobotContactForceStateAccepted(Shared, Chaos::EObjectStateType::Kinematic));
+	TestFalse(TEXT("dynamic other bodies remain excluded in shared world"),
+		IsGenericRobotContactForceStateAccepted(Shared, Chaos::EObjectStateType::Dynamic));
+	TestFalse(TEXT("sleeping simulated bodies remain excluded in shared world"),
+		IsGenericRobotContactForceStateAccepted(Shared, Chaos::EObjectStateType::Sleeping));
+	for (const auto State : {Chaos::EObjectStateType::Static, Chaos::EObjectStateType::Kinematic,
+		Chaos::EObjectStateType::Dynamic, Chaos::EObjectStateType::Sleeping})
+	{
+		TestTrue(TEXT("isolated force accepts every non-self environment state"),
+			IsGenericRobotContactForceStateAccepted(Isolated, State));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FUERLGenericRobotContactFilterTest,
 	"UERL.Unit.Robot.GenericContact.AC_UE_UNIT_ROBOT_CONTACT_002.EnvironmentFilter",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

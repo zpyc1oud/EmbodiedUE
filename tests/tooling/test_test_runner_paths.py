@@ -139,6 +139,12 @@ def test_e2e_session_launch_uses_selected_host(
     with pytest.raises(_LaunchBoundaryReached):
         if case == "test_phantomx_default_pose_settles_without_spurious_reset":
             callback(tmp_path, terrain_level=0)
+        elif case == "test_phantomx_contact_force_fields_round_trip_as_nonnegative_finite_values":
+            callback(
+                tmp_path,
+                task_id=settings["PHANTOMX_TERRAIN_TASK_ID"],
+                map_name="/Engine/Maps/Entry",
+            )
         else:
             callback(tmp_path)
 
