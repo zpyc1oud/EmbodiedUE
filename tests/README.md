@@ -247,6 +247,13 @@ They also stop the input and check momentum, so a stale force cannot pass.
 Missing input, reversed input, and a 100-fold input scaling error must fail the same physical oracle.
 These are deliberate fixture-input faults; they do not modify production code.
 
+The supported effort path requires positive damping and applies `target - damping * velocity`.
+Use that declared law in its physical prediction; zero-gain free-body input is a separate reference fixture.
+The CartPole force fixture locks the pole so the independent translation model has total mass `m_cart + m_pole`.
+Its velocity follows `v(t) = target/d + (v0 - target/d) exp(-d*t/m)` within each constant-input phase.
+The fixed-axis pole uses the corresponding angular solution with the inventoried hinge inertia.
+These fixtures preserve the product command path and its documented damping behavior.
+
 The expected response uses declared SI properties and elementary mechanics.
 Do not compute it with the production unit-conversion function.
 Check actual mass and inertia against the declared fixture before evaluating motion.

@@ -64,7 +64,7 @@ namespace UERLPhantomXPhysicsTests
 		if (!Actor) { return false; }
 		UStaticMeshComponent* Mesh = Actor->GetStaticMeshComponent();
 		Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
-		Mesh->SetMobility(EComponentMobility::Static);
+		Mesh->SetMobility(EComponentMobility::Movable);
 		Mesh->SetWorldScale3D(FVector(20.0, 20.0, 0.2));
 		Mesh->SetWorldLocation(FVector(0.0, 0.0, -10.0));
 		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -645,6 +645,8 @@ bool FUERLGeometricSupportWithoutForceTest::RunTest(const FString& Parameters)
     if (!Plane) { AddError(TEXT("missing support plane")); return false; }
     Plane->SetMobility(EComponentMobility::Movable);
     Plane->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    Plane->SetCollisionObjectType(ECC_WorldStatic);
+    Plane->SetCollisionResponseToAllChannels(ECR_Block);
     auto RobotConfig = Config(3.0);
     RobotConfig.Observations.Reset();
     RobotConfig.Observations.Add({ EUERLObservationType::Contact, FName(TEXT("base_link")) });
@@ -749,7 +751,7 @@ bool FUERLPhantomXBodyFeedbackTest::RunTest(const FString& Parameters)
             const FVector ReportedW(State[I + 10], State[I + 11], State[I + 12]);
             TestTrue(TEXT("named child pose feedback uses the declared SI link frame"),
                 Matches(Position, Link.GetLocation() / 100.0, 1.0e-5)
-                && Rotation.AngularDistance(Link.GetRotation()) < 1.0e-5);
+                && Rotation.GetNormalized().AngularDistance(Link.GetRotation().GetNormalized()) < 1.0e-5);
             // The current body-linear-velocity field is COM velocity. Do not
             // compare it with the derivative of an offset link-origin pose.
             TestTrue(TEXT("named body velocity feedback preserves COM and angular semantics"),

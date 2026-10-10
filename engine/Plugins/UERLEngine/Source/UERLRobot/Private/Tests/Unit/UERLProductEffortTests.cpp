@@ -30,7 +30,7 @@ bool FUERLProductForceMomentumTest::RunTest(const FString& Parameters)
 			FUERLSkeletalMeshRuntimeActuator& Actuator = Config.Actuators.AddDefaulted_GetRef();
 			Actuator.JointName = TEXT("cart");
 			Actuator.Stiffness = 0.0; // Select the actual generic effort path.
-			Actuator.Damping = 0.0;
+			Actuator.Damping = 0.1; // The supported effort law includes viscous damping.
 			Actuator.EffortLimit = 10.0;
 			Config.Observations.Add({ EUERLObservationType::JointPosition, FName(TEXT("cart")) });
 			Config.Observations.Add({ EUERLObservationType::JointVelocity, FName(TEXT("cart")) });
@@ -62,6 +62,13 @@ bool FUERLProductForceMomentumTest::RunTest(const FString& Parameters)
 			{
 				if (C) { C->DisableProjection(); C->DisableMassConditioning(); }
 			}
+			// A fixed pole gives one independent translational coordinate. This
+			// lets the supported target-minus-damping law have a closed solution.
+			FConstraintInstance* PoleJoint = Mesh->FindConstraintInstance(FName(TEXT("pole")));
+			if (!PoleJoint) { AddError(TEXT("missing pole fixture constraint")); return false; }
+			PoleJoint->SetAngularTwistMotion(EAngularConstraintMotion::ACM_Locked);
+			PoleJoint->SetAngularSwing1Motion(EAngularConstraintMotion::ACM_Locked);
+			PoleJoint->SetAngularSwing2Motion(EAngularConstraintMotion::ACM_Locked);
 			constexpr double Dt = 0.005;
 			if (!Tick(*this, *World, Dt)) { return false; }
 			TestTrue(TEXT("cart mass matches its declared physical fixture"), FMath::Abs(Cart->GetBodyMass() - CartMass) < 1.0e-5);
@@ -79,7 +86,9 @@ bool FUERLProductForceMomentumTest::RunTest(const FString& Parameters)
 					+ Pole->GetUnrealWorldVelocity() * (0.2 / 100.0));
 			};
 			const double InitialMomentum = MomentumAlongRail();
-			double DeclaredImpulse = 0.0;
+			double ExpectedMomentum = InitialMomentum;
+			const double TotalMass = CartMass + 0.2;
+			constexpr double Damping = 0.1;
 			for (float Force : { 1.0f, 0.0f, -1.0f })
 			{
 				const float Targets[] = { Force };
@@ -89,12 +98,12 @@ bool FUERLProductForceMomentumTest::RunTest(const FString& Parameters)
 				for (int32 Step = 0; Step < 40; ++Step)
 				{
 					if (!Tick(*this, *World, Dt)) { return false; }
-					DeclaredImpulse += Force * Dt;
-					const double Measured = MomentumAlongRail() - InitialMomentum;
-					// The rail supplies no force along its free axis. All cart/pole
-					// joint forces cancel in total momentum, even while the pole rotates.
-					TestTrue(TEXT("generic held effort produces the independently declared whole-system impulse"),
-						FMath::Abs(Measured - DeclaredImpulse) <= 0.001 + FMath::Abs(DeclaredImpulse) * 0.02);
+					const double EquilibriumMomentum = Force * TotalMass / Damping;
+					ExpectedMomentum = EquilibriumMomentum + (ExpectedMomentum - EquilibriumMomentum)
+						* FMath::Exp(-Damping * Dt / TotalMass);
+					const double Measured = MomentumAlongRail();
+					TestTrue(TEXT("generic held effort follows the independent damped whole-system response"),
+						FMath::Abs(Measured - ExpectedMomentum) <= 0.001 + FMath::Abs(ExpectedMomentum) * 0.02);
 				}
 			}
 			const float ForceBeforeReset[] = { 1.0f };
@@ -139,7 +148,7 @@ bool FUERLProductTorqueResponseTest::RunTest(const FString& Parameters)
         Config.PlacementTransform = FTransform(FRotator(0.0, Yaw, 0.0), FVector(0.0, 0.0, 300.0));
         auto& A = Config.Actuators.AddDefaulted_GetRef();
         A.JointName = TEXT("pole"); A.Stiffness = SolverCallback ? 0.0 : 1.0;
-        A.Damping = 0.0; A.EffortLimit = 10.0;
+        A.Damping = 0.01; A.EffortLimit = 10.0;
         Config.Observations.Add({ EUERLObservationType::JointPosition, FName(TEXT("pole")) });
         Config.Observations.Add({ EUERLObservationType::JointVelocity, FName(TEXT("pole")) });
         FUERLSkeletalMeshRobotRuntime Runtime;
@@ -202,7 +211,7 @@ bool FUERLProductTorqueResponseTest::RunTest(const FString& Parameters)
         EffortActuators.Add(FUERLActuatorConfig{
             0, PoleIndex, FName(TEXT("pole")), TEXT("revolute"),
             Twist ? TEXT("twist") : Swing1 ? TEXT("swing1") : TEXT("swing2"), TEXT("N*m"), TEXT("effort"),
-            0.0, 0.0, 10.0, 0.0 });
+            0.0, 0.01, 10.0, 0.0 });
         TArray<float> DirectTargets = { 0.0f };
         FUERLRobotCommandSlotView DirectSlot{ Mesh, &Indices, &DirectTargets };
         const FTransform ParentFrame = Joint->GetRefFrame(EConstraintFrame::Frame2) * Cart->GetUnrealWorldTransform();
@@ -236,9 +245,13 @@ bool FUERLProductTorqueResponseTest::RunTest(const FString& Parameters)
             if (SolverCallback && !Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
             for (int32 Step = 0; Step < Steps; ++Step)
             {
-                const double Acceleration = Multiplier * 0.5;
-                ExpectedQ += ExpectedW * Dt + 0.5 * Acceleration * Dt * Dt;
-                ExpectedW += Acceleration * Dt; Elapsed += Dt;
+                constexpr double Damping = 0.01;
+                const double Rate = Damping / Inertia;
+                const double EquilibriumW = Multiplier * Torque / Damping;
+                const double Decay = FMath::Exp(-Rate * Dt);
+                ExpectedQ += EquilibriumW * Dt + (ExpectedW - EquilibriumW) * (1.0 - Decay) / Rate;
+                ExpectedW = EquilibriumW + (ExpectedW - EquilibriumW) * Decay;
+                Elapsed += Dt;
                 if (!SolverCallback && !ApplyGenericRobotActuatorForces(DirectSlot, Topology, EffortActuators, Error))
                 { AddError(Error); return false; }
                 if (!Tick(*this, *World, Dt)) { return false; }

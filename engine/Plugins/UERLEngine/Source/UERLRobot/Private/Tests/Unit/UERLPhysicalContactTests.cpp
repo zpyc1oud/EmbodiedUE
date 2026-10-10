@@ -30,7 +30,7 @@ namespace UERLPhysicalContactTests
 		AStaticMeshActor* Actor = World.SpawnActor<AStaticMeshActor>();
 		if (!Actor) { return nullptr; }
 		UStaticMeshComponent* Mesh = Actor->GetStaticMeshComponent();
-		Mesh->SetMobility(EComponentMobility::Static);
+		Mesh->SetMobility(EComponentMobility::Movable);
 		Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
 		Mesh->SetWorldScale3D(FVector(20.0, 20.0, 0.2));
 		Mesh->SetWorldLocation(FVector(0.0, 0.0, -10.0)); // top face is z=0
@@ -38,6 +38,8 @@ namespace UERLPhysicalContactTests
 		Mesh->SetCollisionObjectType(ECC_WorldStatic);
 		Mesh->SetCollisionResponseToAllChannels(ECR_Block);
 		Mesh->SetPhysMaterialOverride(Material(Actor, Friction, Restitution));
+		// Register the final static body only after configuring its transform.
+		Mesh->SetMobility(EComponentMobility::Static);
 		return Mesh;
 	}
 
@@ -87,6 +89,9 @@ namespace UERLPhysicalContactTests
 		{
 			if (!UERLPhysicsResponseTests::Tick(Test, World, 0.005)) { return false; }
 		}
+		Test.AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] contact_settle com_m=%s velocity_m_s=%s"),
+			*(Body.GetBodyInstance()->GetCOMPosition() / 100.0).ToString(),
+			*(Body.GetBodyInstance()->GetUnrealWorldVelocity() / 100.0).ToString()));
 		return Test.TestTrue(TEXT("contact fixture settles before the measured phase"),
 			Body.GetBodyInstance()->GetUnrealWorldVelocity().Size() / 100.0 < 0.002
 			&& FMath::Abs(Body.GetBodyInstance()->GetCOMPosition().Z / 100.0 - 0.1) < 0.003);

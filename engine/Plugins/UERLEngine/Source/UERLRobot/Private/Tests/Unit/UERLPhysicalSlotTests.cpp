@@ -34,7 +34,7 @@ bool FUERLPhysicalSparseResetTest::RunTest(const FString& Parameters)
         if (CartIndex == INDEX_NONE) { AddError(TEXT("missing cart joint")); return false; }
         Input.Actuators.Add(FUERLActuatorConfig{
             0, CartIndex, FName(TEXT("cart")), TEXT("prismatic"), TEXT("linear_x"), TEXT("N"), TEXT("effort"),
-            0.0, 0.0, 10.0, 0.0 });
+            0.0, 0.1, 10.0, 0.0 });
         if (!Factory->ValidateConfig(Input, Effective, Error)) { AddError(Error); return false; }
         const auto& Descriptor = Factory->Describe();
         FUERLBatchSchema Schema;
@@ -91,6 +91,11 @@ bool FUERLPhysicalSparseResetTest::RunTest(const FString& Parameters)
                 Body->UpdateDampingProperties(); Body->SetInertiaConditioningEnabled(false);
             }
             for (auto* C : Mesh->Constraints) { if (C) { C->DisableProjection(); C->DisableMassConditioning(); } }
+            auto* PoleJoint = Mesh->FindConstraintInstance(FName(TEXT("pole")));
+            if (!PoleJoint) { AddError(TEXT("missing Slot pole constraint")); return false; }
+            PoleJoint->SetAngularTwistMotion(EAngularConstraintMotion::ACM_Locked);
+            PoleJoint->SetAngularSwing1Motion(EAngularConstraintMotion::ACM_Locked);
+            PoleJoint->SetAngularSwing2Motion(EAngularConstraintMotion::ACM_Locked);
         }
         constexpr double Dt = 0.005;
         if (!Tick(*this, *World, Dt)) { return false; }
@@ -118,8 +123,12 @@ bool FUERLPhysicalSparseResetTest::RunTest(const FString& Parameters)
             {
                 const double P = Meshes[Slot]->GetBodyInstance(FName(TEXT("cart")))->GetUnrealWorldVelocity().X / 100.0
                     + 0.2 * Meshes[Slot]->GetBodyInstance(FName(TEXT("pole")))->GetUnrealWorldVelocity().X / 100.0;
+                constexpr double TotalMass = 1.2, Damping = 0.1;
+                const double EquilibriumMomentum = Commands[Slot] * TotalMass / Damping;
+                const double InitialMomentum = Slot == 0 ? 0.02 : -0.04;
                 const double Expected = Slot == 0 && ResetSelected && Step >= 100 ? 0.0
-                    : (Slot == 0 ? 0.02 : -0.04) + Commands[Slot] * (Step + 1) * Dt;
+                    : EquilibriumMomentum + (InitialMomentum - EquilibriumMomentum)
+                        * FMath::Exp(-Damping * (Step + 1) * Dt / TotalMass);
                 TestTrue(TEXT("selected physical force and impulse have the declared whole-system momentum"),
                     FMath::Abs(P - Expected) <= 0.001 + FMath::Abs(Expected) * 0.02);
                 if (Slot == 0 && ResetSelected && Step >= 100)
