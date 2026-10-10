@@ -544,6 +544,11 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 		BodyNames.Add(Setup->BoneName);
 		TotalMass += Body->GetBodyMass();
 	}
+	auto* ContactContainer = CompletedContactContainer(*this, *World);
+	if (!ContactContainer) { return false; }
+	const auto* SolverTypeOverride = IConsoleManager::Get().FindConsoleVariable(TEXT("p.Chaos.Solver.Collision.SolverType"));
+	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] contact_solver_type=%d override=%d"),
+		static_cast<int32>(ContactContainer->GetSolverType()), SolverTypeOverride ? SolverTypeOverride->GetInt() : -999));
 	const FMomentum Before = Momentum(*Mesh);
 	FVector Origin = FVector::ZeroVector;
 	for (FName Name : BodyNames)
