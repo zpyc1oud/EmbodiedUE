@@ -302,4 +302,67 @@ bool FUERLStaticAngularReactionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLHingeFiniteDifferenceTest,
+    "UERL.Integration.PhysicsResponse.Joint.CompletedPoseVelocityAtTwoSteps",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLHingeFiniteDifferenceTest::RunTest(const FString& Parameters)
+{
+    using namespace UERLPhysicsResponseTests;
+    FLockstepSettings Settings;
+    for (double Mass : { 1.0, 2.0 })
+    for (double Dt : { 0.005, 0.0025 })
+    for (double Sign : { -1.0, 1.0 })
+    {
+        auto Scene = MakeScene();
+        UWorld* World = Scene->GetWorld();
+        UStaticMeshComponent* Cube = World ? MakeCube(*World, Mass) : nullptr;
+        if (!Cube || !Cube->GetBodyInstance()) { AddError(TEXT("missing finite-difference fixture")); return false; }
+        UPhysicsConstraintComponent* Joint = PinCube(*Cube, 0.0, 0.0, 1.0);
+        Joint->ConstraintInstance.DisableMassConditioning();
+        Joint->ConstraintInstance.SetOrientationDriveTwistAndSwing(false, false);
+        Joint->ConstraintInstance.SetAngularVelocityDriveTwistAndSwing(false, false);
+        if (!Tick(*this, *World, Dt)) { return false; }
+        constexpr double Torque = 0.01;
+        const double I = Mass * 0.04 / 6.0;
+        const double Acceleration = Sign * Torque / I;
+        TestTrue(TEXT("declared analytic inertia reaches the hinge body"),
+            Matches(Cube->GetBodyInstance()->GetBodyInertiaTensor() / 10000.0, FVector(I), 1.0e-5));
+        const FQuat Start = Cube->GetBodyInstance()->GetUnrealWorldTransform().GetRotation();
+        TArray<double> Q, W;
+        Q.Add(0.0); W.Add(Cube->GetBodyInstance()->GetUnrealWorldAngularVelocityInRadians().X);
+        const int32 Steps = FMath::RoundToInt(0.2 / Dt);
+        for (int32 Step = 0; Step < Steps; ++Step)
+        {
+            Cube->AddTorqueInRadians(FVector(Sign * Torque * 10000.0, 0.0, 0.0), NAME_None, false);
+            if (!Tick(*this, *World, Dt)) { return false; }
+            const FQuat Relative = (Cube->GetBodyInstance()->GetUnrealWorldTransform().GetRotation() * Start.Inverse()).GetNormalized();
+            const double Angle = 2.0 * FMath::Atan2(Relative.X, Relative.W);
+            Q.Add(Angle); W.Add(Cube->GetBodyInstance()->GetUnrealWorldAngularVelocityInRadians().X);
+            const double T = (Step + 1) * Dt;
+            TestTrue(TEXT("completed hinge velocity follows declared torque and inertia"),
+                FMath::Abs(W.Last() - Acceleration * T) <= 0.0001 + 0.005 * FMath::Abs(Acceleration * T));
+            TestTrue(TEXT("completed hinge angle follows declared acceleration"),
+                FMath::Abs(Angle - 0.5 * Acceleration * T * T) <= 0.0001 + FMath::Abs(Acceleration) * T * Dt);
+            TestTrue(TEXT("published coordinate matches independent body rotation"),
+                FMath::Abs(JointPosition(*Cube, Joint->ConstraintInstance) - Angle) < 0.0001);
+        }
+        double MaximumFiniteDifferenceError = 0.0;
+        for (int32 Step = 1; Step < Q.Num() - 1; ++Step)
+        {
+            const double Centered = (Q[Step + 1] - Q[Step - 1]) / (2.0 * Dt);
+            MaximumFiniteDifferenceError = FMath::Max(MaximumFiniteDifferenceError, FMath::Abs(Centered - W[Step]));
+        }
+        // Constant acceleration has no centered-difference truncation term.
+        // First-order solver position/velocity staggering contributes O(a*dt).
+        const double Budget = 1.0e-6 / Dt + FMath::Abs(Acceleration) * Dt;
+        TestTrue(TEXT("centered pose derivative matches velocity at the same completed frame"),
+            MaximumFiniteDifferenceError <= Budget);
+        AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] hinge_finite_difference mass=%.3f dt=%.6f max_error_rad_s=%.9f budget_rad_s=%.9f"),
+            Mass, Dt, MaximumFiniteDifferenceError, Budget));
+    }
+    return true;
+}
+
 #endif

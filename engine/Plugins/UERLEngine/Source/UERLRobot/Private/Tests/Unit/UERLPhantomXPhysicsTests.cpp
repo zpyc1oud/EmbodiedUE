@@ -12,6 +12,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/PhysicsConstraintTemplate.h"
 #include "PhysicsEngine/SkeletalBodySetup.h"
 #include "UERLSkeletalMeshRobotRuntime.h"
 
@@ -137,7 +138,7 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("PhantomX has 18 live constraints"), Mesh->Constraints.Num(), 18);
 	TSet<FName> Names;
 	double TotalMass = 0.0;
-	for (const USkeletalBodySetup* Setup : Asset->SkeletalBodySetups)
+	for (USkeletalBodySetup* Setup : Asset->SkeletalBodySetups)
 	{
 		if (!Setup) { AddError(TEXT("missing asset body setup")); return false; }
 		TestFalse(TEXT("physical body names are unique"), Names.Contains(Setup->BoneName));
@@ -145,6 +146,14 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 		FBodyInstance* Body = Mesh->GetBodyInstance(Setup->BoneName);
 		if (!Body || !Body->IsValidBodyInstance()) { AddError(TEXT("asset body has no live solver body")); return false; }
 		const double Mass = Body->GetBodyMass();
+		if (Setup->DefaultInstance.bOverrideMass)
+		{
+			TestTrue(TEXT("authored mass override reaches the live body"),
+				FMath::Abs(Mass - Setup->DefaultInstance.GetMassOverride()) <= 1.0e-5);
+		}
+		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] body=%s authored_mass_override=%d authored_mass_kg=%.9f authored_inertia_scale=%s"),
+			*Setup->BoneName.ToString(), Setup->DefaultInstance.bOverrideMass,
+			Setup->DefaultInstance.GetMassOverride(), *Setup->DefaultInstance.InertiaTensorScale.ToString()));
 		const FVector I = Body->GetBodyInertiaTensor() / 10000.0;
 		TestTrue(TEXT("mass and principal inertia are positive and finite"),
 			FMath::IsFinite(Mass) && Mass > 0.0 && !I.ContainsNaN() && I.GetMin() > 0.0);
@@ -168,6 +177,31 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 		if (!C) { AddError(TEXT("missing live joint")); return false; }
 		TestFalse(TEXT("joint names are unique"), Joints.Contains(C->JointName));
 		Joints.Add(C->JointName);
+		UPhysicsConstraintTemplate* Authored = nullptr;
+		for (UPhysicsConstraintTemplate* Candidate : Asset->ConstraintSetup)
+		{
+			if (Candidate && Candidate->DefaultInstance.JointName == C->JointName) { Authored = Candidate; break; }
+		}
+		if (!Authored) { AddError(TEXT("live joint has no authored constraint")); return false; }
+		FConstraintInstance& Original = Authored->DefaultInstance;
+		TestTrue(TEXT("authored joint endpoints reach the live constraint"),
+			Original.ConstraintBone1 == C->ConstraintBone1 && Original.ConstraintBone2 == C->ConstraintBone2);
+		TestTrue(TEXT("authored free and locked coordinates reach the live constraint"),
+			Original.GetAngularTwistMotion() == C->GetAngularTwistMotion()
+			&& Original.GetAngularSwing1Motion() == C->GetAngularSwing1Motion()
+			&& Original.GetAngularSwing2Motion() == C->GetAngularSwing2Motion()
+			&& Original.GetLinearXMotion() == C->GetLinearXMotion()
+			&& Original.GetLinearYMotion() == C->GetLinearYMotion()
+			&& Original.GetLinearZMotion() == C->GetLinearZMotion());
+		TestTrue(TEXT("authored angular limits reach the live constraint"),
+			FMath::Abs(Original.GetAngularTwistLimit() - C->GetAngularTwistLimit()) < 1.0e-5
+			&& FMath::Abs(Original.GetAngularSwing1Limit() - C->GetAngularSwing1Limit()) < 1.0e-5
+			&& FMath::Abs(Original.GetAngularSwing2Limit() - C->GetAngularSwing2Limit()) < 1.0e-5);
+		for (const EConstraintFrame::Type Frame : { EConstraintFrame::Frame1, EConstraintFrame::Frame2 })
+		{
+			TestTrue(TEXT("authored constraint reference frames reach the live constraint"),
+				Original.GetRefFrame(Frame).Equals(C->GetRefFrame(Frame), 1.0e-5));
+		}
 		TestTrue(TEXT("each constraint refers to physical bodies"), Names.Contains(C->ConstraintBone1) && Names.Contains(C->ConstraintBone2));
 		TestTrue(TEXT("each live joint has a declared actuator"), RobotConfig.Actuators.ContainsByPredicate(
 			[C](const FUERLSkeletalMeshRuntimeActuator& A) { return A.JointName == C->JointName; }));
@@ -176,6 +210,10 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 			? Drive.TwistDrive : Drive.SwingDrive;
 		const double ActualKp = AxisDrive.Stiffness * Chaos::ConstraintSettings::AngularDriveStiffnessScale() / 10000.0;
 		const double ActualKd = AxisDrive.Damping * Chaos::ConstraintSettings::AngularDriveDampingScale() / 10000.0;
+		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] joint=%s motions_xyz=%d,%d,%d swing1=%d swing2=%d limits_deg=%.6f,%.6f,%.6f"),
+			*C->JointName.ToString(), int32(C->GetLinearXMotion()), int32(C->GetLinearYMotion()), int32(C->GetLinearZMotion()),
+			int32(C->GetAngularSwing1Motion()), int32(C->GetAngularSwing2Motion()), C->GetAngularTwistLimit(),
+			C->GetAngularSwing1Limit(), C->GetAngularSwing2Limit()));
 		TestTrue(TEXT("declared SI stiffness reaches every PhantomX joint drive"), FMath::Abs(ActualKp - 25.0) < 1.0e-4);
 		TestTrue(TEXT("declared SI damping reaches every PhantomX joint drive"), FMath::Abs(ActualKd - 0.5) < 1.0e-5);
 		TestTrue(TEXT("every live drive uses the declared force-mode torque cap"),
@@ -191,7 +229,7 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 			C->ProfileInstance.bEnableMassConditioning, *C->GetRefFrame(EConstraintFrame::Frame1).ToString(),
 			*C->GetRefFrame(EConstraintFrame::Frame2).ToString()));
 	}
-	AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] total_mass_kg=%.9f; hardware mass provenance requires separate reviewed evidence"), TotalMass));
+	AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] total_mass_kg=%.9f; model=declared_idealized_drive"), TotalMass));
 	return true;
 }
 
@@ -514,6 +552,140 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 			*Name.ToString(), *(BodyImpulse.FindOrAdd(Name) / Duration).ToString()));
 	}
 	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLGeometricSupportWithoutForceTest,
+    "UERL.Integration.PhysicsResponse.PhantomX.GeometricSupportIsNotPhysicalForce",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLGeometricSupportWithoutForceTest::RunTest(const FString& Parameters)
+{
+    using namespace UERLPhysicsResponseTests;
+    using namespace UERLPhantomXPhysicsTests;
+    FLockstepSettings Settings;
+    auto Scene = MakeScene();
+    UWorld* World = Scene->GetWorld();
+    if (!World || !Ground(*World)) { AddError(TEXT("missing geometric support fixture")); return false; }
+    UStaticMeshComponent* Plane = nullptr;
+    for (TActorIterator<AStaticMeshActor> It(World); It; ++It) { Plane = It->GetStaticMeshComponent(); break; }
+    if (!Plane) { AddError(TEXT("missing support plane")); return false; }
+    Plane->SetMobility(EComponentMobility::Movable);
+    Plane->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    auto RobotConfig = Config(3.0);
+    RobotConfig.Observations.Reset();
+    RobotConfig.Observations.Add({ EUERLObservationType::Contact, FName(TEXT("base_link")) });
+    RobotConfig.Observations.Add({ EUERLObservationType::ContactForce, FName(TEXT("base_link")) });
+    FUERLSkeletalMeshRobotRuntime Runtime;
+    FString Error;
+    if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
+    USkeletalMeshComponent* Mesh = FindMesh(*World);
+    FBodyInstance* Base = Mesh ? Mesh->GetBodyInstance(FName(TEXT("base_link"))) : nullptr;
+    if (!Mesh || !Base) { AddError(TEXT("missing physical PhantomX base")); return false; }
+    for (FBodyInstance* Body : Mesh->Bodies) { if (Body) { Body->SetEnableGravity(false); } }
+    // The product geometric probe spans 4 cm above and 3 cm below the body's
+    // lowest bound. A query-only surface 1 cm below it is support geometry,
+    // but cannot provide a solver impulse or a physical support force.
+    const double SurfaceZ = Base->GetBodyBounds().Min.Z - 1.0;
+    Plane->SetWorldLocation(FVector(0.0, 0.0, SurfaceZ - 10.0));
+    for (int32 Phase = 0; Phase < 2; ++Phase)
+    {
+        if (Phase == 1) { Plane->SetWorldLocation(FVector(0.0, 0.0, SurfaceZ - 110.0)); }
+        if (!Tick(*this, *World, 0.005)) { return false; }
+        Runtime.SamplePhysicsContacts(0.005);
+        TArray<float> State;
+        if (!Runtime.CollectState(State, Error) || State.Num() != 2) { AddError(Error); return false; }
+        TestTrue(TEXT("geometric support reflects the query surface independently of force"),
+            FMath::Abs(State[0] - (Phase == 0 ? 1.0f : 0.0f)) < 1.0e-6);
+        TestTrue(TEXT("query-only support cannot report physical contact force"), FMath::Abs(State[1]) < 1.0e-6);
+        AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] query_support phase=%d geometric=%.6f force_n=%.9f"),
+            Phase, State[0], State[1]));
+    }
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLPhantomXBodyFeedbackTest,
+    "UERL.Integration.PhysicsResponse.PhantomX.ArticulatedBodyCOMAndLinkFeedback",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPhantomXBodyFeedbackTest::RunTest(const FString& Parameters)
+{
+    using namespace UERLPhysicsResponseTests;
+    using namespace UERLPhantomXPhysicsTests;
+    FLockstepSettings Settings;
+    auto Scene = MakeScene();
+    UWorld* World = Scene->GetWorld();
+    if (!World) { AddError(TEXT("missing articulated feedback World")); return false; }
+    auto RobotConfig = Config(3.0);
+    RobotConfig.Observations.Reset();
+    // Exercise nonidentity field order, including articulated children.
+    TArray<FName> Names;
+    for (int32 J = RobotConfig.Actuators.Num() - 1; J >= 0; --J) { Names.Add(RobotConfig.Actuators[J].JointName); }
+    for (FName Name : Names)
+    {
+        RobotConfig.Observations.Add({ EUERLObservationType::BodyPose, Name });
+        RobotConfig.Observations.Add({ EUERLObservationType::BodyLinearVelocity, Name });
+        RobotConfig.Observations.Add({ EUERLObservationType::BodyAngularVelocity, Name });
+    }
+    FUERLSkeletalMeshRobotRuntime Runtime;
+    FString Error;
+    if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
+    auto* Mesh = FindMesh(*World);
+    if (!Mesh) { AddError(TEXT("missing articulated feedback mesh")); return false; }
+    Mesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+    const FVector Omega(0.2, 0.3, -0.4);
+    const FVector Translation(0.3, -0.2, 0.1);
+    const FVector Origin(0.0, 0.0, 3.0);
+    // Test-local offset guarantees that using COM velocity as link-origin
+    // velocity is observable, even if a future asset centers every body.
+    Mesh->SetCenterOfMass(FVector(2.0, -1.0, 3.0), Names[0]);
+    for (FBodyInstance* Body : Mesh->Bodies)
+    {
+        if (!Body) { continue; }
+        Body->SetEnableGravity(false);
+        Body->LinearDamping = 0.0f; Body->AngularDamping = 0.0f;
+        Body->UpdateDampingProperties();
+        const FVector V = Translation + FVector::CrossProduct(Omega, Body->GetCOMPosition() / 100.0 - Origin);
+        Body->SetLinearVelocity(V * 100.0, false);
+        Body->SetAngularVelocityInRadians(Omega, false);
+    }
+    int32 OffsetBodies = 0;
+    for (int32 Step = 0; Step < 20; ++Step)
+    {
+        if (!Tick(*this, *World, 0.005)) { return false; }
+        TArray<float> State;
+        if (!Runtime.CollectState(State, Error) || State.Num() != Names.Num() * 13) { AddError(Error); return false; }
+        for (int32 B = 0; B < Names.Num(); ++B)
+        {
+            FBodyInstance* Body = Mesh->GetBodyInstance(Names[B]);
+            if (!Body) { AddError(TEXT("missing requested articulated body")); return false; }
+            const FTransform Link = Body->GetUnrealWorldTransform();
+            const FVector COM = Body->GetCOMPosition() / 100.0;
+            const FVector V = Body->GetUnrealWorldVelocity() / 100.0;
+            const FVector W = Body->GetUnrealWorldAngularVelocityInRadians();
+            const FVector LinkOffset = Link.GetLocation() / 100.0 - COM;
+            if (Step == 0 && LinkOffset.Size() > 1.0e-4) { ++OffsetBodies; }
+            const FVector ExpectedLinkV = V + FVector::CrossProduct(W, LinkOffset);
+            TestTrue(TEXT("articulated link velocity has the correct COM moment arm"),
+                Matches(Body->GetUnrealWorldVelocityAtPoint(Link.GetLocation()) / 100.0, ExpectedLinkV, 1.0e-5));
+            const int32 I = B * 13;
+            const FVector Position(State[I], State[I + 1], State[I + 2]);
+            const FQuat Rotation(State[I + 3], State[I + 4], State[I + 5], State[I + 6]);
+            const FVector ReportedV(State[I + 7], State[I + 8], State[I + 9]);
+            const FVector ReportedW(State[I + 10], State[I + 11], State[I + 12]);
+            TestTrue(TEXT("named child pose feedback uses the declared SI link frame"),
+                Matches(Position, Link.GetLocation() / 100.0, 1.0e-5)
+                && Rotation.AngularDistance(Link.GetRotation()) < 1.0e-5);
+            // The current body-linear-velocity field is COM velocity. Do not
+            // compare it with the derivative of an offset link-origin pose.
+            TestTrue(TEXT("named body velocity feedback preserves COM and angular semantics"),
+                Matches(ReportedV, V, 1.0e-5) && Matches(ReportedW, W, 1.0e-5));
+        }
+    }
+    TestTrue(TEXT("the real asset includes a nonzero COM/link offset in this test"), OffsetBodies > 0);
+    AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] articulated_feedback bodies=%d offset_bodies=%d frames=20"), Names.Num(), OffsetBodies));
+    return true;
 }
 
 #endif

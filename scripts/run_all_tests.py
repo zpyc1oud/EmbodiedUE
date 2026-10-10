@@ -9,6 +9,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 PHYSICS_RESPONSE_CASES: tuple[str, ...] = (
+    "UERL.Integration.PhysicsResponse.PhantomX.ArticulatedBodyCOMAndLinkFeedback",
+    "UERL.Integration.PhysicsResponse.ProductEffort.CartPoleRevoluteTorqueResponse",
+    "UERL.Integration.PhysicsResponse.ProductEffort.SparseResetClearsForceAndPreservesOtherSlot",
+    "UERL.Integration.PhysicsResponse.Joint.CompletedPoseVelocityAtTwoSteps",
+    "UERL.Integration.PhysicsResponse.PhantomX.GeometricSupportIsNotPhysicalForce",
     "UERL.Integration.PhysicsResponse.Joint.PrismaticHardStop",
     "UERL.Integration.PhysicsResponse.Joint.StaticAngularReactionAtCOM",
     "UERL.Integration.PhysicsResponse.ProductEffort.CartPoleForceMomentumLifetimeAndReset",

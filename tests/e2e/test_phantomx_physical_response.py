@@ -74,6 +74,11 @@ def _config(directory: Path, slots: int, decimation: int, *, generated_flat: boo
 def _wire_state(payload: bytes, layout: Layout, names: tuple[str, ...], slots: int) -> dict[str, np.ndarray[Any, Any]]:
     result = {}
     assert len(payload) == layout.payload_length
+    if layout.kind == "step_result":
+        valid = layout.segment("system.state_valid")
+        faults = layout.segment("system.slot_fault_code")
+        assert struct.unpack_from(f"<{slots}B", payload, valid.offset) == (1,) * slots
+        assert struct.unpack_from(f"<{slots}H", payload, faults.offset) == (0,) * slots
     for name in names:
         segment = layout.segment(name)
         count = segment.byte_length // 4
@@ -108,6 +113,14 @@ def _direct_trace(
                             step_trace_callback=rows.append)
         assert task.robot_spec is not None
         assert tuple(a.joint for a in task.robot_spec.actuators) == JOINTS
+        for actuator, default in zip(task.robot_spec.actuators, DEFAULTS, strict=True):
+            assert actuator.target_mode == "position"
+            assert actuator.target_unit == "rad"
+            assert actuator.stiffness == pytest.approx(25.0)
+            assert actuator.damping == pytest.approx(0.5)
+            assert actuator.effort_limit == pytest.approx(2.8)
+            assert actuator.action_scale == pytest.approx(0.20)
+            assert actuator.default_pos == pytest.approx(default)
         assert session.initialization is not None
         definitions = session.initialization.bridge_result.response["layouts"]
         layout = Layout.parse(next(d for d in definitions if d["layout_kind"] == "step_result"), batch_size=1)
@@ -218,6 +231,14 @@ def _sparse_sequence(directory: Path, reset_selected: bool) -> list[dict[str, np
         names = tuple(str(d["name"]) for d in schema.state_requirements)
         states = []
         for step in range(200):
+            if step in (50, 100):
+                # This public event is a root velocity increment, not a force
+                # in newtons. The two Slots receive distinct bounded impulses.
+                applied = session.event({
+                    "kind": "root_push", "slot_ids": [0, 1],
+                    "values": [[0.08, 0.02, 0.0], [-0.05, -0.03, 0.0]],
+                })
+                assert applied.get("applied") is True and applied.get("kind") == "root_push"
             if step == 100 and reset_selected:
                 reset = bytearray(initial_reset)
                 reset[mask.offset] = 1
@@ -226,6 +247,9 @@ def _sparse_sequence(directory: Path, reset_selected: bool) -> list[dict[str, np
                 for joint, expected in zip(JOINTS, DEFAULTS, strict=True):
                     assert reset_state[f"robot.joint.{joint}.joint_position"][0, 0] == pytest.approx(expected, abs=1e-4)
                     assert reset_state[f"robot.joint.{joint}.joint_velocity"][0, 0] == pytest.approx(0.0, abs=1e-5)
+                for name in names:
+                    if name.endswith(("body_linear_velocity", "body_angular_velocity", "contact_force")):
+                        np.testing.assert_allclose(reset_state[name][0], 0.0, atol=1e-5, rtol=0, err_msg=name)
             action_layout = layouts["step_action"]
             action = bytearray(action_layout.payload_length)
             targets = action_layout.segment("robot.actuator.target")
@@ -246,10 +270,12 @@ def test_phantomx_sparse_reset_preserves_unselected_physical_trajectory(tmp_path
     reference = _sparse_sequence(tmp_path / "reference", False)
     selected = _sparse_sequence(tmp_path / "selected-reset", True)
     for before, after in zip(reference, selected, strict=True):
-        for joint in JOINTS:
-            for suffix, tolerance in (("joint_position", 0.001), ("joint_velocity", 0.01)):
-                name = f"robot.joint.{joint}.{suffix}"
-                np.testing.assert_allclose(after[name][1], before[name][1], atol=tolerance, rtol=0, err_msg=name)
+        for name in before:
+            tolerance = 0.01 if "velocity" in name else 0.001
+            if name.endswith("contact_force"):
+                tolerance = 0.1
+            np.testing.assert_allclose(after[name][1], before[name][1], atol=tolerance,
+                                       rtol=0.005 if name.endswith("contact_force") else 0, err_msg=name)
     assert any(abs(float(row[f"robot.joint.{joint}.joint_velocity"][1, 0])) > 0.01
                for row in reference for joint in JOINTS), "unselected reference must actually move"
 

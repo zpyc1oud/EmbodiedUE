@@ -203,7 +203,10 @@ The additional native cases cover these boundaries:
 - Signed free coordinates, locked axes, angular/prismatic hard stops, disabled drives, static angular reaction, and underdamped/overdamped trajectories
 - Static support, contact impulse balance, restitution and rebound height, and static/sliding friction
 - The real CartPole effort path, declared cart/pole masses, held-force momentum, and reset clearing
+- The real CartPole revolute effort path with fixed-axis inertia, signed torque, two masses, rotated roots, and two physics steps
+- Two actual provider Slots with distinct forces and impulses, selected reset, and an independent untouched-Slot reference
 - Actual PhantomX body inventory, reordered named actuators, completed joint state, whole-body momentum, and weight support
+- Authored-to-live mass/constraint checks, articulated COM/link feedback, and query-only geometric support with zero physical force
 
 The PhantomX fixed-target case saves bounded CSV traces under `Saved/Automation/PhysicsResponse`.
 Each row records the completed solver frame, time, dt, joint name, target, position, and velocity.
@@ -218,6 +221,9 @@ Keep D1 solver-step consistency separate from D4 control-window comparisons.
 `tests/e2e/test_phantomx_physical_response.py` runs real Workers without a learner.
 It checks Session wire values against named Python fields and policy-observation slices.
 It also compares fresh D1/D4 runs, two-Slot sparse-reset trajectories, and authored/generated flat ground.
+The sparse-reset case applies distinct root-push events before a selected reset.
+Root-push values are velocity increments; they are not forces in newtons.
+It checks cleared velocity/force feedback and the untouched Slot's state trajectory.
 The authored fixture uses the registered Walk Task map; an empty Entry map is used only with generated collision ground.
 The trace oracle lives in `tests/e2e/support/physical_oracles.py`.
 Its unit cases reject missing input, reversed input, wrong units, stale forces, swapped rows, and shifted velocity samples.
