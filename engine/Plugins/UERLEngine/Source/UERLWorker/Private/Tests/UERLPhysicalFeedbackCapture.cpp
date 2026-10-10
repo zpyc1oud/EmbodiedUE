@@ -40,6 +40,7 @@ bool CaptureUERLPhysicalFeedback(UWorld* World, const FUERLBridgeRequest& Reques
         if (OutError.IsEmpty()) { OutError = TEXT("missing physical feedback robot"); }
         return false;
     }
+    const TCHAR* Phase = Request.Type == EUERLBridgeRequestType::Reset ? TEXT("reset") : TEXT("step");
     FString Rows;
     int32 Captured = 0;
     for (FConstraintInstance* Joint : Mesh->Constraints)
@@ -81,9 +82,9 @@ bool CaptureUERLPhysicalFeedback(UWorld* World, const FUERLBridgeRequest& Reques
             {
                 OutError = TEXT("nonfinite physical feedback capture"); return false;
             }
-            Rows += FString::Printf(TEXT("%llu,%d,%.17g,%.17g,%s,%.17g,%.17g\n"),
+            Rows += FString::Printf(TEXT("%llu,%d,%.17g,%.17g,%s,%s,%.17g,%.17g\n"),
                 static_cast<unsigned long long>(Request.Sequence), Clock.Frame, Clock.SolverTime,
-                Clock.LastDt, *Name, Native, double(Staged));
+                Clock.LastDt, Phase, *Name, Native, double(Staged));
             ++Captured;
         }
     }
@@ -117,9 +118,9 @@ bool CaptureUERLPhysicalFeedback(UWorld* World, const FUERLBridgeRequest& Reques
             }
             for (int32 Component = 0; Component < Width; ++Component)
             {
-                Rows += FString::Printf(TEXT("%llu,%d,%.17g,%.17g,%s[%d],%.17g,%.17g\n"),
+                Rows += FString::Printf(TEXT("%llu,%d,%.17g,%.17g,%s,%s[%d],%.17g,%.17g\n"),
                     static_cast<unsigned long long>(Request.Sequence), Clock.Frame, Clock.SolverTime,
-                    Clock.LastDt, *Name, Component, Values[Offset + Component],
+                    Clock.LastDt, Phase, *Name, Component, Values[Offset + Component],
                     double(Request.States.At(0, Field->Column + Component)));
                 ++Captured;
             }

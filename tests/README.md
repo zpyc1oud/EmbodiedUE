@@ -271,6 +271,7 @@ articulated body pose/velocity, and staging values before Transport releases the
 It runs a rotated robot with reversed field order at D1 and D4.
 Its test-only capture switch is compiled under `WITH_DEV_AUTOMATION_TESTS`.
 The fixture enables it for a bounded one-Slot run and writes CSV under the test output directory.
+Reset captures have an explicit phase and must not advance the solver clock.
 Missing capture rows, shifted transactions, mixed frames, and altered values fail acceptance.
 
 Do not label total constraint reaction torque or a PD estimate as measured actuator torque.

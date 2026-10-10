@@ -300,7 +300,7 @@ def test_phantomx_physical_state_on_authored_and_generated_flat_ground(tmp_path:
 
 
 def _assert_native_exchange(
-    path: Path, exchanges: list[tuple[int, dict[str, np.ndarray[Any, Any]]]], decimation: int,
+    path: Path, exchanges: list[tuple[int, str, dict[str, np.ndarray[Any, Any]]]], decimation: int,
 ) -> None:
     """Match independent native geometry, staged values and the same wire sequence."""
     required = {f"robot.joint.{joint}.{quantity}" for joint in JOINTS
@@ -309,22 +309,25 @@ def _assert_native_exchange(
                     for quantity, width in (("body_pose", 7), ("body_linear_velocity", 3), ("body_angular_velocity", 3))
                     for component in range(width))
     with path.open(newline="", encoding="utf-8") as stream:
-        rows = list(csv.DictReader(stream, fieldnames=("sequence", "frame", "time", "dt", "field", "native", "staged")))
+        columns = ("sequence", "frame", "time", "dt", "phase", "field", "native", "staged")
+        rows = list(csv.DictReader(stream, fieldnames=columns))
     assert len(rows) == len(exchanges) * len(required), "missing or extra native physical rows"
     previous_frame: int | None = None
     previous_time: float | None = None
-    for index, (sequence, state) in enumerate(exchanges):
+    for index, (sequence, phase, state) in enumerate(exchanges):
         batch = rows[index * len(required):(index + 1) * len(required)]
         assert {row["field"] for row in batch} == required, "missing or duplicate physical fields"
         assert {int(row["sequence"]) for row in batch} == {sequence}, "wrong physical transaction"
+        assert phase in ("step", "reset") and {row["phase"] for row in batch} == {phase}
         frames = {int(row["frame"]) for row in batch}
         times = {float(row["time"]) for row in batch}
         assert len(frames) == len(times) == 1, "mixed solver snapshots"
         frame, timestamp = frames.pop(), times.pop()
         assert math.isfinite(timestamp)
         if previous_frame is not None and previous_time is not None:
-            assert frame - previous_frame == decimation, "wrong completed solver-frame count"
-            assert timestamp - previous_time == pytest.approx(0.005 * decimation, abs=1e-6)
+            expected_steps = decimation if phase == "step" else 0
+            assert frame - previous_frame == expected_steps, "wrong completed solver-frame count"
+            assert timestamp - previous_time == pytest.approx(0.005 * expected_steps, abs=1e-6)
         previous_frame, previous_time = frame, timestamp
         for row in batch:
             assert float(row["dt"]) == pytest.approx(0.005, abs=1e-7)
@@ -380,10 +383,14 @@ def test_phantomx_native_completed_state_matches_same_session_exchange(tmp_path:
                 assert binding.target_type.value == "joint_position" and binding.joint in JOINTS
                 values.append(DEFAULTS[JOINTS.index(binding.joint)])
         struct.pack_into(f"<{len(values)}f", reset, reset_layout.segment("robot.reset.values").offset, *values)
-        session.reset(reset_layout.layout_id, bytes(reset))
         names = tuple(str(field["name"]) for field in schema.state_requirements)
+        header, state = session.reset(reset_layout.layout_id, bytes(reset))
+        exchanges.append((header.sequence, "reset", _wire_state(state, layouts["reset_result"], names, 1)))
         action_layout = layouts["step_action"]
         for step in range(64):
+            if step == 32:
+                header, state = session.reset(reset_layout.layout_id, bytes(reset))
+                exchanges.append((header.sequence, "reset", _wire_state(state, layouts["reset_result"], names, 1)))
             payload = bytearray(action_layout.payload_length)
             targets = [DEFAULTS[JOINTS.index(a.joint)] + 0.01 * math.sin(step * 0.13 + i * 0.4)
                        for i, a in enumerate(spec.actuators)]
@@ -391,7 +398,7 @@ def test_phantomx_native_completed_state_matches_same_session_exchange(tmp_path:
             struct.pack_into("<18f", payload, action_layout.segment("robot.actuator.target").offset, *targets)
             struct.pack_into("<i", payload, action_layout.segment("step_decimation").offset, decimation)
             header, state = session.step(action_layout.layout_id, bytes(payload))
-            exchanges.append((header.sequence, _wire_state(state, layouts["step_result"], names, 1)))
+            exchanges.append((header.sequence, "step", _wire_state(state, layouts["step_result"], names, 1)))
     finally:
         session.close("native_physical_feedback_complete")
     _assert_native_exchange(capture, exchanges, decimation)

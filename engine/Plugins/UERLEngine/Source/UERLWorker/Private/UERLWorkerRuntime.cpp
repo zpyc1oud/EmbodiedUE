@@ -847,6 +847,14 @@ void FUERLWorkerRuntime::ExecuteReset(FUERLBridgeRequest& Request)
 		FailWorker(Error, &Request);
 		return;
 	}
+#if WITH_DEV_AUTOMATION_TESTS
+	if (!CaptureUERLPhysicalFeedback(StepPipeline.IsValid() ? StepPipeline->GetBoundWorld() : nullptr,
+		Request, BatchBinding, Pool->PhysicalTestSlot(0), Error))
+	{
+		FailWorker(Error, &Request);
+		return;
+	}
+#endif
 	Request.ResetTiming.SafetySeconds = FPlatformTime::Seconds() - SafetyStartSeconds;
 	const double EpisodeStartSeconds = FPlatformTime::Seconds();
 	Request.EpisodeIndices = Pool->EpisodeIndices();
