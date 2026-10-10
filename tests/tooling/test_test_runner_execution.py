@@ -158,9 +158,9 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
     def execute(self: TestRun, index: int, command: list[str]) -> int:
         commands.append(command)
         self.stages[index].status = "passed"
-        if index in {1, 2}:
+        if index in {1, 2, 3}:
             log_argument = next(arg for arg in command if arg.startswith("-abslog="))
-            minimum = 142 if index == 1 else 13
+            minimum = {1: 142, 2: 13, 3: 4}[index]
             Path(log_argument.removeprefix("-abslog=")).write_text(
                 "".join(f"Test Completed. Result={{Success}} Name={{test{case}}} Path={{UERL.Unit.test{case}}}\n"
                         for case in range(minimum)) + "**** TEST COMPLETE. EXIT CODE: 0 ****\n",
@@ -171,11 +171,11 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
     assert run_all_tests.main([
         "--output-dir", str(tmp_path / "reports"), "--ue-executable", str(executable), "--project", str(project),
     ]) == 0
-    assert len(commands) == 4
-    assert commands[1][:2] == commands[2][:2] == [str(executable), str(project)]
-    first_log = next(arg for arg in commands[1] if arg.startswith("-abslog="))
-    second_log = next(arg for arg in commands[2] if arg.startswith("-abslog="))
-    assert first_log != second_log
+    assert len(commands) == 5
+    assert all(command[:2] == [str(executable), str(project)] for command in commands[1:4])
+    logs = [next(arg for arg in command if arg.startswith("-abslog=")) for command in commands[1:4]]
+    assert len(set(logs)) == 3
+    assert "-ExecCmds=Automation RunTests UERL.Integration.PhysicsResponse;Quit" in commands[3]
     assert commands[-1] == [sys.executable, "-m", "pytest", "-v", "-s", "tests/e2e"]
 
 

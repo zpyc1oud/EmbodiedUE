@@ -39,6 +39,11 @@ UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
         "UERL.Integration.Worker.Terrain",
         13,
     ),
+    (
+        "quantitative physics response",
+        "UERL.Integration.PhysicsResponse",
+        4,
+    ),
 )
 
 

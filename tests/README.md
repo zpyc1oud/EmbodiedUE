@@ -153,7 +153,8 @@ The command `scripts/run_e2e.py --suite all` includes `PIEAttach` and supplies i
 ```powershell
 $automationGroups = @(
   'UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component',
-  'UERL.Integration.Robot.GenericDrive+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+UERL.Integration.Robot.TopologyReflector+UERL.Integration.Worker.EnvironmentPool+UERL.Integration.Worker.Terrain'
+  'UERL.Integration.Robot.GenericDrive+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+UERL.Integration.Robot.TopologyReflector+UERL.Integration.Worker.EnvironmentPool+UERL.Integration.Worker.Terrain',
+  'UERL.Integration.PhysicsResponse'
 )
 foreach ($group in $automationGroups) {
   & '<UE-root>/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' `
@@ -176,6 +177,49 @@ Python mock results do not establish these engine behaviors.
 
 Active-Step cancellation cases use a post-physics delay available only in `WITH_DEV_AUTOMATION_TESTS` builds.
 The delay is test instrumentation, not a product setting or wire configuration.
+
+### Quantitative physics response
+
+Run `UERL.Integration.PhysicsResponse` in a fresh Editor process.
+The complete test runner includes this group and requires all four cases.
+These cases use real Chaos simulation. They do not train a policy.
+
+Use an independent physical prediction for each case:
+
+| Fixture | Input | Expected response |
+|---|---|---|
+| Free uniform cube | Constant force at the center of mass | `v = F t / m`; `x = F t² / (2m)` |
+| Free uniform cube | Constant torque | `ω = τ t / I`; `θ = τ t² / (2I)`; `I = m L² / 6` |
+| Fixed-base hinge with a position drive | Constant external torque below the drive limit | `q = target + τ / Kp`; position and angular velocity settle |
+| Fixed-base hinge with a saturated drive | External torque above the opposing drive limit | `Δω = (τ_external - τ_limit) t / I`, with the signed counterpart |
+
+The free-body cases vary mass and physics step duration.
+They use rotated bodies and a multi-axis input to expose frame errors.
+They also stop the input and check momentum, so a stale force cannot pass.
+Missing input, reversed input, and a 100-fold input scaling error must fail the same physical oracle.
+These are deliberate fixture-input faults; they do not modify production code.
+
+The expected response uses declared SI properties and elementary mechanics.
+Do not compute it with the production unit-conversion function.
+Check actual mass and inertia against the declared fixture before evaluating motion.
+Read the completed solver clock on each step; a requested time interval is not evidence of an executed interval.
+
+Free-body velocity tolerance is 0.5% of the expected magnitude plus `1e-4` in the applicable SI unit.
+Position tolerance is `|a| t dt + 1e-4`, which bounds first-order integration error and shrinks with the step duration.
+The hinge equilibrium case allows `0.0025 rad` of position error and `0.005 rad/s` of rest velocity.
+The saturation case allows 2% of expected velocity plus `0.001 rad/s`.
+Investigate a failed bound before changing it. Preserve the measured values and the reason for any tolerance change.
+
+These fixtures verify free-body input conversion and the shared Chaos position-drive configuration.
+They do not by themselves validate PhantomX mass properties, contact behavior, or a learned policy.
+A full-robot case must exercise the Robot/Session path and check its own physical response.
+Do not label total constraint reaction torque or a PD estimate as measured actuator torque.
+
+Reference patterns come from Isaac Lab revision `b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8`:
+[rigid-body force cases](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/source/isaaclab/test/assets/test_rigid_object.py),
+[single-joint static wrench and articulation cases](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/source/isaaclab/test/assets/test_articulation.py),
+and [motor saturation cases](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/source/isaaclab/test/actuators/test_dc_motor.py).
+The Chaos fixtures and predictions are project-specific.
 
 <a id="test-suites-test-conventions"></a>
 ### Test conventions
