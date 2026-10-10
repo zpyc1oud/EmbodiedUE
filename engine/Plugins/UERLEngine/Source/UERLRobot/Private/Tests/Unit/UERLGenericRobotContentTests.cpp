@@ -1453,7 +1453,14 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 	USkeletalMeshComponent* AuthoredMesh = NewObject<USkeletalMeshComponent>(ClaimHost);
 	AuthoredMesh->SetSkeletalMesh(LoadObject<USkeletalMesh>(nullptr, PhantomXRobotAsset));
 	ClaimHost->SetRootComponent(AuthoredMesh);
+	AuthoredMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	AuthoredMesh->RegisterComponent();
+	AuthoredMesh->SetSimulatePhysics(true);
+	if (!TestEqual(TEXT("authored claim fixture has all physical bodies before capture"), AuthoredMesh->Bodies.Num(), 19)
+		|| !TestEqual(TEXT("authored claim fixture has all joints before capture"), AuthoredMesh->Constraints.Num(), 18))
+	{
+		return false;
+	}
 	auto CountBodiesWithSleepType = [AuthoredMesh](Chaos::ESleepType SleepType)
 	{
 		int32 Count = 0;
@@ -1464,6 +1471,28 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 		}
 		return Count;
 	};
+	TArray<FIntVector> AuthoredIterations;
+	TArray<bool> AuthoredIterationOverrides;
+	for (int32 Index = 0; Index < AuthoredMesh->Bodies.Num(); ++Index)
+	{
+		FBodyInstance* Body = AuthoredMesh->Bodies[Index];
+		if (!Body) { AddError(TEXT("missing authored iteration body")); return false; }
+		Body->SetPositionSolverIterationCount(Index % 2 == 0 ? 16 : 48);
+		Body->SetVelocitySolverIterationCount(Index % 2 == 0 ? 2 : 12);
+		Body->SetProjectionSolverIterationCount(Index % 2);
+		Body->SetOverrideIterationCounts(Index % 3 != 0);
+		AuthoredIterations.Add(FIntVector(Body->PositionSolverIterationCount,
+			Body->VelocitySolverIterationCount, Body->ProjectionSolverIterationCount));
+		AuthoredIterationOverrides.Add(Body->GetPositionSolverIterationCount() >= 0);
+	}
+	TArray<bool> AuthoredProjection;
+	for (int32 Index = 0; Index < AuthoredMesh->Constraints.Num(); ++Index)
+	{
+		FConstraintInstance* C = AuthoredMesh->Constraints[Index];
+		if (!C) { AddError(TEXT("missing authored claim constraint")); return false; }
+		if (Index % 2 == 0) { C->EnableProjection(); } else { C->DisableProjection(); }
+		AuthoredProjection.Add(C->IsProjectionEnabled());
+	}
 	TWeakObjectPtr<UPhysicalMaterial> AuthoredMaterial = NewObject<UPhysicalMaterial>(GetTransientPackage());
 	AuthoredMesh->SetPhysMaterialOverride(AuthoredMaterial.Get());
 	FUERLSkeletalMeshRobotRuntimeConfig ClaimConfig = PhantomXRuntimeConfig(FVector(300.0, 0.0, -25.0));
@@ -1476,6 +1505,25 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	TestTrue(TEXT("claimed robot has physics bodies"), AuthoredMesh->Bodies.Num() > 0);
+	for (const FConstraintInstance* C : AuthoredMesh->Constraints)
+	{
+		TestTrue(TEXT("claimed Robot disables position projection while controlled"), C && !C->IsProjectionEnabled());
+	}
+	for (int32 Index = 0; Index < AuthoredMesh->Bodies.Num(); ++Index)
+	{
+		const FBodyInstance* Body = AuthoredMesh->Bodies[Index];
+		TestTrue(TEXT("claim enforces minimum solver accuracy"), Body
+			&& Body->GetPositionSolverIterationCount() >= 32 && Body->GetVelocitySolverIterationCount() >= 8);
+		if (Body && AuthoredIterationOverrides[Index])
+		{
+			TestEqual(TEXT("claim preserves larger authored position count"),
+				Body->GetPositionSolverIterationCount(), FMath::Max(32, AuthoredIterations[Index].X));
+			TestEqual(TEXT("claim preserves larger authored velocity count"),
+				Body->GetVelocitySolverIterationCount(), FMath::Max(8, AuthoredIterations[Index].Y));
+			TestEqual(TEXT("claim preserves authored projection count"),
+				Body->GetProjectionSolverIterationCount(), AuthoredIterations[Index].Z);
+		}
+	}
 	TestEqual(TEXT("claimed robot bodies never sleep while controlled"),
 		CountBodiesWithSleepType(Chaos::ESleepType::NeverSleep), AuthoredMesh->Bodies.Num());
 	// Material replacement uses the same component API as ground-friction events.
@@ -1486,6 +1534,21 @@ bool FUERLGenericRobotIdleDriveTargetTest::RunTest(const FString& Parameters)
 	Runtime.Reset();
 	TestTrue(TEXT("claim release restores the original material after garbage collection"),
 		AuthoredMaterial.IsValid() && AuthoredMesh->GetPhysicsMaterialOverride() == AuthoredMaterial.Get());
+	for (int32 Index = 0; Index < AuthoredProjection.Num(); ++Index)
+	{
+		const FConstraintInstance* C = AuthoredMesh->GetConstraintInstanceByIndex(Index);
+		TestTrue(TEXT("claim release restores each authored projection setting"),
+			C && C->IsProjectionEnabled() == AuthoredProjection[Index]);
+	}
+	for (int32 Index = 0; Index < AuthoredMesh->Bodies.Num(); ++Index)
+	{
+		const FBodyInstance* Body = AuthoredMesh->Bodies[Index];
+		TestTrue(TEXT("claim release restores authored iteration counts and override state"), Body
+			&& Body->PositionSolverIterationCount == AuthoredIterations[Index].X
+			&& Body->VelocitySolverIterationCount == AuthoredIterations[Index].Y
+			&& Body->ProjectionSolverIterationCount == AuthoredIterations[Index].Z
+			&& (Body->GetPositionSolverIterationCount() >= 0) == AuthoredIterationOverrides[Index]);
+	}
 	TestEqual(TEXT("release restores the authored material sleep type"),
 		CountBodiesWithSleepType(Chaos::ESleepType::MaterialSleep), AuthoredMesh->Bodies.Num());
 

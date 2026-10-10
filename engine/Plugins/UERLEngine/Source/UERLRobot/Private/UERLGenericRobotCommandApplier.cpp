@@ -6,6 +6,7 @@
 #include "UERLRobotObservationPlan.h"
 
 #include "Chaos/ChaosEngineInterface.h"
+#include "Chaos/ChaosConstraintSettings.h"
 #include "Chaos/SimCallbackObject.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
@@ -162,9 +163,17 @@ void ConfigureGenericRobotRevoluteAngularDrive(
 	Constraint.SetAngularDriveMode(EAngularDriveMode::TwistAndSwing);
 	Constraint.SetOrientationDriveTwistAndSwing(bTwist, !bTwist);
 	Constraint.SetAngularVelocityDriveTwistAndSwing(bTwist, !bTwist);
+	// UE scales angular drive gains when it builds the Chaos constraint.
+	// Actuator gains are physical SI gains, so compensate at this boundary.
+	// Keep the global engine settings and the torque cap unchanged.
+	const double StiffnessScale = Chaos::ConstraintSettings::AngularDriveStiffnessScale();
+	const double DampingScale = Chaos::ConstraintSettings::AngularDriveDampingScale();
+	checkf(FMath::IsFinite(StiffnessScale) && StiffnessScale > 0.0
+		&& FMath::IsFinite(DampingScale) && DampingScale > 0.0,
+		TEXT("generic Robot SI angular drive gains require positive finite Chaos gain scales"));
 	Constraint.SetAngularDriveParams(
-		static_cast<float>(Actuator.Stiffness * 10000.0),
-		static_cast<float>(Actuator.Damping * 10000.0),
+		static_cast<float>(Actuator.Stiffness * 10000.0 / StiffnessScale),
+		static_cast<float>(Actuator.Damping * 10000.0 / DampingScale),
 		static_cast<float>(Actuator.EffortLimit * 10000.0));
 	Constraint.SetAngularDriveAccelerationMode(false);
 }

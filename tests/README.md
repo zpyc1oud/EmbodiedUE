@@ -153,7 +153,8 @@ The command `scripts/run_e2e.py --suite all` includes `PIEAttach` and supplies i
 ```powershell
 $automationGroups = @(
   'UERL.Unit+UERL.Integration.Worker.SlotCollision+UERL.Integration.Worker.SharedWorldCollision+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_003+UERL.Integration.Policy.Contact+UERL.Integration.Policy.Ground+UERL.Integration.Policy.Clock+UERL.Integration.Policy.Controller+UERL.Integration.Policy.Component',
-  'UERL.Integration.Robot.GenericDrive+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+UERL.Integration.Robot.TopologyReflector+UERL.Integration.Worker.EnvironmentPool+UERL.Integration.Worker.Terrain'
+  'UERL.Integration.Robot.GenericDrive+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_001+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_002+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_004+UERL.Integration.Robot.GenericSkeletalMesh.AC_UE_E2E_ROBOT_CONTENT_005+UERL.Integration.Robot.TopologyReflector+UERL.Integration.Worker.EnvironmentPool+UERL.Integration.Worker.Terrain',
+  'UERL.Integration.PhysicsResponse'
 )
 foreach ($group in $automationGroups) {
   & '<UE-root>/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' `
@@ -176,6 +177,146 @@ Python mock results do not establish these engine behaviors.
 
 Active-Step cancellation cases use a post-physics delay available only in `WITH_DEV_AUTOMATION_TESTS` builds.
 The delay is test instrumentation, not a product setting or wire configuration.
+
+### Quantitative physics response
+
+Run `UERL.Integration.PhysicsResponse` in a fresh Editor process.
+The complete test runner includes this group and requires each named case in `PHYSICS_RESPONSE_CASES` in `scripts/run_all_tests.py`.
+An unrelated passing case cannot replace a missing physical test.
+These cases use real Chaos simulation. They do not train a policy.
+The analytical bodies disable sleep and body inertia conditioning.
+Their predictions use the declared geometric inertia, not a solver-adjusted inertia.
+
+Use an independent physical prediction for each case:
+
+| Fixture | Input | Expected response |
+|---|---|---|
+| Free uniform cube | Constant force at the center of mass | `v = F t / m`; `x = F t² / (2m)` |
+| Free uniform cube | Constant torque | `ω = τ t / I`; `θ = τ t² / (2I)`; `I = m L² / 6` |
+| Fixed-base hinge with a position drive | Constant external torque below the drive limit | `q = target + τ / Kp`; position and angular velocity settle |
+| Fixed-base hinge with a damping-only drive | Initial angular velocity, no external load | `ω(t) = ω(0) exp(-Kd t / I)`; kinetic energy decreases |
+| Fixed-base hinge with a saturated drive | External torque above the opposing drive limit | `Δω = (τ_external - τ_limit) t / I`, with the signed counterpart |
+
+The additional native cases cover these boundaries:
+
+- Input lifetime, one-shot impulses, offset forces, rotated local/world frames, asymmetric inertia, and gravity
+- Signed free coordinates, locked axes, angular/prismatic hard stops, disabled drives, static angular reaction, and underdamped/overdamped trajectories
+- Static support, contact impulse balance, restitution and rebound height, and static/sliding friction
+- The real CartPole effort path, declared cart/pole masses, held-force momentum, and reset clearing
+- The real CartPole revolute effort path with fixed-axis inertia, signed torque, two masses, rotated roots, and two physics steps
+- Two actual provider Slots with distinct forces and impulses, selected reset, and an independent untouched-Slot reference
+- Actual PhantomX body inventory, reordered named actuators, completed joint state, whole-body momentum, and weight support
+- Authored-to-live mass/constraint checks, articulated COM/link feedback, and query-only geometric support with zero physical force
+
+The PhantomX momentum case checks that initialization does not advance the solver clock.
+It checks every body's placement after the first solver step, then applies negative, zero, and positive impulses.
+
+The PhantomX fixed-target case saves bounded CSV traces under `Saved/Automation/PhysicsResponse`.
+Each row records the completed solver frame, time, dt, joint name, target, position, and velocity.
+Compare unwrapped position change with the trapezoidal velocity integral.
+Use an absolute drift budget plus `dt / 2` times total velocity variation.
+Check every prefix of the measured interval with its own accumulated budget.
+Opposite errors must not cancel at the end of a capture.
+Later velocity variation must not relax an earlier failed comparison.
+A stationary position with a persistent nonzero velocity must fail.
+Keep D1 solver-step consistency separate from D4 control-window comparisons.
+
+`tests/e2e/test_phantomx_physical_response.py` runs real Workers without a learner.
+It checks Session wire values against named Python fields and policy-observation slices.
+It also compares fresh D1/D4 runs, two-Slot sparse-reset trajectories, and authored/generated flat ground.
+The sparse-reset case applies distinct root-push events before a selected reset.
+Root-push values are velocity increments; they are not forces in newtons.
+It checks cleared velocity/force feedback and the untouched Slot's state trajectory.
+The authored fixture uses the registered Walk Task map; an empty Entry map is used only with generated collision ground.
+The trace oracle lives in `tests/e2e/support/physical_oracles.py`.
+Its unit cases reject missing input, reversed input, wrong units, stale forces, swapped rows, and shifted velocity samples.
+These unit cases establish oracle sensitivity, not physical correctness.
+
+Run only these real-process cases with:
+
+```powershell
+uv run python scripts/run_e2e.py --suite ue -k physical
+```
+
+Keep measured contact impulse, mean support, and the published final-step force separate.
+For D4, the final-step force is that step's impulse divided by physics dt.
+An interval momentum balance needs the sum of all solver-step impulses.
+Do not infer contact torque from a force magnitude or assume equal loading on all six feet.
+Use [Issue #67](https://github.com/zpyc1oud/EmbodiedUE/issues/67) for the remaining acceptance scope and reviewed evidence.
+
+The free-body cases vary mass and physics step duration.
+They use rotated bodies and a multi-axis input to expose frame errors.
+They also stop the input and check momentum, so a stale force cannot pass.
+Missing input, reversed input, and a 100-fold input scaling error must fail the same physical oracle.
+These are deliberate fixture-input faults; they do not modify production code.
+
+The supported effort path requires positive damping and applies `target - damping * velocity`.
+Use that declared law in its physical prediction; zero-gain free-body input is a separate reference fixture.
+The CartPole force fixture locks the pole so the independent translation model has total mass `m_cart + m_pole`.
+Its velocity follows `v(t) = target/d + (v0 - target/d) exp(-d*t/m)` within each constant-input phase.
+The fixed-axis pole uses the corresponding angular solution with the inventoried hinge inertia.
+These fixtures preserve the product command path and its documented damping behavior.
+
+The expected response uses declared SI properties and elementary mechanics.
+Do not compute it with the production unit-conversion function.
+Check actual mass and inertia against the declared fixture before evaluating motion.
+For PhantomX, rebuild mass geometry from the authored PhysicsAsset and resolved material.
+Compare mass, local COM, and the full body-frame inertia tensor with the live body.
+Compare tensor columns rather than principal-axis quaternions, because repeated eigenvalues make those axes ambiguous.
+Keep this asset-transfer oracle separate from the elementary-mechanics free-body response oracle.
+Read the completed solver clock on each step; a requested time interval is not evidence of an executed interval.
+
+Free-body velocity tolerance is 0.5% of the expected magnitude plus `1e-4` in the applicable SI unit.
+Position tolerance is `|a| t dt + 1e-4`, which bounds first-order integration error and shrinks with the step duration.
+The hinge equilibrium case allows `0.0025 rad` of position error and `0.005 rad/s` of rest velocity.
+The saturation case allows 2% of expected velocity plus `0.001 rad/s`.
+The damping-only case uses the continuous exponential solution and an explicit
+implicit-Euler endpoint error bound that shrinks with dt, plus `1e-4 rad/s`.
+Investigate a failed bound before changing it. Preserve the measured values and the reason for any tolerance change.
+
+These fixtures verify free-body input conversion and the shared Chaos position-drive configuration.
+They do not by themselves validate PhantomX mass properties, contact behavior, or a learned policy.
+Production assets can retain conditioning settings that change their effective response.
+Validate those settings separately with the full-robot cases.
+A full-robot case must exercise the Robot/Session path and check its own physical response.
+For a feedback-boundary case, match the native capture and wire response by transaction sequence.
+The physical E2E fixture records completed solver frame/time, independent joint geometry,
+articulated body pose/velocity, and staging values before Transport releases the response.
+It runs a rotated robot with reversed field order at D1 and D4.
+Its test-only capture switch is compiled under `WITH_DEV_AUTOMATION_TESTS`.
+The fixture enables it for a bounded one-Slot run and writes CSV under the test output directory.
+Reset captures have an explicit phase and must not advance the solver clock.
+Missing capture rows, shifted transactions, mixed frames, and altered values fail acceptance.
+
+Do not label total constraint reaction torque or a PD estimate as measured actuator torque.
+
+The static reaction fixture uses a world anchor offset from the body's COM.
+Compare all three force components and all three moment components in the world frame.
+In UE 5.8.3, `GetConstraintForce` returns constraint impulses despite its name.
+Divide linear output by `100 * physics_dt` and angular output by `10000 * physics_dt` for SI force and moment.
+The angular output is a constraint couple. Add the linear reaction's moment arm for a COM balance.
+Check the engine source before using this conversion on another engine version.
+
+The contact oracle sums completed manifold-point results.
+It uses each point's application position for the external moment balance.
+Require a current collision epoch, valid point results, unlimited manifold capacity, disabled CCD,
+and disabled split impulse for this momentum-based fixture.
+Include both velocity impulse and position impulse divided by physics dt.
+Compare their sum with the constraint's accumulated impulse before comparing measured momentum.
+A force magnitude and a single nearest contact point cannot establish a distributed contact moment.
+
+For soft limits, declare force mode and physical stiffness and damping explicitly.
+The fixture compensates the engine's coefficient scales without changing global settings.
+Compare the trajectory with the independent spring-damper solution at two masses and two time steps.
+Check steady penetration and release under inward load separately.
+The current actuator declaration has no joint-speed limit; do not add one merely to reproduce an upstream test.
+A zero velocity drive target is not a speed limit.
+
+Reference patterns come from Isaac Lab revision `b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8`:
+[rigid-body force cases](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/source/isaaclab/test/assets/test_rigid_object.py),
+[single-joint static wrench and articulation cases](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/source/isaaclab/test/assets/test_articulation.py),
+and [motor saturation cases](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/source/isaaclab/test/actuators/test_dc_motor.py).
+The Chaos fixtures and predictions are project-specific.
 
 <a id="test-suites-test-conventions"></a>
 ### Test conventions

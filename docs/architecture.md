@@ -221,9 +221,34 @@ Before an increase in parallelism, examine isolation and terrain coverage.
 <a id="architecture-actuation-and-observations"></a>
 ### Actuation and observations
 
-The actuator calculation uses stiffness, damping, effort limit, target, position, and velocity.
-It clamps the resulting effort.
-Position, effort, and passive behavior share actuator semantics instead of robot-specific control code.
+Actuators declare physical stiffness, damping, effort limit, target, position, and velocity.
+The explicit actuator path calculates and clamps effort.
+Revolute position actuators use the Chaos constraint drive.
+The adapter compensates UE's angular stiffness and damping scale factors so the
+simulator receives the declared SI gains. It does not change global engine settings.
+The torque limit is converted from N·m to UE units without gain scaling.
+Keep these engine scale factors positive and constant during a Robot's lifetime.
+
+A constraint drive and an explicit PD calculation can have different discrete-time responses.
+Body or joint inertia conditioning and other solver settings can change the physical response.
+The Robot runtime disables joint position projection in training and deployment.
+Projection can change pose without matching physical velocity and can change total momentum.
+A claimed component regains its original projection settings when released.
+When a body becomes simulated, the runtime clears its pending kinematic target.
+The first solver step must preserve the requested initial placement.
+Robot initialization does not advance the solver clock.
+Simulated Robot bodies use at least 32 position iterations and 8 velocity iterations.
+Larger authored counts are preserved; otherwise the runtime uses the scene counts with these minimums.
+The runtime preserves the effective projection iteration count.
+This accuracy budget increases CPU work for articulated contact solves.
+Claim release restores the original per-body counts and override state.
+Check measured trajectories and loads with the physical test fixtures.
+A calculated PD effort is not measured solver torque.
+The current actuator is an idealized simulation drive with an effort cap.
+It does not model servo voltage, temperature, a torque-speed curve, or communication delay.
+A physical servo's stall torque is not a continuous operating limit.
+Keep the asset's declared simulation parameters separate from hardware specifications.
+Position, effort, and passive behavior use shared runtime code instead of robot-specific control code.
 
 | Observation | Shape and semantics |
 |---|---|

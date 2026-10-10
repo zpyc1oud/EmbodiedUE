@@ -158,12 +158,14 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
     def execute(self: TestRun, index: int, command: list[str]) -> int:
         commands.append(command)
         self.stages[index].status = "passed"
-        if index in {1, 2}:
+        if index in {1, 2, 3}:
             log_argument = next(arg for arg in command if arg.startswith("-abslog="))
-            minimum = 142 if index == 1 else 13
+            minimum = {1: 142, 2: 13, 3: len(run_all_tests.PHYSICS_RESPONSE_CASES)}[index]
+            names = (run_all_tests.PHYSICS_RESPONSE_CASES if index == 3
+                     else tuple(f"UERL.Unit.test{case}" for case in range(minimum)))
             Path(log_argument.removeprefix("-abslog=")).write_text(
-                "".join(f"Test Completed. Result={{Success}} Name={{test{case}}} Path={{UERL.Unit.test{case}}}\n"
-                        for case in range(minimum)) + "**** TEST COMPLETE. EXIT CODE: 0 ****\n",
+                "".join(f"Test Completed. Result={{Success}} Name={{test}} Path={{{name}}}\n"
+                        for name in names) + "**** TEST COMPLETE. EXIT CODE: 0 ****\n",
             )
         return 0
 
@@ -171,11 +173,11 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
     assert run_all_tests.main([
         "--output-dir", str(tmp_path / "reports"), "--ue-executable", str(executable), "--project", str(project),
     ]) == 0
-    assert len(commands) == 4
-    assert commands[1][:2] == commands[2][:2] == [str(executable), str(project)]
-    first_log = next(arg for arg in commands[1] if arg.startswith("-abslog="))
-    second_log = next(arg for arg in commands[2] if arg.startswith("-abslog="))
-    assert first_log != second_log
+    assert len(commands) == 5
+    assert all(command[:2] == [str(executable), str(project)] for command in commands[1:4])
+    logs = [next(arg for arg in command if arg.startswith("-abslog=")) for command in commands[1:4]]
+    assert len(set(logs)) == 3
+    assert "-ExecCmds=Automation RunTests UERL.Integration.PhysicsResponse;Quit" in commands[3]
     assert commands[-1] == [sys.executable, "-m", "pytest", "-v", "-s", "tests/e2e"]
 
 
@@ -347,3 +349,30 @@ def test_phase_helper_rejects_unknown_mode_without_launch(monkeypatch: pytest.Mo
         phase1.main(["typo"])
     assert error.value.code == 2
     launch.assert_not_called()
+
+
+@pytest.mark.parametrize("fault", ["missing", "unrelated", "duplicate", "assertion", "partial", "none", "nominal"])
+def test_physics_runner_requires_every_named_case(tmp_path: Path, fault: str) -> None:
+    names = list(run_all_tests.PHYSICS_RESPONSE_CASES)
+    if fault in {"missing", "unrelated"}:
+        names.pop()
+    if fault == "unrelated":
+        names.append("UERL.Unit.Unrelated")
+    if fault == "duplicate":
+        names[-1] = names[0]
+    if fault == "none":
+        names = []
+    rows = [
+        f"Test Completed. Result={{{'Fail' if fault == 'assertion' and i == 0 else 'Success'}}} "
+        f"Name={{case}} Path={{{name}}}\n"
+        for i, name in enumerate(names)
+    ]
+    if fault != "partial":
+        rows.append("**** TEST COMPLETE. EXIT CODE: 0 ****\n")
+    run = TestRun(tmp_path, ["physical response"], 10)
+    log = run.directory / "physics.log"
+    log.write_text("".join(rows))
+    assert run.check_automation(
+        0, log, len(run_all_tests.PHYSICS_RESPONSE_CASES),
+        required_names=run_all_tests.PHYSICS_RESPONSE_CASES,
+    ) == (0 if fault == "nominal" else 1)

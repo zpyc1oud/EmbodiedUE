@@ -25,6 +25,16 @@ struct FUERLGenericRobotCanonicalBody
 	FVector SlotAngularVelocity = FVector::ZeroVector;
 };
 
+/** Per-body authored iteration settings restored after a component claim. */
+struct FUERLGenericRobotClaimedIterations
+{
+	FName BodyName;
+	uint8 Position = 0;
+	uint8 Velocity = 0;
+	uint8 Projection = 0;
+	bool bOverride = false;
+};
+
 /** One successfully spawned Slot owned by the AssetLoader until absorbed by the provider. */
 struct FUERLGenericRobotSpawnedSlot
 {
@@ -62,6 +72,8 @@ struct FUERLGenericRobotSpawnedSlot
 	FTransform ClaimedRelativeTransform = FTransform::Identity;
 	bool bClaimedSimulatePhysics = false;
 	TArray<TPair<FName, Chaos::ESleepType>> ClaimedSleepTypes;
+	TArray<TPair<int32, bool>> ClaimedProjection;
+	TArray<FUERLGenericRobotClaimedIterations> ClaimedIterations;
 	TStrongObjectPtr<UPhysicalMaterial> ClaimedPhysMaterialOverride;
 };
 

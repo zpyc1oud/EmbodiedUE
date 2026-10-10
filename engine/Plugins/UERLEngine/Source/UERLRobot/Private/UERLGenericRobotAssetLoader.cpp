@@ -4,7 +4,10 @@
 #include "UERLInterfaceTypes.h"
 #include "UERLProvider.h"
 
+#include "Chaos/KinematicTargets.h"
 #include "Chaos/RigidParticles.h"
+#include "PBDRigidsSolver.h"
+#include "Physics/Experimental/PhysScene_Chaos.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
@@ -91,6 +94,16 @@ void DestroyGenericRobotSpawnedSlots(TArray<FUERLGenericRobotSpawnedSlot>& Slots
 					Handle->GetGameThreadAPI().SetSleepType(SleepType.Value);
 				}
 			}
+			for (const FUERLGenericRobotClaimedIterations& Saved : Slot.ClaimedIterations)
+			{
+				if (FBodyInstance* Body = Component->GetBodyInstance(Saved.BodyName))
+				{
+					Body->SetPositionSolverIterationCount(Saved.Position);
+					Body->SetVelocitySolverIterationCount(Saved.Velocity);
+					Body->SetProjectionSolverIterationCount(Saved.Projection);
+					Body->SetOverrideIterationCounts(Saved.bOverride);
+				}
+			}
 			if (Component->GetPhysicsMaterialOverride() != Slot.ClaimedPhysMaterialOverride.Get())
 			{
 				Component->SetPhysMaterialOverride(Slot.ClaimedPhysMaterialOverride.Get());
@@ -105,6 +118,14 @@ void DestroyGenericRobotSpawnedSlots(TArray<FUERLGenericRobotSpawnedSlot>& Slots
 				Component->SetCollisionProfileName(Slot.ClaimedCollisionProfile);
 			}
 			Component->SetMobility(Slot.ClaimedMobility);
+			for (const TPair<int32, bool>& Projection : Slot.ClaimedProjection)
+			{
+				if (FConstraintInstance* Constraint = Component->GetConstraintInstanceByIndex(Projection.Key))
+				{
+					if (Projection.Value) { Constraint->EnableProjection(); }
+					else { Constraint->DisableProjection(); }
+				}
+			}
 			if (Slot.ClaimedAttachParent.IsValid())
 			{
 				Component->AttachToComponent(
@@ -377,6 +398,13 @@ bool SpawnGenericRobotSlots(
 		{
 			FConstraintInstance* Constraint = Component->GetConstraintInstanceByIndex(ConstraintIndex);
 			checkf(Constraint, TEXT("generic Robot runtime constraint %d is missing"), ConstraintIndex);
+			if (!bOwnsActor)
+			{
+				Slot.ClaimedProjection.Emplace(ConstraintIndex, Constraint->IsProjectionEnabled());
+			}
+			// Projection changes joint poses outside the velocity solve. Robot
+			// feedback must describe one physical trajectory in train and deploy.
+			Constraint->DisableProjection();
 			Constraint->SetLinearPositionDrive(false, false, false);
 			Constraint->SetLinearVelocityDrive(false, false, false);
 			Constraint->SetOrientationDriveTwistAndSwing(false, false);
@@ -425,7 +453,34 @@ bool SpawnGenericRobotSlots(
 			{
 				Slot.ClaimedSleepTypes.Emplace(BodyName, Handle->GetGameThreadAPI().SleepType());
 			}
-			Handle->GetGameThreadAPI().SetSleepType(Chaos::ESleepType::NeverSleep);
+			auto& PhysicsBody = Handle->GetGameThreadAPI();
+			const Chaos::EObjectStateType State = PhysicsBody.ObjectState();
+			if (State == Chaos::EObjectStateType::Dynamic || State == Chaos::EObjectStateType::Sleeping)
+			{
+				// A pending kinematic placement can overwrite the initial dynamic
+				// pose when Chaos first consumes the actor updates. Publish a None
+				// target without advancing the solver or changing kinematic bodies.
+				PhysicsBody.SetKinematicTarget(Chaos::FKinematicTarget());
+				FBodyInstance* Body = Component->GetBodyInstance(BodyName);
+				if (!bOwnsActor)
+				{
+					Slot.ClaimedIterations.Add({BodyName, Body->PositionSolverIterationCount,
+						Body->VelocitySolverIterationCount, Body->ProjectionSolverIterationCount,
+						Body->GetPositionSolverIterationCount() >= 0});
+				}
+				const auto* Evolution = World.GetPhysicsScene()->GetSolver()->GetEvolution();
+				const bool bOverride = Body->GetPositionSolverIterationCount() >= 0;
+				const int32 Position = bOverride ? Body->GetPositionSolverIterationCount() : Evolution->GetNumPositionIterations();
+				const int32 Velocity = bOverride ? Body->GetVelocitySolverIterationCount() : Evolution->GetNumVelocityIterations();
+				const int32 Projection = bOverride ? Body->GetProjectionSolverIterationCount() : Evolution->GetNumProjectionIterations();
+				// Quantitative articulated support requires this solver accuracy.
+				// Keep larger authored counts and preserve the projection count.
+				Body->SetPositionSolverIterationCount(static_cast<uint8>(FMath::Clamp(Position, 32, 255)));
+				Body->SetVelocitySolverIterationCount(static_cast<uint8>(FMath::Clamp(Velocity, 8, 255)));
+				Body->SetProjectionSolverIterationCount(static_cast<uint8>(FMath::Clamp(Projection, 0, 255)));
+				Body->SetOverrideIterationCounts(true);
+			}
+			PhysicsBody.SetSleepType(Chaos::ESleepType::NeverSleep);
 		}
 		Component->WakeAllRigidBodies();
 		if (!FApp::CanEverRender())
