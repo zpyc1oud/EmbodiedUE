@@ -47,3 +47,53 @@ def test_physical_wire_capture_rejects_invalid_or_faulted_rows(valid: int, fault
     else:
         with pytest.raises(AssertionError):
             _wire_state(bytes(payload), layout, names, 2)
+
+
+@pytest.mark.parametrize("fault", [None, "sequence", "frame", "native", "staged", "missing", "duplicate", "nan"])
+def test_native_exchange_oracle_rejects_corrupted_physical_capture(tmp_path: Path, fault: str | None) -> None:
+    import csv
+
+    import numpy as np
+
+    from tests.e2e.test_phantomx_physical_response import JOINTS, _assert_native_exchange
+
+    names = [f"robot.joint.{joint}.{quantity}" for joint in JOINTS
+             for quantity in ("joint_position", "joint_velocity")]
+    widths = {name: 1 for name in names}
+    widths.update({f"robot.body.{joint}.{quantity}": width for joint in JOINTS
+                   for quantity, width in (("body_pose", 7), ("body_linear_velocity", 3),
+                                           ("body_angular_velocity", 3))})
+    rows = []
+    exchanges = []
+    for step in range(2):
+        state = {name: np.asarray([[np.float32((i + 1) * 0.01 + c * 0.02 + step * 0.03)
+                                   for c in range(width)]]) for i, (name, width) in enumerate(widths.items())}
+        exchanges.append((10 + step, state))
+        for name, width in widths.items():
+            for component in range(width):
+                value = float(state[name][0, component])
+                label = name if width == 1 else f"{name}[{component}]"
+                rows.append([10 + step, 100 + step, 0.5 + step * 0.005, 0.005, label, value, value])
+    if fault == "sequence":
+        rows[0][0] = 9
+    elif fault == "frame":
+        for row in rows[270:]:
+            row[1] = 102
+    elif fault == "native":
+        rows[0][5] = 0.5
+    elif fault == "staged":
+        rows[0][6] = 0.5
+    elif fault == "missing":
+        rows.pop()
+    elif fault == "duplicate":
+        rows[0] = rows[1].copy()
+    elif fault == "nan":
+        rows[0][5] = float("nan")
+    path = tmp_path / "capture.csv"
+    with path.open("w", newline="", encoding="utf-8") as stream:
+        csv.writer(stream).writerows(rows)
+    if fault is None:
+        _assert_native_exchange(path, exchanges, 1)
+    else:
+        with pytest.raises(AssertionError):
+            _assert_native_exchange(path, exchanges, 1)

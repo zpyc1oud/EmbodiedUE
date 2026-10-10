@@ -13,6 +13,8 @@
 #include "Misc/Parse.h"
 #include "UObject/Package.h"
 
+#include "Tests/UERLPhysicalFeedbackCapture.h"
+
 #include <limits>
 
 FUERLWorkerRuntime& FUERLWorkerRuntime::Get()
@@ -757,6 +759,15 @@ void FUERLWorkerRuntime::FinishActiveStep()
 		CompleteRequest(ActiveStepRequest);
 		return;
 	}
+#if WITH_DEV_AUTOMATION_TESTS
+	if (!CaptureUERLPhysicalFeedback(StepPipeline.IsValid() ? StepPipeline->GetBoundWorld() : nullptr,
+		ActiveStepRequest, BatchBinding, Pool->PhysicalTestSlot(0), Error))
+	{
+		FailWorker(Error, &ActiveStepRequest);
+		CompleteRequest(ActiveStepRequest);
+		return;
+	}
+#endif
 	ActiveStepRequest.StepTiming.StateCollectSeconds = FPlatformTime::Seconds() - StateStartSeconds;
 	ActiveStepRequest.Succeed();
 	CompleteRequest(ActiveStepRequest);

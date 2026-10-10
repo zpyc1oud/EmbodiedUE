@@ -297,3 +297,101 @@ def test_phantomx_physical_state_on_authored_and_generated_flat_ground(tmp_path:
     clearance = "robot.body.base_link.ground_clearance"
     np.testing.assert_allclose(np.mean(authored[clearance][100:], axis=0),
                                np.mean(generated[clearance][100:], axis=0), atol=0.003, rtol=0)
+
+
+def _assert_native_exchange(
+    path: Path, exchanges: list[tuple[int, dict[str, np.ndarray[Any, Any]]]], decimation: int,
+) -> None:
+    """Match independent native geometry, staged values and the same wire sequence."""
+    required = {f"robot.joint.{joint}.{quantity}" for joint in JOINTS
+                for quantity in ("joint_position", "joint_velocity")}
+    required.update(f"robot.body.{joint}.{quantity}[{component}]" for joint in JOINTS
+                    for quantity, width in (("body_pose", 7), ("body_linear_velocity", 3), ("body_angular_velocity", 3))
+                    for component in range(width))
+    with path.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream, fieldnames=("sequence", "frame", "time", "dt", "field", "native", "staged")))
+    assert len(rows) == len(exchanges) * len(required), "missing or extra native physical rows"
+    previous_frame: int | None = None
+    previous_time: float | None = None
+    for index, (sequence, state) in enumerate(exchanges):
+        batch = rows[index * len(required):(index + 1) * len(required)]
+        assert {row["field"] for row in batch} == required, "missing or duplicate physical fields"
+        assert {int(row["sequence"]) for row in batch} == {sequence}, "wrong physical transaction"
+        frames = {int(row["frame"]) for row in batch}
+        times = {float(row["time"]) for row in batch}
+        assert len(frames) == len(times) == 1, "mixed solver snapshots"
+        frame, timestamp = frames.pop(), times.pop()
+        assert math.isfinite(timestamp)
+        if previous_frame is not None and previous_time is not None:
+            assert frame - previous_frame == decimation, "wrong completed solver-frame count"
+            assert timestamp - previous_time == pytest.approx(0.005 * decimation, abs=1e-6)
+        previous_frame, previous_time = frame, timestamp
+        for row in batch:
+            assert float(row["dt"]) == pytest.approx(0.005, abs=1e-7)
+            native, staged = float(row["native"]), float(row["staged"])
+            assert math.isfinite(native) and math.isfinite(staged)
+            field, component = row["field"], 0
+            if field.endswith("]"):
+                field, suffix = field.rsplit("[", 1)
+                component = int(suffix[:-1])
+            received = float(state[field][0, component])
+            # 17 decimal digits preserve the exact staged float32 promoted to double.
+            assert staged == received, f"staging/wire mismatch: {row['field']}"
+            assert native == pytest.approx(received, abs=1e-5, rel=1e-6), row["field"]
+
+
+@pytest.mark.parametrize("decimation", [1, 4])
+def test_phantomx_native_completed_state_matches_same_session_exchange(tmp_path: Path, decimation: int) -> None:
+    """A rotated robot and reversed schema expose frame, permutation and stale-state errors."""
+    directory = tmp_path / f"native-wire-d{decimation}"
+    directory.mkdir(parents=True)
+    capture = directory / "native-physical-feedback.csv"
+    config = _config(directory, 1, decimation, generated_flat=True)
+    config = replace(config, session=replace(config.session, worker_args=(
+        *config.session.worker_args, f"-uerltestphysicalfeedback={capture}",
+    )))
+    session = UERLSession.open(config, process_controller=WorkerProcessController())
+    exchanges = []
+    try:
+        session.describe(SessionSchema((), ()).as_request())
+        spec = session.described_robot_spec
+        assert spec is not None
+        fields = robot_observation_schema(spec, ObservationShapeTable.from_descriptor(session.descriptor))
+        selected = {str(field["name"]): field for field in fields}
+        for field in session.descriptor["available_state_schema"]:
+            name = str(field["name"])
+            if any(name == f"robot.body.{joint}.{quantity}" for joint in JOINTS
+                   for quantity in ("body_pose", "body_linear_velocity", "body_angular_velocity")):
+                selected[name] = field
+        schema = SessionSchema(tuple(reversed(tuple(selected.values()))), robot_actuator_action_schema(spec))
+        result = session.initialize(schema.as_request())
+        layouts = {d["layout_kind"]: Layout.parse(d, batch_size=1) for d in result.response["layouts"]}
+        session.acknowledge_ready()
+        reset_layout = layouts["reset_request"]
+        reset = bytearray(reset_layout.payload_length)
+        reset[reset_layout.segment("system.reset_mask").offset] = 1
+        # Nonzero root yaw does not change the joint-local angle contract.
+        pose = (0.0, 0.0, 0.18, 0.0, 0.0, math.sin(0.3), math.cos(0.3))
+        values = []
+        for binding in spec.reset:
+            if binding.target_type.value == "root_pose":
+                values.append(pose[binding.component_index])
+            else:
+                assert binding.target_type.value == "joint_position" and binding.joint in JOINTS
+                values.append(DEFAULTS[JOINTS.index(binding.joint)])
+        struct.pack_into(f"<{len(values)}f", reset, reset_layout.segment("robot.reset.values").offset, *values)
+        session.reset(reset_layout.layout_id, bytes(reset))
+        names = tuple(str(field["name"]) for field in schema.state_requirements)
+        action_layout = layouts["step_action"]
+        for step in range(64):
+            payload = bytearray(action_layout.payload_length)
+            targets = [DEFAULTS[JOINTS.index(a.joint)] + 0.01 * math.sin(step * 0.13 + i * 0.4)
+                       for i, a in enumerate(spec.actuators)]
+            assert len(targets) == 18
+            struct.pack_into("<18f", payload, action_layout.segment("robot.actuator.target").offset, *targets)
+            struct.pack_into("<i", payload, action_layout.segment("step_decimation").offset, decimation)
+            header, state = session.step(action_layout.layout_id, bytes(payload))
+            exchanges.append((header.sequence, _wire_state(state, layouts["step_result"], names, 1)))
+    finally:
+        session.close("native_physical_feedback_complete")
+    _assert_native_exchange(capture, exchanges, decimation)

@@ -265,6 +265,14 @@ They do not by themselves validate PhantomX mass properties, contact behavior, o
 Production assets can retain conditioning settings that change their effective response.
 Validate those settings separately with the full-robot cases.
 A full-robot case must exercise the Robot/Session path and check its own physical response.
+For a feedback-boundary case, match the native capture and wire response by transaction sequence.
+The physical E2E fixture records completed solver frame/time, independent joint geometry,
+articulated body pose/velocity, and staging values before Transport releases the response.
+It runs a rotated robot with reversed field order at D1 and D4.
+Its test-only capture switch is compiled under `WITH_DEV_AUTOMATION_TESTS`.
+The fixture enables it for a bounded one-Slot run and writes CSV under the test output directory.
+Missing capture rows, shifted transactions, mixed frames, and altered values fail acceptance.
+
 Do not label total constraint reaction torque or a PD estimate as measured actuator torque.
 
 Reference patterns come from Isaac Lab revision `b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8`:

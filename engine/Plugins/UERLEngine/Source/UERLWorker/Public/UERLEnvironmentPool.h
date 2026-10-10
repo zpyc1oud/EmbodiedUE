@@ -79,6 +79,15 @@ public:
 	/** Return the current per-Slot episode indices without transferring ownership. */
 	const TArray<uint64>& EpisodeIndices() const { return Episodes; }
 
+#if WITH_DEV_AUTOMATION_TESTS
+	// Independent test capture uses the Environment-owned frame, never the
+	// moving robot Actor transform as a substitute for the Slot origin.
+	const FUERLSlotContext* PhysicalTestSlot(int32 SlotId) const
+	{
+		return Slots.IsValidIndex(SlotId) ? &Slots[SlotId] : nullptr;
+	}
+#endif
+
 private:
 	bool BuildResetBatch(
 		const TArray<int32>& SlotIds,

@@ -151,6 +151,21 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("authored mass override reaches the live body"),
 				FMath::Abs(Mass - Setup->DefaultInstance.GetMassOverride()) <= 1.0e-5);
 		}
+		else
+		{
+			// Compare the authored geometry/material calculation with the live
+			// solver body. This is a configuration-transfer check, separate from
+			// the analytical force/inertia response fixtures.
+			const double AuthoredMass = Setup->CalculateMass(Mesh);
+			TestTrue(TEXT("authored computed mass reaches the live body"),
+				FMath::IsFinite(AuthoredMass) && AuthoredMass > 0.0
+				&& FMath::Abs(Mass - AuthoredMass) <= 1.0e-5 + 0.005 * AuthoredMass);
+			AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] body=%s computed_mass_kg=%.9f live_mass_kg=%.9f"),
+				*Setup->BoneName.ToString(), AuthoredMass, Mass));
+		}
+		TestTrue(TEXT("authored COM nudge and inertia scaling reach the body instance"),
+			Body->COMNudge.Equals(Setup->DefaultInstance.COMNudge, 1.0e-6)
+			&& Body->InertiaTensorScale.Equals(Setup->DefaultInstance.InertiaTensorScale, 1.0e-6));
 		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] body=%s authored_mass_override=%d authored_mass_kg=%.9f authored_inertia_scale=%s"),
 			*Setup->BoneName.ToString(), Setup->DefaultInstance.bOverrideMass,
 			Setup->DefaultInstance.GetMassOverride(), *Setup->DefaultInstance.InertiaTensorScale.ToString()));
@@ -202,6 +217,14 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("authored constraint reference frames reach the live constraint"),
 				Original.GetRefFrame(Frame).Equals(C->GetRefFrame(Frame), 1.0e-5));
 		}
+		TestTrue(TEXT("authored soft-limit selection reaches the live constraint"),
+			Original.ProfileInstance.LinearLimit.bSoftConstraint == C->ProfileInstance.LinearLimit.bSoftConstraint
+			&& Original.ProfileInstance.ConeLimit.bSoftConstraint == C->ProfileInstance.ConeLimit.bSoftConstraint
+			&& Original.ProfileInstance.TwistLimit.bSoftConstraint == C->ProfileInstance.TwistLimit.bSoftConstraint);
+		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] joint=%s soft_linear=%d soft_swing=%d soft_twist=%d soft_linear_k=%.9f soft_swing_k=%.9f soft_twist_k=%.9f"),
+			*C->JointName.ToString(), C->ProfileInstance.LinearLimit.bSoftConstraint,
+			C->ProfileInstance.ConeLimit.bSoftConstraint, C->ProfileInstance.TwistLimit.bSoftConstraint,
+			C->GetSoftLinearLimitStiffness(), C->GetSoftSwingLimitStiffness(), C->GetSoftTwistLimitStiffness()));
 		TestTrue(TEXT("each constraint refers to physical bodies"), Names.Contains(C->ConstraintBone1) && Names.Contains(C->ConstraintBone2));
 		TestTrue(TEXT("each live joint has a declared actuator"), RobotConfig.Actuators.ContainsByPredicate(
 			[C](const FUERLSkeletalMeshRuntimeActuator& A) { return A.JointName == C->JointName; }));
