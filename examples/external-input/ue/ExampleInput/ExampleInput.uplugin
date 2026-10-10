@@ -1,0 +1,11 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Example numeric input",
+  "Description": "Demonstrate an independently registered constant input provider.",
+  "Category": "Machine Learning",
+  "CanContainContent": false,
+  "Modules": [{"Name": "ExampleInput", "Type": "Runtime", "LoadingPhase": "PostDefault"}],
+  "Plugins": [{"Name": "UERLEngine", "Enabled": true}]
+}

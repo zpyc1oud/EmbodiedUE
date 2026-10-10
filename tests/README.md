@@ -756,3 +756,18 @@ Reward capture must use the actual computation once; do not recompute stateful r
 Use independent NumPy calculations for normalized inputs, Gaussian likelihoods, action targets,
 timeout bootstrap, and GAE. Inject a Slot swap or an incorrect target and require a failing audit.
 A passing CPU test does not establish UE contact or actuator behavior.
+
+### Numeric input provider foundation
+
+`UERLProvider/Private/Tests/Unit/UERLInputProviderTests.cpp` adds these cases:
+
+- `UERL.Unit.InputProvider.CacheAndSparseReset`: independent field offsets, stable
+  Slot IDs, repeated-read caching, sparse reset generations and resource release.
+- `UERL.Unit.InputProvider.FaultAndClock`: stale clock rejection, unwritten scalar
+  faults, no stale publication and recovery after reset.
+- `UERL.Unit.InputProvider.BindingFailures`: duplicate/version rejection, missing
+  logical bindings, partial-bind cleanup and retry.
+
+These cases use a deterministic native provider. They do not establish terrain
+sampling, Worker/game integration, artifact format 2, or external plugin deployment.
+Run them on the changed Editor build before accepting this foundation.

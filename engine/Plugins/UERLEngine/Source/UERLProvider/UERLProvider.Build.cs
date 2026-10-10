@@ -17,6 +17,7 @@ public class UERLProvider : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new[]
 		{
 			"PhysicsCore",
+			"Json",
 			"Chaos",
 		});
 	}

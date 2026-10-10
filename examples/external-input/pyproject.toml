@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uerl-example-input"
+version = "0.1.0"
+description = "Independent numeric input declaration example for EmbodiedUE"
+requires-python = ">=3.11,<3.12"
+dependencies = ["ue-rl-engine==1.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+example_input = ["*.yaml"]

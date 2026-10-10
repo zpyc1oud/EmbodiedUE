@@ -1192,3 +1192,103 @@ Physical targets are requested actuator commands; they are not measurements of s
 Passing the checker establishes the recorded data mappings and arithmetic.
 Use real UE contact, joint-response, and coordinate checks to verify the physical model.
 Use training and evaluation results to assess whether the policy learns the task.
+
+## Extend numeric input declarations
+
+The first provider slice supplies Python declarations and a native lifecycle.
+It is not yet selected by a Task or loaded from a policy artifact. Worker/game
+integration and the artifact version change remain pending under Issue #52.
+
+### Declare an input
+
+Use `InputSpec` from `uerl.core.inputs`. Supply an instance name, provider ID and
+positive provider version. Parameters are immutable YAML-compatible values.
+Attachment and scene binding names describe logical roles, not map actor paths.
+The first supported modes are `completed_window` sampling and `fault` on missing
+required data.
+
+Implement a Python `InputFactory` with `provider_id`, `version`, and `validate`.
+Validate provider-specific parameters, add explicit defaults, then return a
+`ResolvedInput` with `InputField` descriptors. Register the factory on an explicit
+`InputRegistry`. Compile the ordered declarations once before allocating buffers.
+The result contains effective specifications, field descriptors and stable offsets.
+
+Output fields use float32 values. Declare shape, unit, frame, semantic and source.
+Duplicate field names fail compilation, including case-only differences that
+collide in native FName lookup. Unsupported provider versions fail before binding.
+Input declaration tests use an external factory without a core dispatch branch.
+
+### Implement the native provider
+
+Implement `IUERLInputFactory` and `IUERLInputProvider` from `UERLInputProvider.h`.
+Register the factory during plugin startup. The factory validates owned parameter
+object text and effective descriptors, then creates the native instance.
+Parameters are encoded internally by the host; human configuration remains YAML.
+
+`FUERLCompiledInputSet` validates every declaration and logical binding before
+creating instances. Bind copies required weak object references. A provider owns
+its buffers and callbacks, not the Robot, World, or simulator clock.
+
+The host supplies a completed sequence, solver time and reset generation.
+Repeated reads return the cached publication. A provider must write every declared
+scalar. Missing or non-finite values fail the Slot rather than publish zeros.
+The Slot requires reset after a sampling fault.
+
+Reset accepts stable Slot IDs. It increments only selected generations and leaves
+other caches unchanged. Read `GetResetGeneration` when preparing the next host
+sample stamp. Reset does not advance physics or produce a new observation.
+Release providers before unloading their module or destroying their World.
+
+### Validate the extension
+
+Follow [Write tests](../tests/README.md#write-tests). The current native foundation cases are
+listed in [UE tests](../tests/README.md#numeric-input-provider-foundation).
+A deterministic provider proves field offsets, cache behavior and lifecycle only.
+Real terrain sampling, scene filtering, serialization parity and installed-plugin
+inference need separate tests before the extension is ready for deployment.
+
+### Configure ground rays
+
+`RayGroundFactory` declares `uerl.ray_ground` version 1. The native factory uses
+`MakeUERLRayGroundInputFactory` and registers with the Robot module. It does not
+replace the legacy Robot observations in this slice.
+
+The effective parameters are:
+
+- `offsets_m`: ordered XY sample positions; default `[[0, 0]]`
+- `start_height_m`: positive height above the attachment; default 1 metre
+- `end_depth_m`: positive depth below the attachment; default 2 metres
+- `alignment`: `yaw` rotates offsets by attachment yaw; `world` leaves them fixed
+- `output`: `height` returns hit Z minus attachment Z; `clearance` reverses the sign
+
+Distances must remain finite after conversion to UE centimetres. The rays point
+along world -Z. Attachment scale does not scale the configured metre offsets.
+The output frame is `world/z-relative`, with one float32 metre value per offset.
+
+An attachment is required. The host supplies a read-only transform callback for
+its logical name. The callback reads the completed physical state in world
+centimetres. Bind copies this callable; its host-owned objects must remain valid
+until release. Native output rejects a non-finite transform or non-unit rotation.
+
+One logical ground binding is required; the default name is `ground`. Both hosts
+supply a nonempty actor whitelist. The query uses that list and the Slot collision
+scope in training and deployment. The game does not bypass the list with a global
+WorldStatic fallback. There is no hold-last-hit behavior; a missing required hit
+fails the sample. Changing the old fallback, ray origin or output meaning requires
+reevaluation and can require fresh training when this path is adopted.
+
+The native `UERL.Unit.Robot.GroundQuery.DeclaredProvider` case constructs two
+translated scene bindings with a plane, a step and an excluded overhead surface.
+Its independent expected heights are -1 and -0.5 metres; clearance is +1 metre.
+Compilation and execution on UE remain required before runtime acceptance.
+
+### Install an independent declaration package
+
+[The external input example](../examples/external-input/README.md) supplies a
+Python wheel and a matching native plugin source. Its constant scalar makes the
+expected result independent of physics. The tooling test builds both Python
+packages, installs them outside the checkout, removes the staged source and
+resolves the packaged YAML through the public registry.
+
+This proves declaration packaging. The native example must still be built and
+sampled in a separate UE project before claiming installed-plugin runtime support.
