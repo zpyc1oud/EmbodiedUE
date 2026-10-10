@@ -509,7 +509,7 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 Conditioning : { 0, 1, 2, 3 })
+	for (int32 Conditioning : { 0, 4, 5, 6, 7 })
 	{
 	auto Scene = MakeScene();
 	UWorld* World = Scene->GetWorld();
@@ -523,20 +523,27 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 	USkeletalMeshComponent* Mesh = FindMesh(*World);
 	if (!Mesh || !Mesh->GetPhysicsAsset()) { AddError(TEXT("missing support mesh")); return false; }
-	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_conditioning=%d (0=product, 1=no_joint_mass, 2=no_body_inertia, 3=neither)"), Conditioning));
-	if (Conditioning & 1)
+	const int32 PositionIterations = Conditioning == 4 ? 32 : (Conditioning == 5 || Conditioning == 7) ? 64 : 0;
+	const int32 VelocityIterations = Conditioning == 4 ? 8 : (Conditioning == 5 || Conditioning == 7) ? 16 : 0;
+	const double Dt = Conditioning >= 6 ? 0.0025 : 0.005;
+	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_accuracy=%d position_iterations=%d velocity_iterations=%d dt=%.9f"),
+		Conditioning, PositionIterations, VelocityIterations, Dt));
+	if (PositionIterations > 0)
 	{
-		for (FConstraintInstance* Joint : Mesh->Constraints) { if (Joint) { Joint->DisableMassConditioning(); } }
-	}
-	if (Conditioning & 2)
-	{
-		for (FBodyInstance* Body : Mesh->Bodies) { if (Body) { Body->SetInertiaConditioningEnabled(false); } }
+		for (FBodyInstance* Body : Mesh->Bodies)
+		{
+			if (Body)
+			{
+				Body->SetOverrideIterationCounts(true);
+				Body->SetPositionSolverIterationCount(static_cast<uint8>(PositionIterations));
+				Body->SetVelocitySolverIterationCount(static_cast<uint8>(VelocityIterations));
+			}
+		}
 	}
 	TArray<float> Targets;
 	for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
 	if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
-	constexpr double Dt = 0.005;
-	for (int32 Step = 0; Step < 800; ++Step) { if (!Tick(*this, *World, Dt)) { return false; } }
+	for (int32 Step = 0; Step < FMath::RoundToInt(4.0 / Dt); ++Step) { if (!Tick(*this, *World, Dt)) { return false; } }
 	double TotalMass = 0.0;
 	TArray<FName> BodyNames;
 	for (const USkeletalBodySetup* Setup : Mesh->GetPhysicsAsset()->SkeletalBodySetups)
@@ -568,7 +575,7 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	FVector Sum = FVector::ZeroVector;
 	double MinimumSupport = TNumericLimits<double>::Max();
 	double MaximumSupport = 0.0;
-	for (int32 Step = 0; Step < 400; ++Step)
+	for (int32 Step = 0; Step < FMath::RoundToInt(2.0 / Dt); ++Step)
 	{
 		// Gravity acts during the step at the pre-step COM. Integrate its
 		// moment about a fixed origin, not a changing support centroid.
@@ -637,7 +644,7 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 		MinimumSupport = FMath::Min(MinimumSupport, StepImpulse.Z / Dt);
 		MaximumSupport = FMath::Max(MaximumSupport, StepImpulse.Z / Dt);
 	}
-	constexpr double Duration = 400 * Dt;
+	constexpr double Duration = 2.0;
 	const FVector Weight = -Gravity * TotalMass;
 	const FVector MeanSupport = Sum / Duration;
 	const double Budget = 0.05 + 0.03 * Weight.Size();
