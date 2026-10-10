@@ -233,6 +233,10 @@ A constraint drive and an explicit PD calculation can have different discrete-ti
 Body or joint inertia conditioning, projection, and other solver settings can also change the
 physical response. Check measured trajectories and loads with the physical test fixtures.
 A calculated PD effort is not measured solver torque.
+The current actuator is an idealized simulation drive with an effort cap.
+It does not model servo voltage, temperature, a torque-speed curve, or communication delay.
+A physical servo's stall torque is not a continuous operating limit.
+Keep the asset's declared simulation parameters separate from hardware specifications.
 Position, effort, and passive behavior use shared runtime code instead of robot-specific control code.
 
 | Observation | Shape and semantics |

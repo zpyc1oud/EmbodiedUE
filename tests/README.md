@@ -200,8 +200,9 @@ Use an independent physical prediction for each case:
 The additional native cases cover these boundaries:
 
 - Input lifetime, one-shot impulses, offset forces, rotated local/world frames, asymmetric inertia, and gravity
-- Signed free coordinates, locked axes, hard stops, disabled drives, and underdamped/overdamped trajectories
-- Static support, contact impulse balance, restitution, and static/sliding friction
+- Signed free coordinates, locked axes, angular/prismatic hard stops, disabled drives, static angular reaction, and underdamped/overdamped trajectories
+- Static support, contact impulse balance, restitution and rebound height, and static/sliding friction
+- The real CartPole effort path, declared cart/pole masses, held-force momentum, and reset clearing
 - Actual PhantomX body inventory, reordered named actuators, completed joint state, whole-body momentum, and weight support
 
 The PhantomX fixed-target case saves bounded CSV traces under `Saved/Automation/PhysicsResponse`.
@@ -213,7 +214,8 @@ Keep D1 solver-step consistency separate from D4 control-window comparisons.
 
 `tests/e2e/test_phantomx_physical_response.py` runs real Workers without a learner.
 It checks Session wire values against named Python fields and policy-observation slices.
-It also compares fresh D1/D4 runs and two-Slot sparse-reset trajectories.
+It also compares fresh D1/D4 runs, two-Slot sparse-reset trajectories, and authored/generated flat ground.
+The authored fixture uses the registered Walk Task map; an empty Entry map is used only with generated collision ground.
 The trace oracle lives in `tests/e2e/support/physical_oracles.py`.
 Its unit cases reject missing input, reversed input, wrong units, stale forces, swapped rows, and shifted velocity samples.
 These unit cases establish oracle sensitivity, not physical correctness.

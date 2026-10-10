@@ -1,6 +1,7 @@
 #include "UERLPhysicsResponseTestSupport.h"
 
 #include "Components/SkeletalMeshComponent.h"
+#include "Chaos/ChaosConstraintSettings.h"
 #include "Chaos/Collision/PBDCollisionConstraint.h"
 #include "Chaos/Collision/ParticleCollisions.h"
 #include "Chaos/ParticleHandle.h"
@@ -150,6 +151,12 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 		// A realizable rigid-body inertia has principal moments satisfying the triangle inequalities.
 		TestTrue(TEXT("principal inertias satisfy rigid-body triangle inequalities"),
 			I.X <= I.Y + I.Z + 1.0e-8 && I.Y <= I.X + I.Z + 1.0e-8 && I.Z <= I.X + I.Y + 1.0e-8);
+		const FVector ExtentMeters = Body->GetBodyBounds().GetSize() / 100.0;
+		TestTrue(TEXT("collision dimensions use the expected metre scale"),
+			!ExtentMeters.ContainsNaN() && ExtentMeters.GetMin() > 0.001 && ExtentMeters.GetMax() < 1.0);
+		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] body=%s simulated=%d gravity=%d linear_damping=%.9f angular_damping=%.9f"),
+			*Setup->BoneName.ToString(), Body->IsInstanceSimulatingPhysics(), Body->bEnableGravity,
+			Body->LinearDamping, Body->AngularDamping));
 		TotalMass += Mass;
 		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] body=%s mass_kg=%.9f inertia_kg_m2=%s com_cm=%s mass_frame=%s bounds_cm=%s"),
 			*Setup->BoneName.ToString(), Mass, *I.ToString(), *Body->GetCOMPosition().ToString(),
@@ -164,6 +171,17 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("each constraint refers to physical bodies"), Names.Contains(C->ConstraintBone1) && Names.Contains(C->ConstraintBone2));
 		TestTrue(TEXT("each live joint has a declared actuator"), RobotConfig.Actuators.ContainsByPredicate(
 			[C](const FUERLSkeletalMeshRuntimeActuator& A) { return A.JointName == C->JointName; }));
+		const auto& Drive = C->ProfileInstance.AngularDrive;
+		const auto& AxisDrive = C->GetAngularTwistMotion() != EAngularConstraintMotion::ACM_Locked
+			? Drive.TwistDrive : Drive.SwingDrive;
+		const double ActualKp = AxisDrive.Stiffness * Chaos::ConstraintSettings::AngularDriveStiffnessScale() / 10000.0;
+		const double ActualKd = AxisDrive.Damping * Chaos::ConstraintSettings::AngularDriveDampingScale() / 10000.0;
+		TestTrue(TEXT("declared SI stiffness reaches every PhantomX joint drive"), FMath::Abs(ActualKp - 25.0) < 1.0e-4);
+		TestTrue(TEXT("declared SI damping reaches every PhantomX joint drive"), FMath::Abs(ActualKd - 0.5) < 1.0e-5);
+		TestTrue(TEXT("every live drive uses the declared force-mode torque cap"),
+			!Drive.bAccelerationMode && FMath::Abs(AxisDrive.MaxForce / 10000.0 - 2.8) < 1.0e-5);
+		AddInfo(FString::Printf(TEXT("[PHYSICS_INVENTORY] joint=%s effective_kp_nm_rad=%.9f effective_kd_nm_s_rad=%.9f cap_nm=%.9f target=%s"),
+			*C->JointName.ToString(), ActualKp, ActualKd, AxisDrive.MaxForce / 10000.0, *Drive.OrientationTarget.ToString()));
 		FVector SolverTarget;
 		FPhysicsInterface::GetDriveAngularVelocity(C->GetPhysicsConstraintRef(), SolverTarget);
 		TestTrue(TEXT("zero requested drive speed reaches the solver"), SolverTarget.Size() < 1.0e-8);
@@ -349,11 +367,14 @@ bool FUERLPhantomXNamedRoutingTest::RunTest(const FString& Parameters)
 			const FName Name = Canonical.Actuators[J].JointName;
 			FConstraintInstance* C = Mesh->FindConstraintInstance(Name);
 			if (!C) { AddError(TEXT("named actuator has no physical constraint")); return false; }
-			TestTrue(TEXT("PhantomX physical coordinate is twist with locked swings"),
-				C->GetAngularTwistMotion() != EAngularConstraintMotion::ACM_Locked
-				&& C->GetAngularSwing1Motion() == EAngularConstraintMotion::ACM_Locked
-				&& C->GetAngularSwing2Motion() == EAngularConstraintMotion::ACM_Locked);
-			const double Target = C->ProfileInstance.AngularDrive.OrientationTarget.Quaternion().GetTwistAngle(FVector::XAxisVector);
+			const bool Twist = C->GetAngularTwistMotion() != EAngularConstraintMotion::ACM_Locked;
+			const bool Swing1 = C->GetAngularSwing1Motion() != EAngularConstraintMotion::ACM_Locked;
+			const bool Swing2 = C->GetAngularSwing2Motion() != EAngularConstraintMotion::ACM_Locked;
+			if (!TestTrue(TEXT("the physical joint has exactly one angular coordinate"),
+				static_cast<int32>(Twist) + static_cast<int32>(Swing1) + static_cast<int32>(Swing2) == 1)) { return false; }
+			// Literal Chaos axis convention; do not use the production axis resolver.
+			const FVector LocalAxis = Twist ? FVector::XAxisVector : Swing1 ? FVector::ZAxisVector : FVector::YAxisVector;
+			const double Target = C->ProfileInstance.AngularDrive.OrientationTarget.Quaternion().GetTwistAngle(LocalAxis);
 			TestTrue(TEXT("reordered named command reaches the intended live drive"), FMath::Abs(Target - Expected[Name]) < 1.0e-6);
 			FBodyInstance* Child = Mesh->GetBodyInstance(C->ConstraintBone1);
 			FBodyInstance* Parent = Mesh->GetBodyInstance(C->ConstraintBone2);
@@ -361,8 +382,9 @@ bool FUERLPhantomXNamedRoutingTest::RunTest(const FString& Parameters)
 			const FTransform ChildFrame = C->GetRefFrame(EConstraintFrame::Frame1) * Child->GetUnrealWorldTransform();
 			const FTransform ParentFrame = C->GetRefFrame(EConstraintFrame::Frame2) * Parent->GetUnrealWorldTransform();
 			const FQuat Relative = (ParentFrame.GetRotation().Inverse() * ChildFrame.GetRotation()).GetNormalized();
-			const double GeometricQ = 2.0 * FMath::Atan2(Relative.X, Relative.W);
-			const FVector Axis = ChildFrame.GetRotation().RotateVector(FVector::XAxisVector);
+			const double GeometricQ = 2.0 * FMath::Atan2(
+				FVector::DotProduct(FVector(Relative.X, Relative.Y, Relative.Z), LocalAxis), Relative.W);
+			const FVector Axis = ChildFrame.GetRotation().RotateVector(LocalAxis);
 			const double PhysicalW = FVector::DotProduct(Axis,
 				Child->GetUnrealWorldAngularVelocityInRadians() - Parent->GetUnrealWorldAngularVelocityInRadians());
 			const double Difference = State[J * 2] - GeometricQ;

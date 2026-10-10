@@ -167,6 +167,7 @@ bool FUERLJointLimitResponseTest::RunTest(const FString& Parameters)
 		UStaticMeshComponent* Cube = World ? MakeCube(*World, 10.0) : nullptr;
 		if (!Cube || !Cube->GetBodyInstance()) { AddError(TEXT("missing limit fixture")); return false; }
 		UPhysicsConstraintComponent* Joint = PinCube(*Cube, 2.0, 0.2, 0.2);
+		Joint->ConstraintInstance.ProfileInstance.TwistLimit.bSoftConstraint = false;
 		Joint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Limited, FMath::RadiansToDegrees(0.2f));
 		Joint->ConstraintInstance.SetAngularOrientationTarget(FQuat(FVector::XAxisVector, Sign * 0.5));
 		for (int32 Step = 0; Step < 800; ++Step)
@@ -187,6 +188,97 @@ bool FUERLJointLimitResponseTest::RunTest(const FString& Parameters)
 		}
 		TestTrue(TEXT("disabled drive has no restoring or damping torque"),
 			Matches(Cube->GetBodyInstance()->GetUnrealWorldAngularVelocityInRadians(), FVector::XAxisVector * (Sign * 0.1), 0.001));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLPrismaticHardStopTest,
+	"UERL.Integration.PhysicsResponse.Joint.PrismaticHardStop",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLPrismaticHardStopTest::RunTest(const FString& Parameters)
+{
+	using namespace UERLPhysicsResponseTests;
+	FLockstepSettings Settings;
+	for (double Sign : { -1.0, 1.0 })
+	{
+		auto Scene = MakeScene();
+		UWorld* World = Scene->GetWorld();
+		UStaticMeshComponent* Cube = World ? MakeCube(*World, 1.0) : nullptr;
+		if (!Cube || !Cube->GetBodyInstance()) { AddError(TEXT("missing prismatic stop body")); return false; }
+		UPhysicsConstraintComponent* Joint = PinCube(*Cube, 0.0, 0.0, 1.0);
+		Joint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Locked, 0.0f);
+		Joint->ConstraintInstance.ProfileInstance.LinearLimit.bSoftConstraint = false;
+		Joint->SetLinearXLimit(ELinearConstraintMotion::LCM_Limited, 5.0f); // +/- 0.05 m
+		if (!Tick(*this, *World, 0.005)) { return false; }
+		const FVector Start = Cube->GetBodyInstance()->GetCOMPosition();
+		for (int32 Step = 0; Step < 400; ++Step)
+		{
+			Cube->AddForce(FVector(Sign * 100.0, 0.0, 0.0), NAME_None, false);
+			if (!Tick(*this, *World, 0.005)) { return false; }
+			const FVector Change = (Cube->GetBodyInstance()->GetCOMPosition() - Start) / 100.0;
+			TestTrue(TEXT("linear hard-stop penetration stays below 0.5 mm"), FMath::Abs(Change.X) <= 0.0505);
+			TestTrue(TEXT("locked transverse coordinates remain fixed"), FMath::Abs(Change.Y) < 0.0005 && FMath::Abs(Change.Z) < 0.0005);
+		}
+		const double Q = (Cube->GetBodyInstance()->GetCOMPosition().X - Start.X) / 100.0;
+		TestTrue(TEXT("signed force reaches the declared prismatic stop"), FMath::Abs(Q - Sign * 0.05) <= 0.0005);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLStaticAngularReactionTest,
+	"UERL.Integration.PhysicsResponse.Joint.StaticAngularReactionAtCOM",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLStaticAngularReactionTest::RunTest(const FString& Parameters)
+{
+	using namespace UERLPhysicsResponseTests;
+	FLockstepSettings Settings;
+	for (double Dt : { 0.005, 0.0025 })
+	{
+		for (double Sign : { -1.0, 1.0 })
+		{
+			auto Scene = MakeScene();
+			UWorld* World = Scene->GetWorld();
+			UStaticMeshComponent* Cube = World ? MakeCube(*World, 2.0) : nullptr;
+			if (!Cube || !Cube->GetBodyInstance()) { AddError(TEXT("missing reaction body")); return false; }
+			UPhysicsConstraintComponent* Joint = PinCube(*Cube, 0.0, 0.0, 1.0);
+			Joint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Locked, 0.0f);
+			Joint->ConstraintInstance.DisableMassConditioning();
+			Joint->ConstraintInstance.SetOrientationDriveTwistAndSwing(false, false);
+			Joint->ConstraintInstance.SetAngularVelocityDriveTwistAndSwing(false, false);
+			Cube->SetEnableGravity(true);
+			const FVector Force = Sign * FVector(1.0, 2.0, 3.0);
+			const FVector Offset(0.1, -0.05, 0.02);
+			const FVector Torque = Sign * FVector(0.03, 0.04, -0.02);
+			// Reference point is the fixed world anchor at the body's COM.
+			// Gravity has zero moment there. The declared offset force does not.
+			const FVector Expected = -(Torque + FVector::CrossProduct(Offset, Force));
+			FVector Mean = FVector::ZeroVector;
+			const int32 Steps = FMath::RoundToInt(1.0 / Dt);
+			for (int32 Step = 0; Step < Steps * 2; ++Step)
+			{
+				Cube->AddForceAtLocation(Force * 100.0, Cube->GetBodyInstance()->GetCOMPosition() + Offset * 100.0);
+				Cube->AddTorqueInRadians(Torque * 10000.0, NAME_None, false);
+				if (!Tick(*this, *World, Dt)) { return false; }
+				if (Step >= Steps)
+				{
+					FVector LinearOutput, AngularImpulseOutput;
+					Joint->ConstraintInstance.GetConstraintForce(LinearOutput, AngularImpulseOutput);
+					// UE 5.8 JointConstraintProxy forwards GetAngularImpulse into
+					// OutputData.Torque. Convert cm^2 to m^2 and divide by this dt.
+					// This is total constraint reaction, not isolated motor torque.
+					Mean += AngularImpulseOutput / (10000.0 * Dt * Steps);
+				}
+			}
+			TestTrue(TEXT("static angular reaction balances applied torque and r cross F"),
+				Matches(Mean, Expected, 0.002 + Expected.Size() * 0.02));
+			TestTrue(TEXT("reaction fixture has settled rather than balancing acceleration"),
+				Cube->GetBodyInstance()->GetUnrealWorldAngularVelocityInRadians().Size() < 0.005
+				&& Cube->GetBodyInstance()->GetUnrealWorldVelocity().Size() / 100.0 < 0.002);
+			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] static_angular_reaction dt=%.6f expected_nm=%s measured_nm=%s"),
+				Dt, *Expected.ToString(), *Mean.ToString()));
+		}
 	}
 	return true;
 }

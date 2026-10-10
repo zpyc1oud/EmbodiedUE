@@ -10,6 +10,7 @@ import csv
 import math
 import struct
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -20,7 +21,7 @@ import torch
 import yaml
 
 from tests.e2e.support.physical_oracles import joint_consistency
-from tests.e2e.support.worker_runner import TRAIN_MAP, UE_CMD, UPROJECT
+from tests.e2e.support.worker_runner import UE_CMD, UPROJECT
 from uerl import (
     ObservationShapeTable,
     PresentationMode,
@@ -32,6 +33,7 @@ from uerl import (
     robot_actuator_action_schema,
     robot_observation_schema,
 )
+from uerl.application.run_config import load_run_config_source
 from uerl.core.codec import Layout
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.registry import create_default_registry
@@ -43,14 +45,30 @@ JOINTS = tuple(f"{segment}_{leg}" for leg in ("rf", "rm", "rr", "lf", "lm", "lr"
 DEFAULTS = (0.0, 0.15, -0.30) * 6
 
 
-def _config(directory: Path, slots: int, decimation: int) -> ResolvedRunConfig:
-    return build_run_config("UERL-PhantomX-Walk-v0", overrides={
+def _config(directory: Path, slots: int, decimation: int, *, generated_flat: bool = False) -> ResolvedRunConfig:
+    base = build_run_config("UERL-PhantomX-Walk-v0")
+    overrides = {
         **build_launch_overrides(ue_executable=Path(UE_CMD), project=Path(UPROJECT),
-                                 map_name=TRAIN_MAP, presentation=PresentationMode.NONE),
+                                 map_name="/Engine/Maps/Entry" if generated_flat else base.session.map_path,
+                                 presentation=PresentationMode.NONE),
         "worker.slot_count": str(slots), "worker.run_seed": "0",
         "worker.decimation": f"[{decimation},{decimation}]",
         "task.max_episode_duration_s": "20", "logging.run_directory": str(directory),
-    })
+    }
+    source = load_run_config_source("UERL-PhantomX-Walk-v0", None)
+    if generated_flat:
+        worker = source.registration.worker_config_factory()
+        flat = {
+            "num_levels": 1, "cell_size": [24.0, 24.0], "border_width": 1.0,
+            "physics_collision": True,
+            "tiers": [{"level": 0, "primitive": "plane", "seed": "0", "platform_width": 0.0, "params": {}}],
+        }
+        # A test-local environment declaration goes through the normal typed
+        # resolver. It does not alter the registered production Task.
+        source = replace(source, registration=replace(
+            source.registration, worker_config_factory=lambda: replace(worker, terrain_config=flat),
+        ))
+    return source.resolve(overrides).config
 
 
 def _wire_state(payload: bytes, layout: Layout, names: tuple[str, ...], slots: int) -> dict[str, np.ndarray[Any, Any]]:
@@ -66,8 +84,10 @@ def _wire_state(payload: bytes, layout: Layout, names: tuple[str, ...], slots: i
     return result
 
 
-def _direct_trace(directory: Path, decimation: int) -> dict[str, np.ndarray[Any, Any]]:
-    config = _config(directory, 1, decimation)
+def _direct_trace(
+    directory: Path, decimation: int, *, generated_flat: bool = False,
+) -> dict[str, np.ndarray[Any, Any]]:
+    config = _config(directory, 1, decimation, generated_flat=generated_flat)
     registry = create_default_registry()
     task = registry.create_task(config.task_id, config.task)
     curriculum = registry.create_curriculum(config.task_id, config.task, num_envs=1, device="cpu", run_seed=0)
@@ -228,3 +248,22 @@ def test_phantomx_sparse_reset_preserves_unselected_physical_trajectory(tmp_path
                 np.testing.assert_allclose(after[name][1], before[name][1], atol=tolerance, rtol=0, err_msg=name)
     assert any(abs(float(row[f"robot.joint.{joint}.joint_velocity"][1, 0])) > 0.01
                for row in reference for joint in JOINTS), "unselected reference must actually move"
+
+
+def test_phantomx_physical_state_on_authored_and_generated_flat_ground(tmp_path: Path) -> None:
+    """Keep scene results separate; check comparable settled support and state."""
+    authored = _direct_trace(tmp_path / "authored-flat", 4)
+    generated = _direct_trace(tmp_path / "generated-flat", 4, generated_flat=True)
+    for label, state in (("authored", authored), ("generated", generated)):
+        terrain = state["robot.body.base_link.terrain_height"][100:]
+        assert np.max(np.ptp(terrain, axis=1)) < 0.001, f"{label}: fixture is not a flat sampled surface"
+        foot_force = sum(state[f"robot.body.tibia_{leg}.contact_force"][100:, 0]
+                         for leg in ("rf", "rm", "rr", "lf", "lm", "lr"))
+        assert float(np.mean(foot_force)) > 0.1, f"{label}: no measured foot support"
+    for joint in JOINTS:
+        name = f"robot.joint.{joint}.joint_position"
+        np.testing.assert_allclose(np.mean(authored[name][100:], axis=0),
+                                   np.mean(generated[name][100:], axis=0), atol=0.02, rtol=0, err_msg=name)
+    clearance = "robot.body.base_link.ground_clearance"
+    np.testing.assert_allclose(np.mean(authored[clearance][100:], axis=0),
+                               np.mean(generated[clearance][100:], axis=0), atol=0.003, rtol=0)

@@ -244,6 +244,26 @@ bool FUERLRestitutionImpulseTest::RunTest(const FString& Parameters)
 			FMath::Abs(ReboundV + Restitution * ImpactV) < 0.05 + 0.03 * FMath::Abs(ImpactV));
 		TestTrue(TEXT("normal drop has no unexplained lateral collision impulse"),
 			FVector(CollisionImpulse.X, CollisionImpulse.Y, 0.0).Size() < 0.02);
+		// Follow the first rebound to its apex. A single velocity sample must
+		// not replace a trajectory-level restitution check.
+		double PeakHeight = Body->GetBodyInstance()->GetCOMPosition().Z / 100.0;
+		double PreviousV = ReboundV;
+		bool ApexSeen = Restitution == 0.0;
+		for (int32 Step = 0; Step < 400; ++Step)
+		{
+			if (!Tick(*this, *World, Dt)) { return false; }
+			PeakHeight = FMath::Max(PeakHeight, Body->GetBodyInstance()->GetCOMPosition().Z / 100.0);
+			const double V = Body->GetBodyInstance()->GetUnrealWorldVelocity().Z / 100.0;
+			if (Restitution > 0.0 && PreviousV > 0.0 && V <= 0.0) { ApexSeen = true; break; }
+			PreviousV = V;
+		}
+		const double ExpectedPeak = 0.1 + Restitution * Restitution * (0.6 - 0.1);
+		const double HeightBudget = 0.005 + FMath::Sqrt(2.0 * FMath::Abs(G) * 0.5) * Dt;
+		TestTrue(TEXT("the nonzero restitution trial reaches a rebound apex"), ApexSeen);
+		TestTrue(TEXT("rebound height agrees with restitution-squared energy recovery"),
+			FMath::Abs(PeakHeight - ExpectedPeak) <= HeightBudget);
+		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] rebound e=%.3f expected_height_m=%.9f height_m=%.9f budget_m=%.9f"),
+			Restitution, ExpectedPeak, PeakHeight, HeightBudget));
 		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] restitution e=%.3f impact_v=%.6f rebound_v=%.6f impulse=%s"),
 			Restitution, ImpactV, ReboundV, *CollisionImpulse.ToString()));
 	}
