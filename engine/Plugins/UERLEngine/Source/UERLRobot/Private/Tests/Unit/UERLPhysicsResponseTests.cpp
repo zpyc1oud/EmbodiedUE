@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 
+#include "Chaos/RigidParticles.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -7,6 +8,7 @@
 #include "PhysicsEngine/BodyInstance.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "PhysicsEngine/PhysicsSettings.h"
+#include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "PreviewScene.h"
 #include "UERLGenericRobotCommandApplier.h"
 #include "UERLGenericRobotKinematics.h"
@@ -67,6 +69,16 @@ namespace UERLPhysicsResponseTests
 		Cube->SetAngularDamping(0.0f);
 		Cube->SetSimulatePhysics(true);
 		Cube->SetMassOverrideInKg(NAME_None, static_cast<float>(MassKg), true);
+		// An analytic free body must not lose velocity to the engine's sleep
+		// heuristic. Match the production Robot's never-sleep physical policy.
+		if (FBodyInstance* Body = Cube->GetBodyInstance())
+		{
+			if (FPhysicsActorHandle Handle = Body->GetPhysicsActorHandle())
+			{
+				Handle->GetGameThreadAPI().SetSleepType(Chaos::ESleepType::NeverSleep);
+			}
+		}
+		Cube->WakeAllRigidBodies();
 		return Cube;
 	}
 
@@ -170,6 +182,7 @@ namespace UERLPhysicsResponseTests
 						else { Cube->AddForce(Axis * ChaosInput, NAME_None, false); }
 						if (!Tick(Test, *World, Dt)) { return false; }
 					}
+					Test.TestTrue(TEXT("analytic body remains awake after applied input"), Body->IsInstanceAwake());
 					const FVector Velocity = Angular ? Body->GetUnrealWorldAngularVelocityInRadians()
 						: Body->GetUnrealWorldVelocity() / 100.0;
 					const FVector ExpectedVelocity = AccelerationSi * Duration;
