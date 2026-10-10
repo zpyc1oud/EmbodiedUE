@@ -250,6 +250,10 @@ These are deliberate fixture-input faults; they do not modify production code.
 The expected response uses declared SI properties and elementary mechanics.
 Do not compute it with the production unit-conversion function.
 Check actual mass and inertia against the declared fixture before evaluating motion.
+For PhantomX, rebuild mass geometry from the authored PhysicsAsset and resolved material.
+Compare mass, local COM, and the full body-frame inertia tensor with the live body.
+Compare tensor columns rather than principal-axis quaternions, because repeated eigenvalues make those axes ambiguous.
+Keep this asset-transfer oracle separate from the elementary-mechanics free-body response oracle.
 Read the completed solver clock on each step; a requested time interval is not evidence of an executed interval.
 
 Free-body velocity tolerance is 0.5% of the expected magnitude plus `1e-4` in the applicable SI unit.
@@ -275,6 +279,28 @@ Reset captures have an explicit phase and must not advance the solver clock.
 Missing capture rows, shifted transactions, mixed frames, and altered values fail acceptance.
 
 Do not label total constraint reaction torque or a PD estimate as measured actuator torque.
+
+The static reaction fixture uses a world anchor offset from the body's COM.
+Compare all three force components and all three moment components in the world frame.
+In UE 5.8.3, `GetConstraintForce` returns constraint impulses despite its name.
+Divide linear output by `100 * physics_dt` and angular output by `10000 * physics_dt` for SI force and moment.
+The angular output is a constraint couple. Add the linear reaction's moment arm for a COM balance.
+Check the engine source before using this conversion on another engine version.
+
+The contact oracle sums completed manifold-point results.
+It uses each point's application position for the external moment balance.
+Require a current collision epoch, valid point results, unlimited manifold capacity, disabled CCD,
+and disabled split impulse for this momentum-based fixture.
+Include both velocity impulse and position impulse divided by physics dt.
+Compare their sum with the constraint's accumulated impulse before comparing measured momentum.
+A force magnitude and a single nearest contact point cannot establish a distributed contact moment.
+
+For soft limits, declare force mode and physical stiffness and damping explicitly.
+The fixture compensates the engine's coefficient scales without changing global settings.
+Compare the trajectory with the independent spring-damper solution at two masses and two time steps.
+Check steady penetration and release under inward load separately.
+The current actuator declaration has no joint-speed limit; do not add one merely to reproduce an upstream test.
+A zero velocity drive target is not a speed limit.
 
 Reference patterns come from Isaac Lab revision `b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8`:
 [rigid-body force cases](https://github.com/isaac-sim/IsaacLab/blob/b0542fe2d45bf91c4e1d9ef6952b9c709c80b4e8/source/isaaclab/test/assets/test_rigid_object.py),

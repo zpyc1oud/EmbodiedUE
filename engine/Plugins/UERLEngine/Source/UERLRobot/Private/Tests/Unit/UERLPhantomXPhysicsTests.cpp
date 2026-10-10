@@ -1,5 +1,6 @@
 #include "UERLPhysicsResponseTestSupport.h"
 #include "UERLContactWrenchTestSupport.h"
+#include "UERLAuthoredMassTestSupport.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Chaos/ChaosConstraintSettings.h"
@@ -146,7 +147,14 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 		Names.Add(Setup->BoneName);
 		FBodyInstance* Body = Mesh->GetBodyInstance(Setup->BoneName);
 		if (!Body || !Body->IsValidBodyInstance()) { AddError(TEXT("asset body has no live solver body")); return false; }
+		if (!CheckAuthoredMassProperties(*this, *Setup, *Body)) { return false; }
 		const double Mass = Body->GetBodyMass();
+		TestTrue(TEXT("the floating PhantomX topology simulates every declared body with gravity"),
+			Body->IsInstanceSimulatingPhysics() && Body->bEnableGravity);
+		TestTrue(TEXT("authored damping and mass scale reach each body instance"),
+			FMath::Abs(Body->LinearDamping - Setup->DefaultInstance.LinearDamping) < 1.0e-6
+			&& FMath::Abs(Body->AngularDamping - Setup->DefaultInstance.AngularDamping) < 1.0e-6
+			&& FMath::Abs(Body->MassScale - Setup->DefaultInstance.MassScale) < 1.0e-6);
 		if (Setup->DefaultInstance.bOverrideMass)
 		{
 			TestTrue(TEXT("authored mass override reaches the live body"),

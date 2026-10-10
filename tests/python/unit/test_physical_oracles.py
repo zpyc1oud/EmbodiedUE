@@ -80,3 +80,19 @@ def test_incomplete_or_invalid_solver_trace_fails(times: list[float]) -> None:
 def test_incomplete_or_nonfinite_force_trace_fails(measured: list[list[float]]) -> None:
     with pytest.raises(ValueError):
         force_trajectory_matches(measured, [[1, 0]], [1, 2], physics_dt=0.1)
+
+
+def test_unmarked_position_jump_fails_the_same_consistency_oracle() -> None:
+    result = joint_consistency([0, 0.005, 0.01, 0.015], [0.0, 0.0, 0.05, 0.05],
+                               [0.0] * 4, physics_dt=0.005)
+    assert not result.passed
+
+
+@pytest.mark.parametrize("field", ["position", "velocity"])
+@pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf])
+def test_nonfinite_joint_feedback_is_rejected(field: str, invalid: float) -> None:
+    positions = [0.0, 0.0, 0.0]
+    velocities = [0.0, 0.0, 0.0]
+    (positions if field == "position" else velocities)[1] = invalid
+    with pytest.raises(ValueError, match="nonfinite"):
+        joint_consistency([0, 0.005, 0.01], positions, velocities, physics_dt=0.005)

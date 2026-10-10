@@ -168,7 +168,8 @@ namespace UERLPhysicsResponseTests
 			TEXT("[PHYSICS_DIAGNOSTIC] trial=%s step=%d mass=%.9f I_si=(%.9f,%.9f,%.9f) q=%.9f w=(%.9f,%.9f,%.9f) constraint_angular_impulse_nms=(%.9f,%.9f,%.9f) kp_si=%.9f kd_si=%.9f limit_nm=%.9f acceleration=%d projection=%d profile_target_rev_s=(%.9f,%.9f,%.9f) solver_target_rad_s=(%.9f,%.9f,%.9f)"),
 			Trial, Step, Body->GetBodyMass(), I.X, I.Y, I.Z, JointPosition(Cube, Joint),
 			W.X, W.Y, W.Z, ReactionTorque.X / 10000.0, ReactionTorque.Y / 10000.0, ReactionTorque.Z / 10000.0,
-			Drive.TwistDrive.Stiffness / 10000.0, Drive.TwistDrive.Damping / 10000.0,
+			Drive.TwistDrive.Stiffness * (StiffnessScale ? StiffnessScale->GetFloat() : 1.0f) / 10000.0,
+			Drive.TwistDrive.Damping * (DampingScale ? DampingScale->GetFloat() : 1.0f) / 10000.0,
 			Drive.TwistDrive.MaxForce / 10000.0, Drive.bAccelerationMode, Joint.IsProjectionEnabled(),
 			ProfileTarget.X, ProfileTarget.Y, ProfileTarget.Z, SolverTarget.X, SolverTarget.Y, SolverTarget.Z));
 	}

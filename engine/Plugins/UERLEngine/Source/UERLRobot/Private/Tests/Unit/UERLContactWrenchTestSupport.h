@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Misc/AutomationTest.h"
+#include "Engine/World.h"
 #include "Chaos/Collision/PBDCollisionConstraint.h"
 #include "Chaos/Collision/ContactPoint.h"
 #include "Chaos/ParticleHandle.h"
