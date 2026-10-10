@@ -1,4 +1,7 @@
 #include "UERLPhysicsResponseTestSupport.h"
+#include "Chaos/ChaosConstraintSettings.h"
+#include "Chaos/PBDJointConstraintData.h"
+#include "Physics/Experimental/PhysInterface_Chaos.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -361,6 +364,202 @@ bool FUERLHingeFiniteDifferenceTest::RunTest(const FString& Parameters)
             MaximumFiniteDifferenceError <= Budget);
         AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] hinge_finite_difference mass=%.3f dt=%.6f max_error_rad_s=%.9f budget_rad_s=%.9f"),
             Mass, Dt, MaximumFiniteDifferenceError, Budget));
+    }
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLStaticOffsetReactionWrenchTest,
+    "UERL.Integration.PhysicsResponse.Joint.StaticOffsetReactionWrench",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLStaticOffsetReactionWrenchTest::RunTest(const FString& Parameters)
+{
+    using namespace UERLPhysicsResponseTests;
+    FLockstepSettings Settings;
+    for (double Mass : { 1.0, 2.0 })
+    for (double Dt : { 0.005, 0.0025 })
+    for (double Yaw : { 0.0, 37.0 })
+    for (double Sign : { -1.0, 1.0 })
+    {
+        auto Scene = MakeScene();
+        UWorld* World = Scene->GetWorld();
+        auto* Cube = World ? MakeCube(*World, Mass) : nullptr;
+        if (!Cube || !Cube->GetBodyInstance()) { AddError(TEXT("missing offset-wrench fixture")); return false; }
+        FBodyInstance* Body = Cube->GetBodyInstance();
+        const FQuat Frame = FRotator(21.0, Yaw, -13.0).Quaternion();
+        const FVector COM = Body->GetCOMPosition() / 100.0;
+        const FVector AnchorToCOM = Frame.RotateVector(FVector(0.08, -0.04, 0.03));
+        const FVector Anchor = COM - AnchorToCOM;
+        auto* Joint = PinCube(*Cube, 0.0, 0.0, 1.0);
+        Joint->SetWorldLocationAndRotation(Anchor * 100.0, Frame);
+        Joint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Locked, 0.0f);
+        Joint->SetConstrainedComponents(Cube, NAME_None, nullptr, NAME_None);
+        Joint->ConstraintInstance.DisableProjection();
+        Joint->ConstraintInstance.DisableMassConditioning();
+        Joint->ConstraintInstance.SetOrientationDriveTwistAndSwing(false, false);
+        Joint->ConstraintInstance.SetAngularVelocityDriveTwistAndSwing(false, false);
+        Cube->SetEnableGravity(true);
+        const FVector Gravity(0.0, 0.0, World->GetGravityZ() / 100.0);
+        const FVector Force = Frame.RotateVector(Sign * FVector(1.0, -2.0, 0.5));
+        const FVector Torque = Frame.RotateVector(Sign * FVector(0.03, 0.04, -0.02));
+        const FVector COMToApplication = Frame.RotateVector(FVector(-0.02, 0.05, 0.04));
+        const FVector ExpectedForce = -(Mass * Gravity + Force);
+        // The reported angular constraint impulse is a couple at the anchor.
+        // Its separate linear impulse also creates a moment about the COM.
+        const FVector ExpectedCouple = -(Torque
+            + FVector::CrossProduct(AnchorToCOM + COMToApplication, Force)
+            + FVector::CrossProduct(AnchorToCOM, Mass * Gravity));
+        FVector MeanForce = FVector::ZeroVector, MeanCouple = FVector::ZeroVector;
+        double MaximumSpeed = 0.0, MaximumAngularSpeed = 0.0;
+        const int32 Samples = FMath::RoundToInt(1.0 / Dt);
+        for (int32 Step = 0; Step < Samples * 2; ++Step)
+        {
+            Cube->AddForceAtLocation(Force * 100.0, (COM + COMToApplication) * 100.0);
+            Cube->AddTorqueInRadians(Torque * 10000.0, NAME_None, false);
+            if (!Tick(*this, *World, Dt)) { return false; }
+            if (Step < Samples) { continue; }
+            FVector LinearImpulse, AngularCoupleImpulse;
+            Joint->ConstraintInstance.GetConstraintForce(LinearImpulse, AngularCoupleImpulse);
+            // UE 5.8.3 PBDJointContainerSolver:273-274 and JointConstraintProxy:
+            // the outputs are world-frame impulses on original Body1, despite
+            // the Force/Torque API names. Body1 is the cube in this fixture.
+            MeanForce += LinearImpulse / (100.0 * Dt * Samples);
+            MeanCouple += AngularCoupleImpulse / (10000.0 * Dt * Samples);
+            MaximumSpeed = FMath::Max(MaximumSpeed, Body->GetUnrealWorldVelocity().Size() / 100.0);
+            MaximumAngularSpeed = FMath::Max(MaximumAngularSpeed, Body->GetUnrealWorldAngularVelocityInRadians().Size());
+        }
+        const double ForceBudget = 0.02 + 0.02 * ExpectedForce.Size();
+        const double TorqueBudget = 0.002 + 0.02 * ExpectedCouple.Size();
+        TestTrue(TEXT("all three reaction force components balance gravity and external force"),
+            Matches(MeanForce, ExpectedForce, ForceBudget));
+        TestTrue(TEXT("all three reaction couple components balance moments about the offset anchor"),
+            Matches(MeanCouple, ExpectedCouple, TorqueBudget));
+        const FVector ReactionAboutCOM = MeanCouple + FVector::CrossProduct(-AnchorToCOM, MeanForce);
+        const FVector ExternalAboutCOM = Torque + FVector::CrossProduct(COMToApplication, Force);
+        TestTrue(TEXT("couple plus the linear reaction moment balances the COM wrench"),
+            (ReactionAboutCOM + ExternalAboutCOM).Size() <= TorqueBudget + AnchorToCOM.Size() * ForceBudget);
+        TestTrue(TEXT("static wrench measurements exclude accelerating or drifting fixtures"),
+            MaximumSpeed < 0.002 && MaximumAngularSpeed < 0.005
+            && (Body->GetCOMPosition() / 100.0 - COM).Size() < 0.0005);
+        TestFalse(TEXT("the same reaction oracle rejects a reversed body sign"),
+            Matches(-MeanForce, ExpectedForce, ForceBudget));
+        TestFalse(TEXT("the same reaction oracle rejects treating impulse as force"),
+            Matches(MeanForce * Dt, ExpectedForce, ForceBudget));
+        TestFalse(TEXT("the same reaction oracle rejects an unrequested local-frame rotation"),
+            Matches(Frame.UnrotateVector(MeanForce), ExpectedForce, ForceBudget));
+        TestFalse(TEXT("the moment balance detects omission of gravity and force moment arms"),
+            Matches(MeanCouple, -Torque, TorqueBudget));
+        AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] offset_wrench mass=%.6f dt=%.6f yaw=%.6f sign=%.0f expected_n=%s measured_n=%s error_n=%.9f budget_n=%.9f expected_nm=%s measured_nm=%s error_nm=%.9f budget_nm=%.9f"),
+            Mass, Dt, Yaw, Sign, *ExpectedForce.ToString(), *MeanForce.ToString(),
+            (MeanForce - ExpectedForce).Size(), ForceBudget, *ExpectedCouple.ToString(), *MeanCouple.ToString(),
+            (MeanCouple - ExpectedCouple).Size(), TorqueBudget));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLSoftLimitResponseTest,
+    "UERL.Integration.PhysicsResponse.Joint.SoftLimitForceModeResponse",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLSoftLimitResponseTest::RunTest(const FString& Parameters)
+{
+    using namespace UERLPhysicsResponseTests;
+    FLockstepSettings Settings;
+    for (bool Angular : { false, true })
+    for (double Mass : { 1.0, 2.0 })
+    for (double Dt : { 0.005, 0.0025 })
+    for (double Sign : { -1.0, 1.0 })
+    {
+        auto Scene = MakeScene();
+        UWorld* World = Scene->GetWorld();
+        auto* Cube = World ? MakeCube(*World, Mass) : nullptr;
+        if (!Cube || !Cube->GetBodyInstance()) { AddError(TEXT("missing soft-limit body")); return false; }
+        auto* Body = Cube->GetBodyInstance();
+        auto* Joint = PinCube(*Cube, 0.0, 0.0, 1.0);
+        auto& C = Joint->ConstraintInstance;
+        C.DisableProjection();
+        C.DisableMassConditioning();
+        C.SetOrientationDriveTwistAndSwing(false, false);
+        C.SetAngularVelocityDriveTwistAndSwing(false, false);
+        const double EffectiveMass = Angular ? Mass * 0.04 / 6.0 : Mass;
+        const double K = Angular ? 0.2 : 20.0;
+        const double D = 3.0 * FMath::Sqrt(K * EffectiveMass); // overdamped
+        const double Load = K * 0.01;
+        const double Limit = Angular ? 0.1 : 0.05;
+        const double KScale = Angular ? Chaos::ConstraintSettings::SoftAngularStiffnessScale()
+            : Chaos::ConstraintSettings::SoftLinearStiffnessScale();
+        const double DScale = Angular ? Chaos::ConstraintSettings::SoftAngularDampingScale()
+            : Chaos::ConstraintSettings::SoftLinearDampingScale();
+        if (!FMath::IsFinite(KScale) || !FMath::IsFinite(DScale) || KScale <= 0.0 || DScale <= 0.0)
+        { AddError(TEXT("soft-limit coefficient scales must be positive and finite")); return false; }
+        const double Units = Angular ? 10000.0 : 1.0;
+        if (Angular)
+        {
+            Joint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Limited, FMath::RadiansToDegrees(Limit));
+            C.SetSoftTwistLimitParams(true, K * Units / KScale, D * Units / DScale, 0.0f, 0.0f);
+        }
+        else
+        {
+            Joint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Locked, 0.0f);
+            Joint->SetLinearXLimit(ELinearConstraintMotion::LCM_Limited, Limit * 100.0);
+            C.SetSoftLinearLimitParams(true, K / KScale, D / DScale, 0.0f, 0.0f);
+        }
+        bool ForceModeSet = false;
+        FPhysicsCommand::ExecuteWrite(C.GetPhysicsConstraintRef(), [&](const FPhysicsConstraintHandle& Ref)
+        {
+            if (!Ref.Constraint || !Ref.Constraint->IsType(Chaos::EConstraintType::JointConstraintType)) { return; }
+            auto* Native = static_cast<Chaos::FJointConstraint*>(Ref.Constraint);
+            Native->SetLinearSoftForceMode(Chaos::EJointForceMode::Force);
+            Native->SetAngularSoftForceMode(Chaos::EJointForceMode::Force);
+            ForceModeSet = true;
+        });
+        if (!TestTrue(TEXT("soft-limit fixture explicitly selects force mode"), ForceModeSet)) { return false; }
+        const FTransform Rest = Body->GetUnrealWorldTransform();
+        FTransform Initial = Rest;
+        if (Angular) { Initial.SetRotation(FQuat(FVector::XAxisVector, Sign * Limit) * Rest.GetRotation()); }
+        else { Initial.AddToTranslation(FVector(Sign * Limit * 100.0, 0.0, 0.0)); }
+        Body->SetBodyTransform(Initial, ETeleportType::TeleportPhysics);
+        Body->SetLinearVelocity(FVector::ZeroVector, false);
+        Body->SetAngularVelocityInRadians(FVector::ZeroVector, false);
+        const double Alpha = D / (2.0 * EffectiveMass);
+        const double Root = FMath::Sqrt(Alpha * Alpha - K / EffectiveMass);
+        const double R1 = -Alpha + Root, R2 = -Alpha - Root;
+        const double Budget = 1.0e-4 + 2.0 * (Load / K) * Dt * (Alpha + Root);
+        double MaximumError = 0.0;
+        auto ReadQ = [&]()
+        {
+            const auto Transform = Body->GetUnrealWorldTransform();
+            if (!Angular) { return (Transform.GetLocation().X - Rest.GetLocation().X) / 100.0; }
+            const auto Relative = (Transform.GetRotation() * Rest.GetRotation().Inverse()).GetNormalized();
+            return 2.0 * FMath::Atan2(Relative.X, Relative.W);
+        };
+        for (int32 Step = 0; Step < FMath::RoundToInt(8.0 / Dt); ++Step)
+        {
+            if (Angular) { Cube->AddTorqueInRadians(FVector(Sign * Load * 10000.0, 0.0, 0.0), NAME_None, false); }
+            else { Cube->AddForce(FVector(Sign * Load * 100.0, 0.0, 0.0), NAME_None, false); }
+            if (!Tick(*this, *World, Dt)) { return false; }
+            const double T = (Step + 1) * Dt;
+            const double Expected = Sign * (Limit + Load / K
+                * (1.0 + (R2 * FMath::Exp(R1 * T) - R1 * FMath::Exp(R2 * T)) / (R1 - R2)));
+            const double Q = ReadQ();
+            if (!FMath::IsFinite(Q)) { AddError(TEXT("nonfinite soft-limit trajectory")); return false; }
+            MaximumError = FMath::Max(MaximumError, FMath::Abs(Q - Expected));
+        }
+        TestTrue(TEXT("soft-limit trajectory follows independent mass-spring-damper solution"), MaximumError <= Budget);
+        TestTrue(TEXT("steady soft-limit penetration equals declared load over stiffness"),
+            FMath::Abs(ReadQ() - Sign * (Limit + Load / K)) <= Budget);
+        bool Released = false;
+        for (int32 Step = 0; Step < FMath::RoundToInt(1.0 / Dt); ++Step)
+        {
+            if (Angular) { Cube->AddTorqueInRadians(FVector(-Sign * Load * 10000.0, 0.0, 0.0), NAME_None, false); }
+            else { Cube->AddForce(FVector(-Sign * Load * 100.0, 0.0, 0.0), NAME_None, false); }
+            if (!Tick(*this, *World, Dt)) { return false; }
+            if (Sign * ReadQ() < Limit - 0.001) { Released = true; break; }
+        }
+        TestTrue(TEXT("inward load releases the penetrated soft stop"), Released);
+        AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] soft_limit angular=%d mass=%.6f dt=%.6f sign=%.0f k=%.9f d=%.9f max_error=%.9f budget=%.9f released=%d"),
+            Angular, Mass, Dt, Sign, K, D, MaximumError, Budget, Released));
     }
     return true;
 }

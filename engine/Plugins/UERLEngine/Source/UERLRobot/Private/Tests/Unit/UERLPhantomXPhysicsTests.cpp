@@ -1,4 +1,5 @@
 #include "UERLPhysicsResponseTestSupport.h"
+#include "UERLContactWrenchTestSupport.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Chaos/ChaosConstraintSettings.h"
@@ -502,17 +503,39 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 		TotalMass += Body->GetBodyMass();
 	}
 	const FMomentum Before = Momentum(*Mesh);
+	FVector Origin = FVector::ZeroVector;
+	for (FName Name : BodyNames)
+	{
+		const auto* Body = Mesh->GetBodyInstance(Name);
+		Origin += Body->GetCOMPosition() * (Body->GetBodyMass() / (100.0 * TotalMass));
+	}
+	const FVector Gravity(0.0, 0.0, World->GetGravityZ() / 100.0);
+	FVector ContactAngularImpulse = FVector::ZeroVector;
+	FVector GravityAngularImpulse = FVector::ZeroVector;
+	double MaximumSpeed = 0.0;
+	double MaximumAngularSpeed = 0.0;
 	TMap<FName, FVector> BodyImpulse;
 	FVector Sum = FVector::ZeroVector;
 	double MinimumSupport = TNumericLimits<double>::Max();
 	double MaximumSupport = 0.0;
 	for (int32 Step = 0; Step < 400; ++Step)
 	{
+		// Gravity acts during the step at the pre-step COM. Integrate its
+		// moment about a fixed origin, not a changing support centroid.
+		for (FName Name : BodyNames)
+		{
+			const auto* Body = Mesh->GetBodyInstance(Name);
+			GravityAngularImpulse += FVector::CrossProduct(Body->GetCOMPosition() / 100.0 - Origin,
+				Gravity * (Body->GetBodyMass() * Dt));
+		}
 		if (!Tick(*this, *World, Dt)) { return false; }
 		FVector StepImpulse = FVector::ZeroVector;
 		TMap<FName, FVector> StepByBody;
 		FPhysicsCommand::ExecuteRead(Mesh, [&]()
 		{
+			auto* Collisions = CompletedContactContainer(*this, *World);
+			if (!Collisions) { return; }
+			const int32 Epoch = Collisions->GetConstraintAllocator().GetCurrentEpoch();
 			TSet<Chaos::FGeometryParticleHandle*> RobotParticles;
 			for (FBodyInstance* Body : Mesh->Bodies)
 			{
@@ -522,16 +545,15 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 			{
 				const auto Handle = Mesh->GetBodyInstance(Name)->GetPhysicsActorHandle();
 				auto* Particle = Handle && Handle->GetHandle_LowLevel() ? Handle->GetHandle_LowLevel()->CastToRigidParticle() : nullptr;
-				if (!Particle) { continue; }
+				if (!Particle) { AddError(TEXT("missing support particle")); return; }
 				FVector J = FVector::ZeroVector;
-				Particle->ParticleCollisions().VisitConstCollisions([&](const Chaos::FPBDCollisionConstraint& C)
+				for (const auto* C : Collisions->GetConstraints())
 				{
-					auto* Other = C.GetParticle0() == Particle ? C.GetParticle1() : C.GetParticle0();
-					if (!Other || RobotParticles.Contains(Other)) { return Chaos::ECollisionVisitorResult::Continue; }
-					const double Sign = C.GetParticle0() == Particle ? 1.0 : -1.0;
-					J += Sign * FVector(C.AccumulatedImpulse.X, C.AccumulatedImpulse.Y, C.AccumulatedImpulse.Z) / 100.0;
-					return Chaos::ECollisionVisitorResult::Continue;
-				});
+					if (!C || (C->GetParticle0() != Particle && C->GetParticle1() != Particle)) { continue; }
+					auto* Other = C->GetParticle0() == Particle ? C->GetParticle1() : C->GetParticle0();
+					if (!Other || RobotParticles.Contains(Other)) { continue; }
+					if (!AccumulateContactWrench(*this, *C, Epoch, Particle, Dt, Origin, J, ContactAngularImpulse)) { return; }
+				}
 				StepByBody.Add(Name, J);
 				BodyImpulse.FindOrAdd(Name) += J;
 				StepImpulse += J;
@@ -555,18 +577,38 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 					FMath::Abs(State[36 + Index] - ExpectedForce) <= 0.001 + ExpectedForce * 0.005);
 			}
 		}
+		for (FName Name : BodyNames)
+		{
+			const auto* Body = Mesh->GetBodyInstance(Name);
+			MaximumSpeed = FMath::Max(MaximumSpeed, Body->GetUnrealWorldVelocity().Size() / 100.0);
+			MaximumAngularSpeed = FMath::Max(MaximumAngularSpeed, Body->GetUnrealWorldAngularVelocityInRadians().Size());
+		}
 		Sum += StepImpulse;
 		MinimumSupport = FMath::Min(MinimumSupport, StepImpulse.Z / Dt);
 		MaximumSupport = FMath::Max(MaximumSupport, StepImpulse.Z / Dt);
 	}
 	constexpr double Duration = 400 * Dt;
-	const FVector Gravity(0.0, 0.0, World->GetGravityZ() / 100.0);
 	const FVector Weight = -Gravity * TotalMass;
 	const FVector MeanSupport = Sum / Duration;
 	const double Budget = 0.05 + 0.03 * Weight.Size();
 	TestTrue(TEXT("whole-robot signed mean contact force balances actual weight"), Matches(MeanSupport, Weight, Budget));
 	TestTrue(TEXT("contact plus gravity impulse explains whole-body momentum change"),
 		Matches(Momentum(*Mesh).Linear - Before.Linear, Sum + Gravity * (TotalMass * Duration), Budget * Duration));
+	const FMomentum After = Momentum(*Mesh);
+	const FVector AngularChange = After.Angular - Before.Angular
+		- FVector::CrossProduct(Origin, After.Linear - Before.Linear);
+	const FVector ExternalAngularImpulse = ContactAngularImpulse + GravityAngularImpulse;
+	// 5 mN m absolute plus 3% of gravity moment, fixed before execution.
+	const double MomentBudget = 0.005 + 0.03 * GravityAngularImpulse.Size() / Duration;
+	TestTrue(TEXT("per-point contact and gravity moments explain whole-body angular momentum change"),
+		Matches(AngularChange, ExternalAngularImpulse, MomentBudget * Duration));
+	TestTrue(TEXT("settled support balances all three external moment components"),
+		ExternalAngularImpulse.Size() / Duration <= MomentBudget);
+	TestTrue(TEXT("weight-support fixture remains at rest throughout measurement"),
+		MaximumSpeed < 0.01 && MaximumAngularSpeed < 0.1);
+	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_moment contact_nms=%s gravity_nms=%s delta_h=%s error_nms=%.9f budget_nm=%.9f max_v=%.9f max_w=%.9f"),
+		*ContactAngularImpulse.ToString(), *GravityAngularImpulse.ToString(), *AngularChange.ToString(),
+		(AngularChange - ExternalAngularImpulse).Size(), MomentBudget, MaximumSpeed, MaximumAngularSpeed));
 	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support mass=%.9f weight=%s mean=%s min_z=%.9f max_z=%.9f budget_n=%.9f"),
 		TotalMass, *Weight.ToString(), *MeanSupport.ToString(), MinimumSupport, MaximumSupport, Budget));
 	for (FName Name : BodyNames)

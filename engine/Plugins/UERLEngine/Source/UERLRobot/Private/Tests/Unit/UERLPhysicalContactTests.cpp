@@ -1,4 +1,5 @@
 #include "UERLPhysicsResponseTestSupport.h"
+#include "UERLContactWrenchTestSupport.h"
 
 #include "Chaos/Collision/PBDCollisionConstraint.h"
 #include "Chaos/Collision/ParticleCollisions.h"
@@ -55,7 +56,7 @@ namespace UERLPhysicalContactTests
 
 	// Read the completed constraint impulses. The expected impulse comes from
 	// momentum balance, not from the production contact-force conversion.
-	FVector ContactImpulse(UPrimitiveComponent& Component)
+	FVector ContactImpulse(FAutomationTestBase& Test, UPrimitiveComponent& Component, double Dt)
 	{
 		FVector Sum = FVector::ZeroVector;
 		FPhysicsCommand::ExecuteRead(&Component, [&]()
@@ -64,14 +65,17 @@ namespace UERLPhysicalContactTests
 			FPhysicsActorHandle Handle = Body ? Body->GetPhysicsActorHandle() : nullptr;
 			auto* Particle = Handle && Handle->GetHandle_LowLevel()
 				? Handle->GetHandle_LowLevel()->CastToRigidParticle() : nullptr;
-			if (!Particle) { return; }
-			Particle->ParticleCollisions().VisitConstCollisions([&](const Chaos::FPBDCollisionConstraint& C)
+			if (!Particle) { Test.AddError(TEXT("missing measured contact particle")); return; }
+			auto* Collisions = UERLPhysicsResponseTests::CompletedContactContainer(Test, *Component.GetWorld());
+			if (!Collisions) { return; }
+			const int32 Epoch = Collisions->GetConstraintAllocator().GetCurrentEpoch();
+			FVector AngularImpulse = FVector::ZeroVector;
+			for (const auto* C : Collisions->GetConstraints())
 			{
-				const double Sign = C.GetParticle0() == Particle ? 1.0 : -1.0;
-				const auto& J = C.AccumulatedImpulse;
-				Sum += Sign * FVector(J.X, J.Y, J.Z) / 100.0; // N s
-				return Chaos::ECollisionVisitorResult::Continue;
-			});
+				if (!C || (C->GetParticle0() != Particle && C->GetParticle1() != Particle)) { continue; }
+				if (!UERLPhysicsResponseTests::AccumulateContactWrench(Test, *C, Epoch, Particle, Dt,
+					FVector::ZeroVector, Sum, AngularImpulse)) { return; }
+			}
 		});
 		return Sum;
 	}
@@ -110,7 +114,7 @@ bool FUERLStaticContactBalanceTest::RunTest(const FString& Parameters)
 		for (int32 Step = 0; Step < 200; ++Step)
 		{
 			if (!Tick(*this, *World, Dt)) { return false; }
-			Impulse += ContactImpulse(*Body);
+			Impulse += ContactImpulse(*this, *Body, Dt);
 		}
 		const FVector Gravity(0.0, 0.0, World->GetGravityZ() / 100.0);
 		const FVector Expected = -Gravity * Mass; // one second of weight support
@@ -231,7 +235,7 @@ bool FUERLRestitutionImpulseTest::RunTest(const FString& Parameters)
 		{
 			const double BeforeV = Body->GetBodyInstance()->GetUnrealWorldVelocity().Z / 100.0;
 			if (!Tick(*this, *World, Dt)) { return false; }
-			const FVector J = ContactImpulse(*Body);
+			const FVector J = ContactImpulse(*this, *Body, Dt);
 			TotalContactImpulse += J;
 			++CompletedSteps;
 			const double AfterV = Body->GetBodyInstance()->GetUnrealWorldVelocity().Z / 100.0;
@@ -259,7 +263,7 @@ bool FUERLRestitutionImpulseTest::RunTest(const FString& Parameters)
 		for (int32 Step = 0; Step < 400; ++Step)
 		{
 			if (!Tick(*this, *World, Dt)) { return false; }
-			TotalContactImpulse += ContactImpulse(*Body);
+			TotalContactImpulse += ContactImpulse(*this, *Body, Dt);
 			++CompletedSteps;
 			PeakHeight = FMath::Max(PeakHeight, Body->GetBodyInstance()->GetCOMPosition().Z / 100.0);
 			const double V = Body->GetBodyInstance()->GetUnrealWorldVelocity().Z / 100.0;
