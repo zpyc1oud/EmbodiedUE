@@ -106,6 +106,15 @@ namespace UERLPhantomXPhysicsTests
 		{
 			auto* Particle = ReadHandle->GetHandle_LowLevel()
 				? ReadHandle->GetHandle_LowLevel()->CastToRigidParticle() : nullptr;
+			const auto* KinematicGT = ReadHandle->GetParticle_LowLevel()->CastToKinematicParticle();
+			if (KinematicGT)
+			{
+				const auto Target = KinematicGT->KinematicTarget();
+				Test.AddInfo(FString::Printf(TEXT("[PHYSICS_LIFECYCLE] stage=%s gt_state=%d kinematic_mode=%d kinematic_dirty=%d kinematic_position_cm=%s"),
+					Stage, static_cast<int32>(ReadHandle->GetGameThreadAPI().ObjectState()),
+					static_cast<int32>(Target.GetMode()), ReadHandle->GetGameThreadAPI().IsKinematicTargetDirty(),
+					*PreciseVector(Target.GetMode() == Chaos::EKinematicTargetMode::Position ? FVector(Target.GetPosition()) : FVector::ZeroVector)));
+			}
 			Test.AddInfo(FString::Printf(TEXT("[PHYSICS_LIFECYCLE] stage=%s component_cm=%s body_cm=%s com_cm=%s gt_cm=%s solver_exists=%d solver_cm=%s"),
 				Stage, *PreciseVector(Mesh.GetComponentLocation()),
 				*PreciseVector(Root->GetUnrealWorldTransform().GetLocation()),
@@ -398,10 +407,10 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 Mode : { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 })
+	for (int32 Mode : { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 })
 	for (double Sign : { -1.0, 0.0, 1.0 })
 	{
-		if (Mode >= 7 && Sign != 0.0) { continue; }
+		if (Mode >= 7 && Mode != 10 && Sign != 0.0) { continue; }
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World) { return false; }
@@ -477,6 +486,17 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 			ReportInitialPose(*this, *Mesh, TEXT("flushed_state_replayed"));
 		}
 		if (Mode == 9) { Mesh->SetComponentTickEnabled(false); }
+		if (Mode == 10)
+		{
+			for (FBodyInstance* Body : Mesh->Bodies)
+			{
+				FPhysicsCommand::ExecuteWrite(Body->GetPhysicsActorHandle(), [](const FPhysicsActorHandle& Handle)
+				{
+					Handle->GetGameThreadAPI().SetKinematicTarget(Chaos::FKinematicTarget());
+				});
+			}
+			ReportInitialPose(*this, *Mesh, TEXT("kinematic_target_cleared"));
+		}
 		if (!Tick(*this, *World, 0.005)) { return false; }
 		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("first_tick")); }
 		if (Mode == 6)
