@@ -4,6 +4,7 @@
 #include "UERLInterfaceTypes.h"
 #include "UERLProvider.h"
 
+#include "Chaos/KinematicTargets.h"
 #include "Chaos/RigidParticles.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -440,7 +441,16 @@ bool SpawnGenericRobotSlots(
 			{
 				Slot.ClaimedSleepTypes.Emplace(BodyName, Handle->GetGameThreadAPI().SleepType());
 			}
-			Handle->GetGameThreadAPI().SetSleepType(Chaos::ESleepType::NeverSleep);
+			auto& PhysicsBody = Handle->GetGameThreadAPI();
+			const Chaos::EObjectStateType State = PhysicsBody.ObjectState();
+			if (State == Chaos::EObjectStateType::Dynamic || State == Chaos::EObjectStateType::Sleeping)
+			{
+				// A pending kinematic placement can overwrite the initial dynamic
+				// pose when Chaos first consumes the actor updates. Publish a None
+				// target without advancing the solver or changing kinematic bodies.
+				PhysicsBody.SetKinematicTarget(Chaos::FKinematicTarget());
+			}
+			PhysicsBody.SetSleepType(Chaos::ESleepType::NeverSleep);
 		}
 		Component->WakeAllRigidBodies();
 		if (!FApp::CanEverRender())

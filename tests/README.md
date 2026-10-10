@@ -208,6 +208,9 @@ The additional native cases cover these boundaries:
 - Actual PhantomX body inventory, reordered named actuators, completed joint state, whole-body momentum, and weight support
 - Authored-to-live mass/constraint checks, articulated COM/link feedback, and query-only geometric support with zero physical force
 
+The PhantomX momentum case checks that initialization does not advance the solver clock.
+It checks every body's placement after the first solver step, then applies negative, zero, and positive impulses.
+
 The PhantomX fixed-target case saves bounded CSV traces under `Saved/Automation/PhysicsResponse`.
 Each row records the completed solver frame, time, dt, joint name, target, position, and velocity.
 Compare unwrapped position change with the trapezoidal velocity integral.

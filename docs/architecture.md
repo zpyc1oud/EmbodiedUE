@@ -234,6 +234,9 @@ Body or joint inertia conditioning and other solver settings can change the phys
 The Robot runtime disables joint position projection in training and deployment.
 Projection can change pose without matching physical velocity and can change total momentum.
 A claimed component regains its original projection settings when released.
+When a body becomes simulated, the runtime clears its pending kinematic target.
+The first solver step must preserve the requested initial placement.
+Robot initialization does not advance the solver clock.
 Check measured trajectories and loads with the physical test fixtures.
 A calculated PD effort is not measured solver torque.
 The current actuator is an idealized simulation drive with an effort cap.

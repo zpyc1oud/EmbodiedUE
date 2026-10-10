@@ -97,46 +97,6 @@ namespace UERLPhantomXPhysicsTests
 		return FString::Printf(TEXT("(%.9f,%.9f,%.9f)"), V.X, V.Y, V.Z);
 	}
 
-	void ReportInitialPose(FAutomationTestBase& Test, USkeletalMeshComponent& Mesh, const TCHAR* Stage)
-	{
-		FBodyInstance* Root = Mesh.GetBodyInstance(FName(TEXT("base_link")));
-		FPhysicsActorHandle Handle = Root ? Root->GetPhysicsActorHandle() : nullptr;
-		if (!Handle) { Test.AddError(TEXT("initial-pose diagnostic requires root actor")); return; }
-		FPhysicsCommand::ExecuteRead(Handle, [&](const FPhysicsActorHandle& ReadHandle)
-		{
-			auto* Particle = ReadHandle->GetHandle_LowLevel()
-				? ReadHandle->GetHandle_LowLevel()->CastToRigidParticle() : nullptr;
-			const auto* KinematicGT = ReadHandle->GetParticle_LowLevel()->CastToKinematicParticle();
-			if (KinematicGT)
-			{
-				const auto Target = KinematicGT->KinematicTarget();
-				Test.AddInfo(FString::Printf(TEXT("[PHYSICS_LIFECYCLE] stage=%s gt_state=%d kinematic_mode=%d kinematic_dirty=%d kinematic_position_cm=%s"),
-					Stage, static_cast<int32>(ReadHandle->GetGameThreadAPI().ObjectState()),
-					static_cast<int32>(Target.GetMode()), ReadHandle->GetGameThreadAPI().IsKinematicTargetDirty(),
-					*PreciseVector(Target.GetMode() == Chaos::EKinematicTargetMode::Position ? FVector(Target.GetPosition()) : FVector::ZeroVector)));
-			}
-			Test.AddInfo(FString::Printf(TEXT("[PHYSICS_LIFECYCLE] stage=%s component_cm=%s body_cm=%s com_cm=%s gt_cm=%s solver_exists=%d solver_cm=%s"),
-				Stage, *PreciseVector(Mesh.GetComponentLocation()),
-				*PreciseVector(Root->GetUnrealWorldTransform().GetLocation()),
-				*PreciseVector(Root->GetCOMPosition()), *PreciseVector(ReadHandle->GetGameThreadAPI().X()),
-				Particle != nullptr, *PreciseVector(Particle ? FVector(Particle->X()) : FVector::ZeroVector)));
-		});
-	}
-
-	void SetDiagnosticConditioning(USkeletalMeshComponent& Mesh, int32 Mode)
-	{
-		// Product configuration is mode zero. Separate the two conditioning
-		// mechanisms without changing projection or acceptance tolerances.
-		if (Mode & 1)
-		{
-			for (FConstraintInstance* C : Mesh.Constraints) { if (C) { C->DisableMassConditioning(); } }
-		}
-		if (Mode & 2)
-		{
-			for (FBodyInstance* B : Mesh.Bodies) { if (B) { B->SetInertiaConditioningEnabled(false); } }
-		}
-	}
-
 	struct FMomentum
 	{
 		FVector Linear = FVector::ZeroVector;
@@ -321,10 +281,8 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
 	TArray<float> D1Final;
-	for (int32 Mode : { 0, 1, 2, 3 })
 	for (int32 Decimation : { 1, 4 })
 	{
-		if (Mode != 0 && Decimation != 1) { continue; }
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World || !Ground(*World)) { AddError(TEXT("missing state-consistency World")); return false; }
@@ -334,7 +292,6 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 		if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 		USkeletalMeshComponent* Mesh = FindMesh(*World);
 		if (!Mesh) { AddError(TEXT("missing consistency mesh")); return false; }
-		SetDiagnosticConditioning(*Mesh, Mode);
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
 		TArray<double> DeltaQ, IntegratedW, Variation, MaximumPrefixError, MaximumPrefixExcess;
@@ -371,7 +328,7 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 			}
 			Previous = State;
 		}
-		if (!SaveTrace(*this, FString::Printf(TEXT("phantomx-conditioning%d-D%d"), Mode, Decimation), Trace)) { return false; }
+		if (!SaveTrace(*this, FString::Printf(TEXT("phantomx-D%d"), Decimation), Trace)) { return false; }
 		for (int32 J = 0; J < 18; ++J)
 		{
 			// Include a first-order variation budget and an absolute six-second
@@ -380,9 +337,9 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 			const FString Label = FString::Printf(TEXT("%s D%d position change agrees with solver-step velocity integral"),
 				*RobotConfig.Actuators[J].JointName.ToString(), Decimation);
 			// A later opposite error or noisy section cannot erase an earlier failure.
-			if (Mode == 0) { TestTrue(*Label, MaximumPrefixExcess[J] <= 0.0); }
-			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] conditioning=%d joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f max_prefix_error=%.9f max_prefix_excess=%.9f"),
-				Mode, *RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance,
+			TestTrue(*Label, MaximumPrefixExcess[J] <= 0.0);
+			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f max_prefix_error=%.9f max_prefix_excess=%.9f"),
+				*RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance,
 				MaximumPrefixError[J], MaximumPrefixExcess[J]));
 		}
 		if (Decimation == 1) { D1Final = State; }
@@ -407,23 +364,24 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 Mode : { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 })
 	for (double Sign : { -1.0, 0.0, 1.0 })
 	{
-		if (Mode >= 7 && Mode != 10 && Sign != 0.0) { continue; }
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World) { return false; }
-		if ((Mode == 4 || Mode == 5) && !Tick(*this, *World, 0.005)) { return false; }
 		const auto RobotConfig = Config(3.0);
 		FUERLSkeletalMeshRobotRuntime Runtime;
 		FString Error;
+		FUERLSolverClockSnapshot BeforeInitialize, AfterInitialize;
+		if (!ReadUERLSolverClock(*World, BeforeInitialize, Error)) { AddError(Error); return false; }
 		if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
+		if (!ReadUERLSolverClock(*World, AfterInitialize, Error)) { AddError(Error); return false; }
+		TestEqual(TEXT("Robot initialization does not advance the solver frame"), AfterInitialize.Frame, BeforeInitialize.Frame);
+		TestEqual(TEXT("Robot initialization does not advance solver time"), AfterInitialize.SolverTime, BeforeInitialize.SolverTime);
 		USkeletalMeshComponent* Mesh = FindMesh(*World);
 		if (!Mesh) { AddError(TEXT("momentum test requires the actual PhantomX")); return false; }
-		const bool bReportLifecycle = Sign == 0.0 && (Mode == 0 || Mode >= 6);
-		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("initialized")); }
 		Mesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+		TArray<FVector> InitialBodyCOMs;
 		for (FBodyInstance* Body : Mesh->Bodies)
 		{
 			if (!Body || !Body->IsValidBodyInstance()) { AddError(TEXT("missing momentum body")); return false; }
@@ -431,85 +389,22 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 			Body->LinearDamping = 0.0f;
 			Body->AngularDamping = 0.0f;
 			Body->UpdateDampingProperties();
-		}
-		SetDiagnosticConditioning(*Mesh, Mode == 5 ? 2 : Mode >= 4 ? 0 : Mode);
-		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("configured")); }
-		const FVector InitialCOM = Mesh->GetBodyInstance(FName(TEXT("base_link")))->GetCOMPosition();
-		TArray<FTransform> InitialTransforms;
-		TArray<FVector> InitialLinearVelocities, InitialAngularVelocities;
-		if (Mode == 6 || Mode == 8)
-		{
-			for (FBodyInstance* Body : Mesh->Bodies)
-			{
-				InitialTransforms.Add(Body->GetUnrealWorldTransform());
-				InitialLinearVelocities.Add(Body->GetUnrealWorldVelocity());
-				InitialAngularVelocities.Add(Body->GetUnrealWorldAngularVelocityInRadians());
-			}
-		}
-		const auto ReplayInitialBodies = [&]()
-		{
-			for (int32 Index = 0; Index < Mesh->Bodies.Num(); ++Index)
-			{
-				FBodyInstance* Body = Mesh->Bodies[Index];
-				Body->SetBodyTransform(InitialTransforms[Index], ETeleportType::TeleportPhysics, false);
-				Body->SetLinearVelocity(InitialLinearVelocities[Index], false);
-				Body->SetAngularVelocityInRadians(InitialAngularVelocities[Index], false);
-			}
-		};
-		TArray<float> Targets;
-		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
-		if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
-		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("targets_applied")); }
-		if (Mode == 7)
-		{
-			for (FBodyInstance* Body : Mesh->Bodies)
-			{
-				FPhysicsCommand::ExecuteWrite(Body->GetPhysicsActorHandle(), [](const FPhysicsActorHandle& Handle)
-				{
-					auto& GT = Handle->GetGameThreadAPI();
-					GT.SetX(GT.X());
-					GT.SetR(GT.R());
-				});
-			}
-			ReportInitialPose(*this, *Mesh, TEXT("same_pose_marked"));
-		}
-		if (Mode == 8)
-		{
-			FUERLSolverClockSnapshot BeforeFlush, AfterFlush;
-			if (!ReadUERLSolverClock(*World, BeforeFlush, Error)) { AddError(Error); return false; }
-			World->GetPhysicsScene()->Flush();
-			if (!ReadUERLSolverClock(*World, AfterFlush, Error)) { AddError(Error); return false; }
-			AddInfo(FString::Printf(TEXT("[PHYSICS_LIFECYCLE] flush_delta_frame=%lld flush_delta_time=%.9f"),
-				static_cast<long long>(AfterFlush.Frame - BeforeFlush.Frame), AfterFlush.SolverTime - BeforeFlush.SolverTime));
-			ReportInitialPose(*this, *Mesh, TEXT("zero_dt_flush"));
-			ReplayInitialBodies();
-			ReportInitialPose(*this, *Mesh, TEXT("flushed_state_replayed"));
-		}
-		if (Mode == 9) { Mesh->SetComponentTickEnabled(false); }
-		if (Mode == 10)
-		{
-			for (FBodyInstance* Body : Mesh->Bodies)
-			{
-				FPhysicsCommand::ExecuteWrite(Body->GetPhysicsActorHandle(), [](const FPhysicsActorHandle& Handle)
-				{
-					Handle->GetGameThreadAPI().SetKinematicTarget(Chaos::FKinematicTarget());
-				});
-			}
-			ReportInitialPose(*this, *Mesh, TEXT("kinematic_target_cleared"));
-		}
-		if (!Tick(*this, *World, 0.005)) { return false; }
-		if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("first_tick")); }
-		if (Mode == 6)
-		{
-			// Diagnostic only: repeat the exact pre-step state after registration.
-			// The formal mode-zero acceptance remains unchanged.
-			ReplayInitialBodies();
-			if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("state_replayed")); }
-			if (!Tick(*this, *World, 0.005)) { return false; }
-			if (bReportLifecycle) { ReportInitialPose(*this, *Mesh, TEXT("replay_tick")); }
+			InitialBodyCOMs.Add(Body->GetCOMPosition());
 		}
 		FBodyInstance* Root = Mesh->GetBodyInstance(FName(TEXT("base_link")));
 		if (!Root) { AddError(TEXT("missing PhantomX root body")); return false; }
+		const FVector InitialCOM = Root->GetCOMPosition();
+		TArray<float> Targets;
+		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
+		if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
+		if (!Tick(*this, *World, 0.005)) { return false; }
+		for (int32 Index = 0; Index < Mesh->Bodies.Num(); ++Index)
+		{
+			// One centimetre permits initial joint correction but rejects a stale
+			// placement that moves the suspended three-metre fixture to the origin.
+			TestTrue(TEXT("first solver step preserves each body's initial placement"),
+				(Mesh->Bodies[Index]->GetCOMPosition() - InitialBodyCOMs[Index]).Size() < 1.0);
+		}
 		const FMomentum Before = Momentum(*Mesh);
 		const FVector Impulse = Sign * FVector(0.02, -0.01, 0.03);
 		const FVector At = Root->GetCOMPosition() / 100.0;
@@ -520,15 +415,12 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 		}
 		const FMomentum After = Momentum(*Mesh);
 		const FVector ExpectedAngular = FVector::CrossProduct(At, Impulse);
-		if (Mode == 0)
-		{
 		TestTrue(TEXT("internal articulation forces preserve total linear momentum"),
 			Matches(After.Linear - Before.Linear, Impulse, 0.001 + Impulse.Size() * 0.02));
 		TestTrue(TEXT("internal articulation torques preserve total angular momentum about the fixed world origin"),
 			Matches(After.Angular - Before.Angular, ExpectedAngular, 0.0001 + ExpectedAngular.Size() * 0.02));
-		}
-		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] phantomx_momentum conditioning=%d sign=%.0f expected_dp=%s actual_dp=%s expected_dL=%s actual_dL=%s error_dp=%.9f error_dL=%.9f initial_com_cm=%s first_com_m=%s"),
-			Mode, Sign, *PreciseVector(Impulse), *PreciseVector(After.Linear - Before.Linear),
+		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] phantomx_momentum sign=%.0f expected_dp=%s actual_dp=%s expected_dL=%s actual_dL=%s error_dp=%.9f error_dL=%.9f initial_com_cm=%s first_com_m=%s"),
+			Sign, *PreciseVector(Impulse), *PreciseVector(After.Linear - Before.Linear),
 			*PreciseVector(ExpectedAngular), *PreciseVector(After.Angular - Before.Angular),
 			(After.Linear - Before.Linear - Impulse).Size(), (After.Angular - Before.Angular - ExpectedAngular).Size(),
 			*PreciseVector(InitialCOM), *PreciseVector(At)));
