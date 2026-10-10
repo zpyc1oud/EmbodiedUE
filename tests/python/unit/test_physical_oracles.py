@@ -52,6 +52,24 @@ def test_joint_angle_wrap_is_not_a_two_pi_jump() -> None:
     assert result.passed
 
 
+def test_opposite_velocity_errors_cannot_cancel_at_the_end() -> None:
+    # The reported angle never moves. Wrong +1/-1 rad/s feedback integrates
+    # to zero over the complete capture, but is wrong in each half.
+    times = [index * 0.005 for index in range(201)]
+    velocities = [1.0] * 100 + [0.0] + [-1.0] * 100
+    result = joint_consistency(times, [0.2] * len(times), velocities, physics_dt=0.005)
+    assert abs(result.error) < 1e-12
+    assert not result.passed
+
+
+def test_later_velocity_variation_cannot_relax_an_earlier_failure() -> None:
+    # A later noisy section must not increase the earlier prefix's budget.
+    times = [index * 0.005 for index in range(221)]
+    velocities = [1.0] * 100 + [0.0] + [-1.0] * 100 + [100.0, -100.0] * 10
+    result = joint_consistency(times, [0.2] * len(times), velocities, physics_dt=0.005)
+    assert not result.passed
+
+
 @pytest.mark.parametrize("times", [[0, 0.1], [0, 0.2, 0.3], [0, 0.1, 0.1], [0.2, 0.1, 0], [0, math.nan, 0.2]])
 def test_incomplete_or_invalid_solver_trace_fails(times: list[float]) -> None:
     with pytest.raises(ValueError):

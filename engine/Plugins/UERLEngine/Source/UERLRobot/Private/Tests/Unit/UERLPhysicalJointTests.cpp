@@ -178,6 +178,15 @@ bool FUERLJointLimitResponseTest::RunTest(const FString& Parameters)
 		}
 		TestTrue(TEXT("out-of-range target reaches the intended signed stop"),
 			FMath::Abs(JointPosition(*Cube, Joint->ConstraintInstance) - Sign * 0.2) <= 0.002);
+		Joint->ConstraintInstance.SetAngularOrientationTarget(FQuat::Identity);
+		for (int32 Step = 0; Step < 800; ++Step)
+		{
+			if (!Tick(*this, *World, 0.005)) { return false; }
+			TestTrue(TEXT("inward recovery remains within the hard limit"),
+				FMath::Abs(JointPosition(*Cube, Joint->ConstraintInstance)) <= 0.202);
+		}
+		TestTrue(TEXT("an inward target releases the stop and returns to zero"),
+			FMath::Abs(JointPosition(*Cube, Joint->ConstraintInstance)) <= 0.002);
 		Joint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Free, 0.0f);
 		Joint->ConstraintInstance.SetOrientationDriveTwistAndSwing(false, false);
 		Joint->ConstraintInstance.SetAngularVelocityDriveTwistAndSwing(false, false);
@@ -222,6 +231,16 @@ bool FUERLPrismaticHardStopTest::RunTest(const FString& Parameters)
 		}
 		const double Q = (Cube->GetBodyInstance()->GetCOMPosition().X - Start.X) / 100.0;
 		TestTrue(TEXT("signed force reaches the declared prismatic stop"), FMath::Abs(Q - Sign * 0.05) <= 0.0005);
+		for (int32 Step = 0; Step < 400; ++Step)
+		{
+			Cube->AddForce(FVector(-Sign * 100.0, 0.0, 0.0), NAME_None, false);
+			if (!Tick(*this, *World, 0.005)) { return false; }
+			const double RecoveryQ = (Cube->GetBodyInstance()->GetCOMPosition().X - Start.X) / 100.0;
+			TestTrue(TEXT("reversed force recovers within the prismatic limits"), FMath::Abs(RecoveryQ) <= 0.0505);
+		}
+		const double RecoveredQ = (Cube->GetBodyInstance()->GetCOMPosition().X - Start.X) / 100.0;
+		TestTrue(TEXT("inward force releases the old stop and reaches the opposite stop"),
+			FMath::Abs(RecoveredQ + Sign * 0.05) <= 0.0005);
 	}
 	return true;
 }

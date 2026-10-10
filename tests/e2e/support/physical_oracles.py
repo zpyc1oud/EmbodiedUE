@@ -19,10 +19,12 @@ class JointConsistency:
     integrated_velocity: float
     error: float
     tolerance: float
+    maximum_prefix_error: float
+    maximum_prefix_excess: float
 
     @property
     def passed(self) -> bool:
-        return abs(self.error) <= self.tolerance
+        return self.maximum_prefix_excess <= 0.0
 
 
 def joint_consistency(
@@ -33,7 +35,9 @@ def joint_consistency(
 
     Every row must belong to the next completed solver step. The integration
     allowance is dt/2 times measured velocity variation; it cannot conceal a
-    persistent velocity offset in a stationary joint. A separate absolute
+    persistent velocity offset in a stationary joint. Check every prefix so
+    opposite errors cannot cancel and later variation cannot relax an earlier
+    failure. A separate absolute
     allowance accounts for accumulated pose readback error.
     """
     if not (len(times) == len(positions) == len(velocities) and len(times) >= 3):
@@ -45,6 +49,8 @@ def joint_consistency(
     if any(not math.isfinite(x) for values in (times, positions, velocities) for x in values):
         raise ValueError("Physical trace contains nonfinite data")
     displacement = integrated = variation = 0.0
+    maximum_error = 0.0
+    maximum_excess = -absolute_budget
     for index in range(1, len(times)):
         dt = times[index] - times[index - 1]
         if not math.isclose(dt, physics_dt, rel_tol=1e-6, abs_tol=1e-9):
@@ -53,8 +59,12 @@ def joint_consistency(
         displacement += math.atan2(math.sin(change), math.cos(change))
         integrated += (velocities[index] + velocities[index - 1]) * (dt / 2)
         variation += abs(velocities[index] - velocities[index - 1])
+        error = abs(displacement - integrated)
+        maximum_error = max(maximum_error, error)
+        maximum_excess = max(maximum_excess, error - absolute_budget - physics_dt * variation / 2)
     return JointConsistency(displacement, integrated, displacement - integrated,
-                            absolute_budget + physics_dt * variation / 2)
+                            absolute_budget + physics_dt * variation / 2,
+                            maximum_error, maximum_excess)
 
 
 def force_trajectory_matches(

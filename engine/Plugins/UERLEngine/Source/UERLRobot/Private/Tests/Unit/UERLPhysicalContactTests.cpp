@@ -222,11 +222,18 @@ bool FUERLRestitutionImpulseTest::RunTest(const FString& Parameters)
 		double ImpactV = 0.0;
 		double ReboundV = 0.0;
 		FVector CollisionImpulse = FVector::ZeroVector;
+		FVector TotalContactImpulse = FVector::ZeroVector;
+		const FVector InitialVelocity = Body->GetBodyInstance()->GetUnrealWorldVelocity() / 100.0;
+		int32 CompletedSteps = 0;
+		TestTrue(TEXT("drop fixture has the declared one-kilogram mass"),
+			FMath::Abs(Body->GetBodyInstance()->GetBodyMass() - 1.0) < 1.0e-5);
 		for (int32 Step = 0; Step < 300; ++Step)
 		{
 			const double BeforeV = Body->GetBodyInstance()->GetUnrealWorldVelocity().Z / 100.0;
 			if (!Tick(*this, *World, Dt)) { return false; }
 			const FVector J = ContactImpulse(*Body);
+			TotalContactImpulse += J;
+			++CompletedSteps;
 			const double AfterV = Body->GetBodyInstance()->GetUnrealWorldVelocity().Z / 100.0;
 			if (J.Size() > 0.001)
 			{
@@ -252,12 +259,22 @@ bool FUERLRestitutionImpulseTest::RunTest(const FString& Parameters)
 		for (int32 Step = 0; Step < 400; ++Step)
 		{
 			if (!Tick(*this, *World, Dt)) { return false; }
+			TotalContactImpulse += ContactImpulse(*Body);
+			++CompletedSteps;
 			PeakHeight = FMath::Max(PeakHeight, Body->GetBodyInstance()->GetCOMPosition().Z / 100.0);
 			const double V = Body->GetBodyInstance()->GetUnrealWorldVelocity().Z / 100.0;
 			if (Restitution > 0.0 && PreviousV > 0.0 && V <= 0.0) { ApexSeen = true; break; }
 			PreviousV = V;
 		}
 		const double ExpectedPeak = 0.1 + Restitution * Restitution * (0.6 - 0.1);
+		const FVector FinalVelocity = Body->GetBodyInstance()->GetUnrealWorldVelocity() / 100.0;
+		const FVector ExpectedContactImpulse = FinalVelocity - InitialVelocity
+			- FVector(0.0, 0.0, G * Dt * CompletedSteps); // declared mass is 1 kg
+		TestTrue(TEXT("all collision and support impulses account for the complete drop and rebound momentum"),
+			Matches(TotalContactImpulse, ExpectedContactImpulse, 0.03));
+		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] drop_balance steps=%d impulse=%s expected=%s error_ns=%.9f"),
+			CompletedSteps, *TotalContactImpulse.ToString(), *ExpectedContactImpulse.ToString(),
+			(TotalContactImpulse - ExpectedContactImpulse).Size()));
 		const double HeightBudget = 0.005 + FMath::Sqrt(2.0 * FMath::Abs(G) * 0.5) * Dt;
 		TestTrue(TEXT("the nonzero restitution trial reaches a rebound apex"), ApexSeen);
 		TestTrue(TEXT("rebound height agrees with restitution-squared energy recovery"),

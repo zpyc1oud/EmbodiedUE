@@ -209,6 +209,9 @@ The PhantomX fixed-target case saves bounded CSV traces under `Saved/Automation/
 Each row records the completed solver frame, time, dt, joint name, target, position, and velocity.
 Compare unwrapped position change with the trapezoidal velocity integral.
 Use an absolute drift budget plus `dt / 2` times total velocity variation.
+Check every prefix of the measured interval with its own accumulated budget.
+Opposite errors must not cancel at the end of a capture.
+Later velocity variation must not relax an earlier failed comparison.
 A stationary position with a persistent nonzero velocity must fail.
 Keep D1 solver-step consistency separate from D4 control-window comparisons.
 

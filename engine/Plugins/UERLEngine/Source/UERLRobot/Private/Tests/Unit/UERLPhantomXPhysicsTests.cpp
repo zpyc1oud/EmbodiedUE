@@ -216,8 +216,9 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 		if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
-		TArray<double> DeltaQ, IntegratedW, Variation;
+		TArray<double> DeltaQ, IntegratedW, Variation, MaximumPrefixError, MaximumPrefixExcess;
 		DeltaQ.Init(0.0, 18); IntegratedW.Init(0.0, 18); Variation.Init(0.0, 18);
+		MaximumPrefixError.Init(0.0, 18); MaximumPrefixExcess.Init(-0.008, 18);
 		TArray<float> Previous, State;
 		if (!Runtime.CollectState(Previous, Error) || Previous.Num() != 36) { AddError(TEXT("expected 36 named joint fields")); return false; }
 		FString Trace = TEXT("solver_step,solver_frame,solver_time_s,solver_dt_s,decimation,joint,target_rad,q_rad,qd_rad_s\n");
@@ -239,6 +240,10 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 					DeltaQ[J] += FMath::Atan2(FMath::Sin(Difference), FMath::Cos(Difference));
 					IntegratedW[J] += 0.5 * (W + Previous[2 * J + 1]) * Dt;
 					Variation[J] += FMath::Abs(W - Previous[2 * J + 1]);
+					const double PrefixError = FMath::Abs(DeltaQ[J] - IntegratedW[J]);
+					MaximumPrefixError[J] = FMath::Max(MaximumPrefixError[J], PrefixError);
+					MaximumPrefixExcess[J] = FMath::Max(MaximumPrefixExcess[J],
+						PrefixError - (0.008 + 0.5 * Dt * Variation[J]));
 				}
 				Trace += FString::Printf(TEXT("%d,%lld,%.9f,%.9f,%d,%s,%.9f,%.9f,%.9f\n"), Step + 1,
 					static_cast<long long>(Clock.Frame), Clock.SolverTime, Clock.LastDt, Decimation, *RobotConfig.Actuators[J].JointName.ToString(), Targets[J], Q, W);
@@ -253,9 +258,11 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 			const double Tolerance = 0.008 + 0.5 * Dt * Variation[J];
 			const FString Label = FString::Printf(TEXT("%s D%d position change agrees with solver-step velocity integral"),
 				*RobotConfig.Actuators[J].JointName.ToString(), Decimation);
-			TestTrue(*Label, FMath::Abs(DeltaQ[J] - IntegratedW[J]) <= Tolerance);
-			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f"),
-				*RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance));
+			// A later opposite error or noisy section cannot erase an earlier failure.
+			TestTrue(*Label, MaximumPrefixExcess[J] <= 0.0);
+			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f max_prefix_error=%.9f max_prefix_excess=%.9f"),
+				*RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance,
+				MaximumPrefixError[J], MaximumPrefixExcess[J]));
 		}
 		if (Decimation == 1) { D1Final = State; }
 		else

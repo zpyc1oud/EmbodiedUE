@@ -158,7 +158,11 @@ def _direct_trace(
                 check = joint_consistency(times[399:], arrays[f"robot.joint.{joint}.joint_position"][399:, 0].tolist(),
                                           arrays[f"robot.joint.{joint}.joint_velocity"][399:, 0].tolist(),
                                           physics_dt=0.005)
-                checks[joint] = {"error_rad": check.error, "tolerance_rad": check.tolerance, "passed": check.passed}
+                checks[joint] = {
+                    "error_rad": check.error, "tolerance_rad": check.tolerance,
+                    "maximum_prefix_error_rad": check.maximum_prefix_error,
+                    "maximum_prefix_excess_rad": check.maximum_prefix_excess, "passed": check.passed,
+                }
             (directory / "physical-summary.yaml").write_text(yaml.safe_dump(checks, sort_keys=False), encoding="utf-8")
             assert all(c["passed"] for c in checks.values()), checks
         return arrays
