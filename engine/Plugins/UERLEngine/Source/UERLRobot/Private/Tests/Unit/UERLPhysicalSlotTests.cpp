@@ -1,6 +1,7 @@
 #include "UERLPhysicsResponseTestSupport.h"
 
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/BoxComponent.h"
 #include "EngineUtils.h"
 #include "Misc/ScopeExit.h"
 #include "UERLBatchBinding.h"
@@ -63,6 +64,18 @@ bool FUERLPhysicalSparseResetTest::RunTest(const FString& Parameters)
             const FVector Origin(Slot * 1000.0, 0.0, 300.0);
             Slots.Add(FUERLSlotContext{ Slot, Origin, 0.0, FVector::UpVector, {} });
             Slots.Last().CollisionProfile = CollisionPlan.Profile(Slot);
+            // A real isolated Environment owner is part of the product spawn
+            // contract. Keep its geometry below this gravity-free fixture.
+            AActor* Environment = World->SpawnActor<AActor>();
+            if (!Environment) { AddError(TEXT("missing Slot Environment owner")); return false; }
+            UBoxComponent* Floor = NewObject<UBoxComponent>(Environment);
+            Environment->SetRootComponent(Floor);
+            Floor->SetBoxExtent(FVector(100.0, 100.0, 10.0));
+            Floor->SetWorldLocation(Origin - FVector(0.0, 0.0, 300.0));
+            Floor->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+            Slots.Last().CollisionProfile.ApplySlotEnvironment(*Floor);
+            Floor->RegisterComponent();
+            Slots.Last().EnvironmentActors.Add(Environment);
             Initial.Rows.Add(FUERLResetRow{ Slot, 0, Origin, 0.0, FVector::UpVector, {} });
         }
         if (!Robot->SpawnIntoSlots(*World, Slots, Error) || !Robot->ResetSlots(Initial, Error)) { AddError(Error); return false; }
