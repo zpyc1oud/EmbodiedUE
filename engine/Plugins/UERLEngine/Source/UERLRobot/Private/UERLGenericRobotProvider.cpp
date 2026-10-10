@@ -70,6 +70,7 @@ namespace
 			bool bClaimedSimulatePhysics = false;
 			TArray<TPair<FName, Chaos::ESleepType>> ClaimedSleepTypes;
 			TArray<TPair<int32, bool>> ClaimedProjection;
+			TArray<FUERLGenericRobotClaimedIterations> ClaimedIterations;
 			TStrongObjectPtr<UPhysicalMaterial> ClaimedPhysMaterialOverride;
 		};
 
@@ -194,6 +195,7 @@ namespace
 				Slot.ClaimedRelativeTransform = Item.ClaimedRelativeTransform;
 				Slot.ClaimedSleepTypes = MoveTemp(Item.ClaimedSleepTypes);
 				Slot.ClaimedProjection = MoveTemp(Item.ClaimedProjection);
+				Slot.ClaimedIterations = MoveTemp(Item.ClaimedIterations);
 				Slot.ClaimedPhysMaterialOverride = MoveTemp(Item.ClaimedPhysMaterialOverride);
 			}
 			if (bSolverStepCommands && DriveActuators.Num() != Actuators.Num())
@@ -507,6 +509,7 @@ namespace
 				Item.ClaimedRelativeTransform = Slot.ClaimedRelativeTransform;
 				Item.ClaimedSleepTypes = MoveTemp(Slot.ClaimedSleepTypes);
 				Item.ClaimedProjection = MoveTemp(Slot.ClaimedProjection);
+				Item.ClaimedIterations = MoveTemp(Slot.ClaimedIterations);
 				Item.ClaimedPhysMaterialOverride = MoveTemp(Slot.ClaimedPhysMaterialOverride);
 			}
 			Slots.Reset();

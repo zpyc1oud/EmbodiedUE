@@ -6,6 +6,8 @@
 
 #include "Chaos/KinematicTargets.h"
 #include "Chaos/RigidParticles.h"
+#include "PBDRigidsSolver.h"
+#include "Physics/Experimental/PhysScene_Chaos.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
@@ -90,6 +92,16 @@ void DestroyGenericRobotSpawnedSlots(TArray<FUERLGenericRobotSpawnedSlot>& Slots
 				if (FPhysicsActorHandle Handle = Body ? Body->GetPhysicsActorHandle() : nullptr)
 				{
 					Handle->GetGameThreadAPI().SetSleepType(SleepType.Value);
+				}
+			}
+			for (const FUERLGenericRobotClaimedIterations& Saved : Slot.ClaimedIterations)
+			{
+				if (FBodyInstance* Body = Component->GetBodyInstance(Saved.BodyName))
+				{
+					Body->SetPositionSolverIterationCount(Saved.Position);
+					Body->SetVelocitySolverIterationCount(Saved.Velocity);
+					Body->SetProjectionSolverIterationCount(Saved.Projection);
+					Body->SetOverrideIterationCounts(Saved.bOverride);
 				}
 			}
 			if (Component->GetPhysicsMaterialOverride() != Slot.ClaimedPhysMaterialOverride.Get())
@@ -449,6 +461,24 @@ bool SpawnGenericRobotSlots(
 				// pose when Chaos first consumes the actor updates. Publish a None
 				// target without advancing the solver or changing kinematic bodies.
 				PhysicsBody.SetKinematicTarget(Chaos::FKinematicTarget());
+				FBodyInstance* Body = Component->GetBodyInstance(BodyName);
+				if (!bOwnsActor)
+				{
+					Slot.ClaimedIterations.Add({BodyName, Body->PositionSolverIterationCount,
+						Body->VelocitySolverIterationCount, Body->ProjectionSolverIterationCount,
+						Body->GetPositionSolverIterationCount() >= 0});
+				}
+				const auto* Evolution = World.GetPhysicsScene()->GetSolver()->GetEvolution();
+				const bool bOverride = Body->GetPositionSolverIterationCount() >= 0;
+				const int32 Position = bOverride ? Body->GetPositionSolverIterationCount() : Evolution->GetNumPositionIterations();
+				const int32 Velocity = bOverride ? Body->GetVelocitySolverIterationCount() : Evolution->GetNumVelocityIterations();
+				const int32 Projection = bOverride ? Body->GetProjectionSolverIterationCount() : Evolution->GetNumProjectionIterations();
+				// Quantitative articulated support requires this solver accuracy.
+				// Keep larger authored counts and preserve the projection count.
+				Body->SetPositionSolverIterationCount(static_cast<uint8>(FMath::Clamp(Position, 32, 255)));
+				Body->SetVelocitySolverIterationCount(static_cast<uint8>(FMath::Clamp(Velocity, 8, 255)));
+				Body->SetProjectionSolverIterationCount(static_cast<uint8>(FMath::Clamp(Projection, 0, 255)));
+				Body->SetOverrideIterationCounts(true);
 			}
 			PhysicsBody.SetSleepType(Chaos::ESleepType::NeverSleep);
 		}

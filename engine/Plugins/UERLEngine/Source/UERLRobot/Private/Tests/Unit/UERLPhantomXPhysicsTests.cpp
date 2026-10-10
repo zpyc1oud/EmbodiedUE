@@ -153,6 +153,8 @@ bool FUERLPhantomXPhysicalInventoryTest::RunTest(const FString& Parameters)
 		FBodyInstance* Body = Mesh->GetBodyInstance(Setup->BoneName);
 		if (!Body || !Body->IsValidBodyInstance()) { AddError(TEXT("asset body has no live solver body")); return false; }
 		if (!CheckAuthoredMassProperties(*this, *Setup, *Body)) { return false; }
+		TestTrue(TEXT("simulated Robot bodies have the required position and velocity iteration budget"),
+			Body->GetPositionSolverIterationCount() >= 32 && Body->GetVelocitySolverIterationCount() >= 8);
 		const double Mass = Body->GetBodyMass();
 		TestTrue(TEXT("the floating PhantomX topology simulates every declared body with gravity"),
 			Body->IsInstanceSimulatingPhysics() && Body->bEnableGravity);
@@ -509,8 +511,6 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 Conditioning : { 0, 4, 5, 6, 7 })
-	{
 	auto Scene = MakeScene();
 	UWorld* World = Scene->GetWorld();
 	if (!World || !Ground(*World)) { AddError(TEXT("missing support ground")); return false; }
@@ -523,26 +523,10 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 	USkeletalMeshComponent* Mesh = FindMesh(*World);
 	if (!Mesh || !Mesh->GetPhysicsAsset()) { AddError(TEXT("missing support mesh")); return false; }
-	const int32 PositionIterations = Conditioning == 4 ? 32 : (Conditioning == 5 || Conditioning == 7) ? 64 : 0;
-	const int32 VelocityIterations = Conditioning == 4 ? 8 : (Conditioning == 5 || Conditioning == 7) ? 16 : 0;
-	const double Dt = Conditioning >= 6 ? 0.0025 : 0.005;
-	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_accuracy=%d position_iterations=%d velocity_iterations=%d dt=%.9f"),
-		Conditioning, PositionIterations, VelocityIterations, Dt));
-	if (PositionIterations > 0)
-	{
-		for (FBodyInstance* Body : Mesh->Bodies)
-		{
-			if (Body)
-			{
-				Body->SetOverrideIterationCounts(true);
-				Body->SetPositionSolverIterationCount(static_cast<uint8>(PositionIterations));
-				Body->SetVelocitySolverIterationCount(static_cast<uint8>(VelocityIterations));
-			}
-		}
-	}
 	TArray<float> Targets;
 	for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
 	if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
+	constexpr double Dt = 0.005;
 	for (int32 Step = 0; Step < FMath::RoundToInt(4.0 / Dt); ++Step) { if (!Tick(*this, *World, Dt)) { return false; } }
 	double TotalMass = 0.0;
 	TArray<FName> BodyNames;
@@ -663,8 +647,8 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 		ExternalAngularImpulse.Size() / Duration <= MomentBudget);
 	TestTrue(TEXT("weight-support fixture remains at rest throughout measurement"),
 		MaximumSpeed < 0.01 && MaximumAngularSpeed < 0.1);
-	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_moment conditioning=%d contact_nms=%s gravity_nms=%s delta_h=%s error_nms=%.9f budget_nm=%.9f max_v=%.9f max_w=%.9f"),
-		Conditioning, *PreciseVector(ContactAngularImpulse), *PreciseVector(GravityAngularImpulse), *PreciseVector(AngularChange),
+	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_moment contact_nms=%s gravity_nms=%s delta_h=%s error_nms=%.9f budget_nm=%.9f max_v=%.9f max_w=%.9f"),
+		*PreciseVector(ContactAngularImpulse), *PreciseVector(GravityAngularImpulse), *PreciseVector(AngularChange),
 		(AngularChange - ExternalAngularImpulse).Size(), MomentBudget, MaximumSpeed, MaximumAngularSpeed));
 	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support mass=%.9f weight=%s mean=%s min_z=%.9f max_z=%.9f budget_n=%.9f"),
 		TotalMass, *Weight.ToString(), *MeanSupport.ToString(), MinimumSupport, MaximumSupport, Budget));
@@ -672,7 +656,6 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	{
 		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] body=%s mean_external_contact_n=%s"),
 			*Name.ToString(), *(BodyImpulse.FindOrAdd(Name) / Duration).ToString()));
-	}
 	}
 	return true;
 }

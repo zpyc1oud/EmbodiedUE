@@ -237,6 +237,11 @@ A claimed component regains its original projection settings when released.
 When a body becomes simulated, the runtime clears its pending kinematic target.
 The first solver step must preserve the requested initial placement.
 Robot initialization does not advance the solver clock.
+Simulated Robot bodies use at least 32 position iterations and 8 velocity iterations.
+Larger authored counts are preserved; otherwise the runtime uses the scene counts with these minimums.
+The runtime preserves the effective projection iteration count.
+This accuracy budget increases CPU work for articulated contact solves.
+Claim release restores the original per-body counts and override state.
 Check measured trajectories and loads with the physical test fixtures.
 A calculated PD effort is not measured solver torque.
 The current actuator is an idealized simulation drive with an effort cap.
