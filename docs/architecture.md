@@ -234,8 +234,6 @@ Body or joint inertia conditioning and other solver settings can change the phys
 The Robot runtime disables joint position projection in training and deployment.
 Projection can change pose without matching physical velocity and can change total momentum.
 A claimed component regains its original projection settings when released.
-After writing all reset body states, the runtime clears the older deferred skeletal
-teleport. The next physics step must start from the completed reset pose.
 Check measured trajectories and loads with the physical test fixtures.
 A calculated PD effort is not measured solver torque.
 The current actuator is an idealized simulation drive with an effort cap.

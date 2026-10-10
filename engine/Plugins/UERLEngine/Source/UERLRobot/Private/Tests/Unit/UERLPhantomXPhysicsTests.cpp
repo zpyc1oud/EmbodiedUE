@@ -381,12 +381,13 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
-	for (int32 Mode : { 0, 1, 2, 3 })
+	for (int32 Mode : { 0, 1, 2, 3, 4, 5 })
 	for (double Sign : { -1.0, 0.0, 1.0 })
 	{
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World) { return false; }
+		if (Mode >= 4 && !Tick(*this, *World, 0.005)) { return false; }
 		const auto RobotConfig = Config(3.0);
 		FUERLSkeletalMeshRobotRuntime Runtime;
 		FString Error;
@@ -402,7 +403,7 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 			Body->AngularDamping = 0.0f;
 			Body->UpdateDampingProperties();
 		}
-		SetDiagnosticConditioning(*Mesh, Mode);
+		SetDiagnosticConditioning(*Mesh, Mode == 5 ? 2 : Mode >= 4 ? 0 : Mode);
 		const FVector InitialCOM = Mesh->GetBodyInstance(FName(TEXT("base_link")))->GetCOMPosition();
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
