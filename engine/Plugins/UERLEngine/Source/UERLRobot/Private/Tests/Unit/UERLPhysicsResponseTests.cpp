@@ -374,4 +374,53 @@ bool FUERLSaturatedPositionDriveResponseTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLAngularDampingResponseTest,
+	"UERL.Integration.PhysicsResponse.Joint.AngularDampingDecay",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUERLAngularDampingResponseTest::RunTest(const FString& Parameters)
+{
+	using namespace UERLPhysicsResponseTests;
+	FLockstepSettings Settings;
+	for (double Dt : { 0.005, 0.0025 })
+	{
+		for (double Sign : { -1.0, 1.0 })
+		{
+			TUniquePtr<FPreviewScene> Scene = MakeScene();
+			UWorld* World = Scene->GetWorld();
+			UStaticMeshComponent* Cube = World ? MakeCube(*World, 10.0) : nullptr;
+			if (!Cube || !Cube->GetBodyInstance()) { AddError(TEXT("missing damping body")); return false; }
+			UPhysicsConstraintComponent* Joint = PinCube(*Cube, 0.0, 0.2, 0.2);
+			if (!Tick(*this, *World, Dt)) { return false; }
+			FBodyInstance* Body = Cube->GetBodyInstance();
+			Body->SetAngularVelocityInRadians(FVector::XAxisVector * (Sign * 0.4), false);
+			constexpr double Duration = 0.2;
+			const int32 Steps = FMath::RoundToInt(Duration / Dt);
+			double PreviousSpeed = 0.4;
+			for (int32 Step = 0; Step < Steps; ++Step)
+			{
+				if (!Tick(*this, *World, Dt)) { return false; }
+				const double Speed = Body->GetUnrealWorldAngularVelocityInRadians().Size();
+				TestTrue(TEXT("an unforced damping drive cannot increase kinetic energy"), Speed <= PreviousSpeed + 1.0e-6);
+				PreviousSpeed = Speed;
+			}
+			// I*w_dot = -Kd*w. Predict from the declared SI parameters.
+			constexpr double InertiaSi = 10.0 * 0.2 * 0.2 / 6.0;
+			constexpr double Rate = 0.2 / InertiaSi;
+			const double ExpectedW = Sign * 0.4 * FMath::Exp(-Rate * Duration);
+			// Implicit Euler has log(1+x) >= x-x^2/2 for x >= 0.
+			// This bounds its endpoint error above the continuous exponential.
+			const double Tolerance = 1.0e-4 + FMath::Abs(ExpectedW)
+				* (FMath::Exp(Rate * Rate * Duration * Dt / 2.0) - 1.0);
+			const FVector ActualW = Body->GetUnrealWorldAngularVelocityInRadians();
+			TestTrue(TEXT("angular damping follows the declared physical decay rate"),
+				Matches(ActualW, FVector::XAxisVector * ExpectedW, Tolerance));
+			ReportHinge(*this, *Cube, Joint->ConstraintInstance, TEXT("damping"), Steps);
+			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] damping dt=%.6f expected_w=%.9f actual_w=%.9f tolerance=%.9f"),
+				Dt, ExpectedW, ActualW.X, Tolerance));
+		}
+	}
+	return true;
+}
+
 #endif

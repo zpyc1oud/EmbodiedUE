@@ -42,7 +42,7 @@ UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
     (
         "quantitative physics response",
         "UERL.Integration.PhysicsResponse",
-        4,
+        5,
     ),
 )
 

@@ -221,9 +221,19 @@ Before an increase in parallelism, examine isolation and terrain coverage.
 <a id="architecture-actuation-and-observations"></a>
 ### Actuation and observations
 
-The actuator calculation uses stiffness, damping, effort limit, target, position, and velocity.
-It clamps the resulting effort.
-Position, effort, and passive behavior share actuator semantics instead of robot-specific control code.
+Actuators declare physical stiffness, damping, effort limit, target, position, and velocity.
+The explicit actuator path calculates and clamps effort.
+Revolute position actuators use the Chaos constraint drive.
+The adapter compensates UE's angular stiffness and damping scale factors so the
+simulator receives the declared SI gains. It does not change global engine settings.
+The torque limit is converted from N·m to UE units without gain scaling.
+Keep these engine scale factors positive and constant during a Robot's lifetime.
+
+A constraint drive and an explicit PD calculation can have different discrete-time responses.
+Body or joint inertia conditioning, projection, and other solver settings can also change the
+physical response. Check measured trajectories and loads with the physical test fixtures.
+A calculated PD effort is not measured solver torque.
+Position, effort, and passive behavior use shared runtime code instead of robot-specific control code.
 
 | Observation | Shape and semantics |
 |---|---|

@@ -181,8 +181,10 @@ The delay is test instrumentation, not a product setting or wire configuration.
 ### Quantitative physics response
 
 Run `UERL.Integration.PhysicsResponse` in a fresh Editor process.
-The complete test runner includes this group and requires all four cases.
+The complete test runner includes this group and requires all five cases.
 These cases use real Chaos simulation. They do not train a policy.
+The analytical bodies disable sleep and body inertia conditioning.
+Their predictions use the declared geometric inertia, not a solver-adjusted inertia.
 
 Use an independent physical prediction for each case:
 
@@ -191,6 +193,7 @@ Use an independent physical prediction for each case:
 | Free uniform cube | Constant force at the center of mass | `v = F t / m`; `x = F t² / (2m)` |
 | Free uniform cube | Constant torque | `ω = τ t / I`; `θ = τ t² / (2I)`; `I = m L² / 6` |
 | Fixed-base hinge with a position drive | Constant external torque below the drive limit | `q = target + τ / Kp`; position and angular velocity settle |
+| Fixed-base hinge with a damping-only drive | Initial angular velocity, no external load | `ω(t) = ω(0) exp(-Kd t / I)`; kinetic energy decreases |
 | Fixed-base hinge with a saturated drive | External torque above the opposing drive limit | `Δω = (τ_external - τ_limit) t / I`, with the signed counterpart |
 
 The free-body cases vary mass and physics step duration.
@@ -208,10 +211,14 @@ Free-body velocity tolerance is 0.5% of the expected magnitude plus `1e-4` in th
 Position tolerance is `|a| t dt + 1e-4`, which bounds first-order integration error and shrinks with the step duration.
 The hinge equilibrium case allows `0.0025 rad` of position error and `0.005 rad/s` of rest velocity.
 The saturation case allows 2% of expected velocity plus `0.001 rad/s`.
+The damping-only case uses the continuous exponential solution and an explicit
+implicit-Euler endpoint error bound that shrinks with dt, plus `1e-4 rad/s`.
 Investigate a failed bound before changing it. Preserve the measured values and the reason for any tolerance change.
 
 These fixtures verify free-body input conversion and the shared Chaos position-drive configuration.
 They do not by themselves validate PhantomX mass properties, contact behavior, or a learned policy.
+Production assets can retain conditioning settings that change their effective response.
+Validate those settings separately with the full-robot cases.
 A full-robot case must exercise the Robot/Session path and check its own physical response.
 Do not label total constraint reaction torque or a PD estimate as measured actuator torque.
 

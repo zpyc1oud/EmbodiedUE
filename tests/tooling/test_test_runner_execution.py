@@ -160,7 +160,7 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
         self.stages[index].status = "passed"
         if index in {1, 2, 3}:
             log_argument = next(arg for arg in command if arg.startswith("-abslog="))
-            minimum = {1: 142, 2: 13, 3: 4}[index]
+            minimum = {1: 142, 2: 13, 3: 5}[index]
             Path(log_argument.removeprefix("-abslog=")).write_text(
                 "".join(f"Test Completed. Result={{Success}} Name={{test{case}}} Path={{UERL.Unit.test{case}}}\n"
                         for case in range(minimum)) + "**** TEST COMPLETE. EXIT CODE: 0 ****\n",
