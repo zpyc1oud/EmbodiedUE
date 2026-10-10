@@ -15,6 +15,15 @@
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 
+bool IsGenericRobotContactForceStateAccepted(
+	EUERLEnvironmentCollisionScope CollisionScope,
+	Chaos::EObjectStateType OtherState)
+{
+	return CollisionScope == EUERLEnvironmentCollisionScope::SlotIsolated
+		|| OtherState == Chaos::EObjectStateType::Static
+		|| OtherState == Chaos::EObjectStateType::Kinematic;
+}
+
 float ConvertGenericRobotAccumulatedImpulseToForceNewtons(
 	const FVector& SolverStepImpulse,
 	double SolverStepSeconds)
@@ -32,7 +41,6 @@ void SampleGenericRobotContactForces(
 	EUERLEnvironmentCollisionScope CollisionScope,
 	double SolverStepSeconds)
 {
-	const bool bSharedWorld = CollisionScope == EUERLEnvironmentCollisionScope::SharedWorld;
 	FPhysicsCommand::ExecuteRead(&Component, [&]()
 	{
 		// The shipped Robots fit inline. Larger topologies retain dynamic capacity.
@@ -77,8 +85,10 @@ void SampleGenericRobotContactForces(
 						return Chaos::ECollisionVisitorResult::Continue;
 					}
 					Chaos::FGeometryParticleHandle* Other = Particle0 == Particle ? Particle1 : Particle0;
+					// Movable non-simulated supports also have rigid particle handles.
+					// Object state distinguishes them from simulated bodies.
 					if (!Other || RobotParticles.Contains(Other)
-						|| (bSharedWorld && Other->CastToRigidParticle() != nullptr))
+						|| !IsGenericRobotContactForceStateAccepted(CollisionScope, Other->ObjectState()))
 					{
 						return Chaos::ECollisionVisitorResult::Continue;
 					}
