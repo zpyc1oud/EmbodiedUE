@@ -92,6 +92,25 @@ namespace UERLPhantomXPhysicsTests
 		return true;
 	}
 
+	FString PreciseVector(const FVector& V)
+	{
+		return FString::Printf(TEXT("(%.9f,%.9f,%.9f)"), V.X, V.Y, V.Z);
+	}
+
+	void SetDiagnosticConditioning(USkeletalMeshComponent& Mesh, int32 Mode)
+	{
+		// Product configuration is mode zero. Separate the two conditioning
+		// mechanisms without changing projection or acceptance tolerances.
+		if (Mode & 1)
+		{
+			for (FConstraintInstance* C : Mesh.Constraints) { if (C) { C->DisableMassConditioning(); } }
+		}
+		if (Mode & 2)
+		{
+			for (FBodyInstance* B : Mesh.Bodies) { if (B) { B->SetInertiaConditioningEnabled(false); } }
+		}
+	}
+
 	struct FMomentum
 	{
 		FVector Linear = FVector::ZeroVector;
@@ -276,8 +295,10 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
 	TArray<float> D1Final;
+	for (int32 Mode : { 0, 1, 2, 3 })
 	for (int32 Decimation : { 1, 4 })
 	{
+		if (Mode != 0 && Decimation != 1) { continue; }
 		auto Scene = MakeScene();
 		UWorld* World = Scene->GetWorld();
 		if (!World || !Ground(*World)) { AddError(TEXT("missing state-consistency World")); return false; }
@@ -287,6 +308,7 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 		if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 		USkeletalMeshComponent* Mesh = FindMesh(*World);
 		if (!Mesh) { AddError(TEXT("missing consistency mesh")); return false; }
+		SetDiagnosticConditioning(*Mesh, Mode);
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
 		TArray<double> DeltaQ, IntegratedW, Variation, MaximumPrefixError, MaximumPrefixExcess;
@@ -323,7 +345,7 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 			}
 			Previous = State;
 		}
-		if (!SaveTrace(*this, FString::Printf(TEXT("phantomx-fixed-target-D%d"), Decimation), Trace)) { return false; }
+		if (!SaveTrace(*this, FString::Printf(TEXT("phantomx-conditioning%d-D%d"), Mode, Decimation), Trace)) { return false; }
 		for (int32 J = 0; J < 18; ++J)
 		{
 			// Include a first-order variation budget and an absolute six-second
@@ -332,9 +354,9 @@ bool FUERLPhantomXStateConsistencyTest::RunTest(const FString& Parameters)
 			const FString Label = FString::Printf(TEXT("%s D%d position change agrees with solver-step velocity integral"),
 				*RobotConfig.Actuators[J].JointName.ToString(), Decimation);
 			// A later opposite error or noisy section cannot erase an earlier failure.
-			TestTrue(*Label, MaximumPrefixExcess[J] <= 0.0);
-			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f max_prefix_error=%.9f max_prefix_excess=%.9f"),
-				*RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance,
+			if (Mode == 0) { TestTrue(*Label, MaximumPrefixExcess[J] <= 0.0); }
+			AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] conditioning=%d joint=%s D=%d delta_q=%.9f integral_qd=%.9f tolerance=%.9f max_prefix_error=%.9f max_prefix_excess=%.9f"),
+				Mode, *RobotConfig.Actuators[J].JointName.ToString(), Decimation, DeltaQ[J], IntegratedW[J], Tolerance,
 				MaximumPrefixError[J], MaximumPrefixExcess[J]));
 		}
 		if (Decimation == 1) { D1Final = State; }
@@ -359,6 +381,7 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
+	for (int32 Mode : { 0, 1, 2, 3 })
 	for (double Sign : { -1.0, 0.0, 1.0 })
 	{
 		auto Scene = MakeScene();
@@ -379,6 +402,8 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 			Body->AngularDamping = 0.0f;
 			Body->UpdateDampingProperties();
 		}
+		SetDiagnosticConditioning(*Mesh, Mode);
+		const FVector InitialCOM = Mesh->GetBodyInstance(FName(TEXT("base_link")))->GetCOMPosition();
 		TArray<float> Targets;
 		for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
 		if (!Runtime.ApplyActuatorTargets(Targets, Error) || !Tick(*this, *World, 0.005)) { AddError(Error); return false; }
@@ -394,13 +419,18 @@ bool FUERLPhantomXMomentumTest::RunTest(const FString& Parameters)
 		}
 		const FMomentum After = Momentum(*Mesh);
 		const FVector ExpectedAngular = FVector::CrossProduct(At, Impulse);
+		if (Mode == 0)
+		{
 		TestTrue(TEXT("internal articulation forces preserve total linear momentum"),
 			Matches(After.Linear - Before.Linear, Impulse, 0.001 + Impulse.Size() * 0.02));
 		TestTrue(TEXT("internal articulation torques preserve total angular momentum about the fixed world origin"),
 			Matches(After.Angular - Before.Angular, ExpectedAngular, 0.0001 + ExpectedAngular.Size() * 0.02));
-		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] phantomx_momentum sign=%.0f expected_dp=%s actual_dp=%s expected_dL=%s actual_dL=%s"),
-			Sign, *Impulse.ToString(), *(After.Linear - Before.Linear).ToString(),
-			*ExpectedAngular.ToString(), *(After.Angular - Before.Angular).ToString()));
+		}
+		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] phantomx_momentum conditioning=%d sign=%.0f expected_dp=%s actual_dp=%s expected_dL=%s actual_dL=%s error_dp=%.9f error_dL=%.9f initial_com_cm=%s first_com_m=%s"),
+			Mode, Sign, *PreciseVector(Impulse), *PreciseVector(After.Linear - Before.Linear),
+			*PreciseVector(ExpectedAngular), *PreciseVector(After.Angular - Before.Angular),
+			(After.Linear - Before.Linear - Impulse).Size(), (After.Angular - Before.Angular - ExpectedAngular).Size(),
+			*PreciseVector(InitialCOM), *PreciseVector(At)));
 	}
 	return true;
 }
@@ -618,7 +648,7 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("weight-support fixture remains at rest throughout measurement"),
 		MaximumSpeed < 0.01 && MaximumAngularSpeed < 0.1);
 	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_moment contact_nms=%s gravity_nms=%s delta_h=%s error_nms=%.9f budget_nm=%.9f max_v=%.9f max_w=%.9f"),
-		*ContactAngularImpulse.ToString(), *GravityAngularImpulse.ToString(), *AngularChange.ToString(),
+		*PreciseVector(ContactAngularImpulse), *PreciseVector(GravityAngularImpulse), *PreciseVector(AngularChange),
 		(AngularChange - ExternalAngularImpulse).Size(), MomentBudget, MaximumSpeed, MaximumAngularSpeed));
 	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support mass=%.9f weight=%s mean=%s min_z=%.9f max_z=%.9f budget_n=%.9f"),
 		TotalMass, *Weight.ToString(), *MeanSupport.ToString(), MinimumSupport, MaximumSupport, Budget));
