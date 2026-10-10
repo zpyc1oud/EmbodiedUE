@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -67,10 +68,18 @@ class PhantomXCurriculumConfig:
     velocity_error_threshold: float = 0.20
 
 
+class PhantomXCommandSampling(StrEnum):
+    STAGED = "staged"
+    UNIFORM_VELOCITY = "uniform_velocity"
+
+
 @dataclass(frozen=True, slots=True)
 class PhantomXCommandConfig:
     """Configure episode-boundary command sampling owned by Python."""
 
+    sampling: PhantomXCommandSampling = PhantomXCommandSampling.STAGED
+    lateral_speed_min: float = 0.0
+    lateral_speed_max: float = 0.0
     initial_speed_min: float = 0.4
     initial_speed_max: float = 0.5
     post_turn_speed_min: float = 0.4
@@ -80,6 +89,10 @@ class PhantomXCommandConfig:
     resampling_time_min_s: float = 5.0
     resampling_time_max_s: float = 10.0
     standing_probability: float = 0.1
+    heading_command: bool = True
+    yaw_rate_min: float = -0.5
+    yaw_rate_max: float = 0.5
+    turn_in_place_probability: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,7 +215,10 @@ class PhantomXIdentityCfg:
 class PhantomXCommandCfg:
     """Episode-boundary command sampling ranges."""
 
-    initial_speed_min: float = spec_field(MISSING, ge=0.0, finite=True)
+    sampling: Literal["staged", "uniform_velocity"] = spec_field(MISSING)
+    lateral_speed_min: float = spec_field(MISSING, finite=True)
+    lateral_speed_max: float = spec_field(MISSING, finite=True)
+    initial_speed_min: float = spec_field(MISSING, finite=True)
     initial_speed_max: float = spec_field(MISSING, finite=True)
     post_turn_speed_min: float = spec_field(MISSING, ge=0.0, finite=True)
     post_turn_speed_max: float = spec_field(MISSING, finite=True)
@@ -211,6 +227,10 @@ class PhantomXCommandCfg:
     resampling_time_min_s: float = spec_field(MISSING, gt=0.0, finite=True)
     resampling_time_max_s: float = spec_field(MISSING, gt=0.0, finite=True)
     standing_probability: float = spec_field(MISSING, ge=0.0, le=1.0, finite=True)
+    heading_command: bool = spec_field(MISSING)
+    yaw_rate_min: float = spec_field(MISSING, finite=True)
+    yaw_rate_max: float = spec_field(MISSING, finite=True)
+    turn_in_place_probability: float = spec_field(MISSING, ge=0.0, le=1.0, finite=True)
 
 
 @configspec
@@ -489,6 +509,9 @@ def _assemble_phantomx_training_config(cfg: PhantomXTrainingCfg) -> PhantomXTrai
         turn_start_distance=task_cfg.turn_start_distance,
         turn_completion_tolerance=task_cfg.turn_completion_tolerance,
         command=PhantomXCommandConfig(
+            sampling=PhantomXCommandSampling(task_cfg.command.sampling),
+            lateral_speed_min=task_cfg.command.lateral_speed_min,
+            lateral_speed_max=task_cfg.command.lateral_speed_max,
             initial_speed_min=task_cfg.command.initial_speed_min,
             initial_speed_max=task_cfg.command.initial_speed_max,
             post_turn_speed_min=task_cfg.command.post_turn_speed_min,
@@ -498,6 +521,10 @@ def _assemble_phantomx_training_config(cfg: PhantomXTrainingCfg) -> PhantomXTrai
             resampling_time_min_s=task_cfg.command.resampling_time_min_s,
             resampling_time_max_s=task_cfg.command.resampling_time_max_s,
             standing_probability=task_cfg.command.standing_probability,
+            heading_command=task_cfg.command.heading_command,
+            yaw_rate_min=task_cfg.command.yaw_rate_min,
+            yaw_rate_max=task_cfg.command.yaw_rate_max,
+            turn_in_place_probability=task_cfg.command.turn_in_place_probability,
         ),
         curriculum=PhantomXCurriculumConfig(
             window_episodes=task_cfg.curriculum.window_episodes,
@@ -570,8 +597,17 @@ def _validate_phantomx_invariants(cfg: PhantomXTrainingCfg) -> None:
     """Enforce command/curriculum cross-field rules after configspec parse."""
 
     command = cfg.task.command
+    if command.sampling == "staged" and command.initial_speed_min < 0.0:
+        raise ConfigError("Staged speed must be non-negative", code="CONFIG_OUT_OF_RANGE",
+                          path="task.command.initial_speed_min")
     if (
-        command.initial_speed_min > command.initial_speed_max
+        command.lateral_speed_min > command.lateral_speed_max
+        or (command.sampling == "uniform_velocity" and command.turn_in_place_probability > 0.0)
+        or (command.sampling == "staged" and (command.lateral_speed_min != 0.0 or command.lateral_speed_max != 0.0))
+        or command.yaw_rate_min > command.yaw_rate_max
+        or command.standing_probability + command.turn_in_place_probability > 1.0
+        or (command.heading_command and command.turn_in_place_probability > 0.0)
+        or command.initial_speed_min > command.initial_speed_max
         or command.post_turn_speed_min > command.post_turn_speed_max
         or command.heading_delta_min > command.heading_delta_max
         or command.resampling_time_min_s > command.resampling_time_max_s
