@@ -57,6 +57,8 @@ def _config(directory: Path, slots: int, decimation: int, *, generated_flat: boo
     }
     source = load_run_config_source("UERL-PhantomX-Walk-v0", None)
     if generated_flat:
+        # The production lattice is sized for many robots. Center this small
+        # probe explicitly inside its independently declared 24 m flat patch.
         worker = source.registration.worker_config_factory()
         flat = {
             "num_levels": 1, "cell_size": [24.0, 24.0], "border_width": 1.0,
@@ -66,7 +68,12 @@ def _config(directory: Path, slots: int, decimation: int, *, generated_flat: boo
         # A test-local environment declaration goes through the normal typed
         # resolver. It does not alter the registered production Task.
         source = replace(source, registration=replace(
-            source.registration, worker_config_factory=lambda: replace(worker, terrain_config=flat),
+            source.registration, worker_config_factory=lambda: replace(worker, terrain_config=flat, environment_config={
+                **worker.environment_config,
+                "environment.columns": float(slots),
+                "environment.spacing_x_m": 1.5, "environment.spacing_y_m": 1.5,
+                "environment.origin_x_m": -0.75 * (slots - 1), "environment.origin_y_m": 0.0,
+            }),
         ))
     return source.resolve(overrides).config
 

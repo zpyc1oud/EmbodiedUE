@@ -1,6 +1,8 @@
 """Resolve real-process physical fixtures without launching an engine."""
 import struct
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -25,6 +27,16 @@ def test_physical_probe_resolves_a_supported_ground_and_fixed_clock(
         assert config.worker.terrain_config["num_levels"] == 1
         assert config.worker.terrain_config["physics_collision"] is True
         assert config.worker.terrain_config["tiers"][0]["primitive"] == "plane"  # type: ignore[index]
+        terrain = config.worker.terrain_config
+        environment = cast(Mapping[str, float], config.worker.environment_config)
+        columns = int(environment["environment.columns"])
+        cell_size = cast(Sequence[float], terrain["cell_size"])
+        border = cast(float, terrain["border_width"])
+        for slot in range(slots):
+            x = environment["environment.origin_x_m"] + (slot % columns) * environment["environment.spacing_x_m"]
+            y = environment["environment.origin_y_m"] + (slot // columns) * environment["environment.spacing_y_m"]
+            assert abs(x) + border <= cell_size[0] / 2
+            assert abs(y) + border <= cell_size[1] / 2
     else:
         assert not config.worker.terrain_config
 
