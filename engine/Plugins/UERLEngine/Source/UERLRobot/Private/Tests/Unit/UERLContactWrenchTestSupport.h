@@ -34,11 +34,11 @@ namespace UERLPhysicsResponseTests
     // post-scatter boundary with split impulse disabled and no solver overflow.
     // The fixture rejects CCD contributions that have no manifold-point result.
     inline bool AccumulateContactWrench(FAutomationTestBase& Test,
-        const Chaos::FPBDCollisionConstraint& Constraint, int32 CurrentEpoch,
+        const Chaos::FPBDCollisionConstraint& Constraint, Chaos::Private::FCollisionConstraintAllocator& Allocator,
         const Chaos::FGeometryParticleHandle* Body, double Dt, const FVector& OriginMeters,
         FVector& OutImpulseNs, FVector& OutAngularImpulseNmS)
     {
-        if (!Constraint.IsCurrent() || Constraint.GetContainerCookie().LastUsedEpoch != CurrentEpoch) { return true; }
+        if (!Constraint.IsCurrent() || Allocator.IsConstraintExpired(Constraint)) { return true; }
         if (Dt <= 0.0 || Constraint.GetCCDEnabled())
         {
             Test.AddError(TEXT("per-point momentum oracle requires positive dt and CCD disabled")); return false;

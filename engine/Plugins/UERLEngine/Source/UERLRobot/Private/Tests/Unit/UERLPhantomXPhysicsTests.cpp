@@ -543,7 +543,7 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 		{
 			auto* Collisions = CompletedContactContainer(*this, *World);
 			if (!Collisions) { return; }
-			const int32 Epoch = Collisions->GetConstraintAllocator().GetCurrentEpoch();
+			auto& Allocator = Collisions->GetConstraintAllocator();
 			TSet<Chaos::FGeometryParticleHandle*> RobotParticles;
 			for (FBodyInstance* Body : Mesh->Bodies)
 			{
@@ -560,7 +560,7 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 					if (!C || (C->GetParticle0() != Particle && C->GetParticle1() != Particle)) { continue; }
 					auto* Other = C->GetParticle0() == Particle ? C->GetParticle1() : C->GetParticle0();
 					if (!Other || RobotParticles.Contains(Other)) { continue; }
-					if (!AccumulateContactWrench(*this, *C, Epoch, Particle, Dt, Origin, J, ContactAngularImpulse)) { return; }
+					if (!AccumulateContactWrench(*this, *C, Allocator, Particle, Dt, Origin, J, ContactAngularImpulse)) { return; }
 				}
 				StepByBody.Add(Name, J);
 				BodyImpulse.FindOrAdd(Name) += J;

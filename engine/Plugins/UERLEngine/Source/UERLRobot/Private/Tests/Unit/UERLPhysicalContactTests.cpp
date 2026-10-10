@@ -59,21 +59,22 @@ namespace UERLPhysicalContactTests
 	FVector ContactImpulse(FAutomationTestBase& Test, UPrimitiveComponent& Component, double Dt)
 	{
 		FVector Sum = FVector::ZeroVector;
-		FPhysicsCommand::ExecuteRead(&Component, [&]()
+		FBodyInstance* Body = Component.GetBodyInstance();
+		FPhysicsActorHandle Handle = Body ? Body->GetPhysicsActorHandle() : nullptr;
+		if (!Handle) { Test.AddError(TEXT("missing contact actor handle")); return Sum; }
+		FPhysicsCommand::ExecuteRead(Handle, [&](const FPhysicsActorHandle& ReadHandle)
 		{
-			FBodyInstance* Body = Component.GetBodyInstance();
-			FPhysicsActorHandle Handle = Body ? Body->GetPhysicsActorHandle() : nullptr;
-			auto* Particle = Handle && Handle->GetHandle_LowLevel()
-				? Handle->GetHandle_LowLevel()->CastToRigidParticle() : nullptr;
+			auto* Particle = ReadHandle && ReadHandle->GetHandle_LowLevel()
+				? ReadHandle->GetHandle_LowLevel()->CastToRigidParticle() : nullptr;
 			if (!Particle) { Test.AddError(TEXT("missing measured contact particle")); return; }
 			auto* Collisions = UERLPhysicsResponseTests::CompletedContactContainer(Test, *Component.GetWorld());
 			if (!Collisions) { return; }
-			const int32 Epoch = Collisions->GetConstraintAllocator().GetCurrentEpoch();
+			auto& Allocator = Collisions->GetConstraintAllocator();
 			FVector AngularImpulse = FVector::ZeroVector;
 			for (const auto* C : Collisions->GetConstraints())
 			{
 				if (!C || (C->GetParticle0() != Particle && C->GetParticle1() != Particle)) { continue; }
-				if (!UERLPhysicsResponseTests::AccumulateContactWrench(Test, *C, Epoch, Particle, Dt,
+				if (!UERLPhysicsResponseTests::AccumulateContactWrench(Test, *C, Allocator, Particle, Dt,
 					FVector::ZeroVector, Sum, AngularImpulse)) { return; }
 			}
 		});
