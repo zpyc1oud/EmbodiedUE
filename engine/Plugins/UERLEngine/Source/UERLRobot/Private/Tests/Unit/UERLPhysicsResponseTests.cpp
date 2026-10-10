@@ -6,6 +6,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "HAL/IConsoleManager.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "PhysicsEngine/PhysicsSettings.h"
@@ -74,6 +75,9 @@ namespace UERLPhysicsResponseTests
 		// heuristic. Match the production Robot's never-sleep physical policy.
 		if (FBodyInstance* Body = Cube->GetBodyInstance())
 		{
+			// The analytical oracle uses the declared geometric inertia. Engine
+			// inertia conditioning must not silently replace it in joint solves.
+			Body->SetInertiaConditioningEnabled(false);
 			if (FPhysicsActorHandle Handle = Body->GetPhysicsActorHandle())
 			{
 				Handle->GetGameThreadAPI().SetSleepType(Chaos::ESleepType::NeverSleep);
@@ -151,8 +155,15 @@ namespace UERLPhysicsResponseTests
 		FVector SolverTarget = FVector::ZeroVector;
 		FPhysicsInterface::GetDriveAngularVelocity(Joint.GetPhysicsConstraintRef(), SolverTarget);
 		const auto& Drive = Joint.ProfileInstance.AngularDrive;
+		const IConsoleVariable* StiffnessScale = IConsoleManager::Get().FindConsoleVariable(
+			TEXT("p.Chaos.JointConstraint.AngularDriveStiffnessScale"));
+		const IConsoleVariable* DampingScale = IConsoleManager::Get().FindConsoleVariable(
+			TEXT("p.Chaos.JointConstraint.AngularDriveDampingScale"));
+		Test.AddInfo(FString::Printf(TEXT("[PHYSICS_DIAGNOSTIC] trial=%s step=%d stiffness_scale=%.9f damping_scale=%.9f joint_mass_conditioning=%d"),
+			Trial, Step, StiffnessScale ? StiffnessScale->GetFloat() : -1.0f,
+			DampingScale ? DampingScale->GetFloat() : -1.0f, Joint.ProfileInstance.bEnableMassConditioning));
 		Test.AddInfo(FString::Printf(
-			TEXT("[PHYSICS_DIAGNOSTIC] trial=%s step=%d mass=%.9f I_si=(%.9f,%.9f,%.9f) q=%.9f w=(%.9f,%.9f,%.9f) reaction_nm=(%.9f,%.9f,%.9f) kp_si=%.9f kd_si=%.9f limit_nm=%.9f acceleration=%d projection=%d profile_target_rev_s=(%.9f,%.9f,%.9f) solver_target_rad_s=(%.9f,%.9f,%.9f)"),
+			TEXT("[PHYSICS_DIAGNOSTIC] trial=%s step=%d mass=%.9f I_si=(%.9f,%.9f,%.9f) q=%.9f w=(%.9f,%.9f,%.9f) constraint_angular_impulse_nms=(%.9f,%.9f,%.9f) kp_si=%.9f kd_si=%.9f limit_nm=%.9f acceleration=%d projection=%d profile_target_rev_s=(%.9f,%.9f,%.9f) solver_target_rad_s=(%.9f,%.9f,%.9f)"),
 			Trial, Step, Body->GetBodyMass(), I.X, I.Y, I.Z, JointPosition(Cube, Joint),
 			W.X, W.Y, W.Z, ReactionTorque.X / 10000.0, ReactionTorque.Y / 10000.0, ReactionTorque.Z / 10000.0,
 			Drive.TwistDrive.Stiffness / 10000.0, Drive.TwistDrive.Damping / 10000.0,
