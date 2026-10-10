@@ -694,6 +694,7 @@ bool FUERLGeometricSupportWithoutForceTest::RunTest(const FString& Parameters)
     // The product geometric probe spans 4 cm above and 3 cm below the body's
     // lowest bound. A query-only surface 1 cm below it is support geometry,
     // but cannot provide a solver impulse or a physical support force.
+    const FVector ResetCOM = Base->GetCOMPosition();
     const double SurfaceZ = Base->GetBodyBounds().Min.Z - 1.0;
     Plane->SetWorldLocation(FVector(0.0, 0.0, SurfaceZ - 10.0));
     for (int32 Phase = 0; Phase < 2; ++Phase)
@@ -701,6 +702,8 @@ bool FUERLGeometricSupportWithoutForceTest::RunTest(const FString& Parameters)
         if (Phase == 1) { Plane->SetWorldLocation(FVector(0.0, 0.0, SurfaceZ - 110.0)); }
         if (!Tick(*this, *World, 0.005)) { return false; }
         Runtime.SamplePhysicsContacts(0.005);
+        TestTrue(TEXT("the first solver steps preserve the explicit gravity-free reset placement"),
+            (Base->GetCOMPosition() - ResetCOM).Size() < 1.0); // 1 cm allows internal settling, not a lost 3 m reset
         const FBox CurrentBounds = Base->GetBodyBounds();
         const FVector ProbeCenter(Base->GetUnrealWorldTransform().GetLocation().X,
             Base->GetUnrealWorldTransform().GetLocation().Y, CurrentBounds.Min.Z);

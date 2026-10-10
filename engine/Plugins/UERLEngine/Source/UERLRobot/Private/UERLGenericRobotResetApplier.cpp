@@ -6,6 +6,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "PhysicsEngine/BodyInstance.h"
+#include "Engine/World.h"
+#include "Physics/Experimental/PhysScene_Chaos.h"
 
 namespace
 {
@@ -394,6 +396,13 @@ bool ResetGenericRobotSlots(
 		{
 			return false;
 		}
+		// Component teleports can queue a pre-simulation bone-to-body update.
+		// This reset has now written every canonical body and named override.
+		// Discard the older animation pose so the next solver step cannot
+		// overwrite the completed reset, including simulated bodies.
+		FPhysScene* PhysicsScene = Slot->Component->GetWorld()->GetPhysicsScene();
+		checkf(PhysicsScene, TEXT("generic Robot reset requires a physics scene"));
+		PhysicsScene->ClearPreSimKinematicUpdate(Slot->Component);
 		Slot->Component->WakeAllRigidBodies();
 		Slot->ContactState->Clear();
 	}
