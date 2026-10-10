@@ -509,6 +509,8 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	using namespace UERLPhysicsResponseTests;
 	using namespace UERLPhantomXPhysicsTests;
 	FLockstepSettings Settings;
+	for (int32 Conditioning : { 0, 1, 2, 3 })
+	{
 	auto Scene = MakeScene();
 	UWorld* World = Scene->GetWorld();
 	if (!World || !Ground(*World)) { AddError(TEXT("missing support ground")); return false; }
@@ -521,6 +523,15 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	if (!Runtime.Initialize(*World, RobotConfig, Error)) { AddError(Error); return false; }
 	USkeletalMeshComponent* Mesh = FindMesh(*World);
 	if (!Mesh || !Mesh->GetPhysicsAsset()) { AddError(TEXT("missing support mesh")); return false; }
+	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_conditioning=%d (0=product, 1=no_joint_mass, 2=no_body_inertia, 3=neither)"), Conditioning));
+	if (Conditioning & 1)
+	{
+		for (FConstraintInstance* Joint : Mesh->Constraints) { if (Joint) { Joint->DisableMassConditioning(); } }
+	}
+	if (Conditioning & 2)
+	{
+		for (FBodyInstance* Body : Mesh->Bodies) { if (Body) { Body->SetInertiaConditioningEnabled(false); } }
+	}
 	TArray<float> Targets;
 	for (const auto& A : RobotConfig.Actuators) { Targets.Add(A.DefaultPosition); }
 	if (!Runtime.ApplyActuatorTargets(Targets, Error)) { AddError(Error); return false; }
@@ -645,8 +656,8 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 		ExternalAngularImpulse.Size() / Duration <= MomentBudget);
 	TestTrue(TEXT("weight-support fixture remains at rest throughout measurement"),
 		MaximumSpeed < 0.01 && MaximumAngularSpeed < 0.1);
-	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_moment contact_nms=%s gravity_nms=%s delta_h=%s error_nms=%.9f budget_nm=%.9f max_v=%.9f max_w=%.9f"),
-		*PreciseVector(ContactAngularImpulse), *PreciseVector(GravityAngularImpulse), *PreciseVector(AngularChange),
+	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support_moment conditioning=%d contact_nms=%s gravity_nms=%s delta_h=%s error_nms=%.9f budget_nm=%.9f max_v=%.9f max_w=%.9f"),
+		Conditioning, *PreciseVector(ContactAngularImpulse), *PreciseVector(GravityAngularImpulse), *PreciseVector(AngularChange),
 		(AngularChange - ExternalAngularImpulse).Size(), MomentBudget, MaximumSpeed, MaximumAngularSpeed));
 	AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] support mass=%.9f weight=%s mean=%s min_z=%.9f max_z=%.9f budget_n=%.9f"),
 		TotalMass, *Weight.ToString(), *MeanSupport.ToString(), MinimumSupport, MaximumSupport, Budget));
@@ -654,6 +665,7 @@ bool FUERLPhantomXSupportBalanceTest::RunTest(const FString& Parameters)
 	{
 		AddInfo(FString::Printf(TEXT("[PHYSICS_ORACLE] body=%s mean_external_contact_n=%s"),
 			*Name.ToString(), *(BodyImpulse.FindOrAdd(Name) / Duration).ToString()));
+	}
 	}
 	return true;
 }
