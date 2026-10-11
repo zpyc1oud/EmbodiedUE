@@ -8,6 +8,29 @@
 #include <limits>
 
 #if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLInputContractNegativeTest, "UERL.Unit.InputProvider.Host.InvalidContractCorpus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUERLInputContractNegativeTest::RunTest(const FString&)
+{
+	FString Text;
+	if (!TestTrue(TEXT("read shared negative corpus"), FFileHelper::LoadFileToString(Text,
+		*FPaths::Combine(FPaths::ProjectDir(), TEXT("../tests/parity/cases/inputs/invalid_contracts.json"))))) { return false; }
+	TArray<TSharedPtr<FJsonValue>> Cases;
+	if (!TestTrue(TEXT("parse corpus"), FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Cases))) { return false; }
+	TestEqual(TEXT("all reviewed corruptions present"), Cases.Num(), 6);
+	for (const auto& Case : Cases)
+	{
+		const auto Row = Case->AsObject();
+		TArray<FUERLResolvedInput> Inputs;
+		FString Error;
+		TestFalse(*Row->GetStringField(TEXT("name")),
+			ParseUERLInputContract(Row->GetObjectField(TEXT("contract")), Inputs, true, Error));
+		TestEqual(TEXT("no partially accepted contract"), Inputs.Num(), 0);
+		TestFalse(TEXT("reports rejection reason"), Error.IsEmpty());
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLHostInputsTest, "UERL.Unit.InputProvider.Host.RoutingResetFault",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FUERLHostInputsTest::RunTest(const FString&)

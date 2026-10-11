@@ -1,6 +1,5 @@
 """Paired input contract, policy container and saved Run behavior."""
 
-import copy
 import json
 import struct
 from dataclasses import replace
@@ -47,24 +46,11 @@ def test_literal_paired_contract_preserves_scalar_and_ray_meaning(tmp_path: Path
     assert restored.onnx == artifact.onnx
 
 
-@pytest.mark.parametrize("failure", ["version", "missing_spec", "duplicate", "dtype", "dimension", "empty_fields"])
-def test_persisted_contract_rejects_incomplete_or_changed_schema(failure: str) -> None:
-    contract = _contract()
-    row = contract["requirements"][0]
-    if failure == "version":
-        contract["version"] = 2
-    elif failure == "missing_spec":
-        del row["spec"]["sampling"]
-    elif failure == "duplicate":
-        contract["requirements"].append(copy.deepcopy(row))
-    elif failure == "dtype":
-        row["fields"][0]["dtype"] = "float64"
-    elif failure == "dimension":
-        row["fields"][0]["shape"] = [0]
-    else:
-        row["fields"] = []
+@pytest.mark.parametrize("case", json.loads(CORPUS.with_name("invalid_contracts.json").read_text()),
+                         ids=lambda case: case["name"])
+def test_persisted_contract_rejects_incomplete_or_changed_schema(case: dict[str, Any]) -> None:
     with pytest.raises(ConfigError):
-        parse_input_contract(contract)
+        parse_input_contract(case["contract"])
 
 
 def test_container_version_gates_input_contract(tmp_path: Path) -> None:

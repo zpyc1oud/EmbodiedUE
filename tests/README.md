@@ -935,9 +935,20 @@ missing or changed contract before persisting the Manifest.
 
 The `p2` E2E suite runs both legacy CartPole and declared state/ground-ray inputs
 through 64-Slot Describe, Commit, physical Step, sparse Reset and shutdown.
+Declared rays are compared with independent body-height telemetry before and
+after Step and Reset. The PhantomX physical-response E2E checks distinct root
+heights, falling motion, sparse height reset, and continued motion on the other Slot.
 `UERL.Integration.Policy.DeclaredInputs` loads the paired format 2 artifact,
 checks a literal 0.25 metre ground clearance and matching ONNX output, resets
-the controller and verifies explicit component ground binding. The game case
-also accepts `-uerlinputartifact=<fresh-export.uerlpol2>` to load and run a newly
-trained CartPole policy. This one-iteration path establishes pipeline behavior,
+the controller and verifies explicit component ground binding.
+`e2e/test_fresh_policy_game.py` trains one CPU iteration, exports the saved Run,
+and supplies its artifact to `UERL.E2E.Policy.FreshExport` through
+`-uerlinputartifact=<fresh-export.uerlpol2>`. That native case requires the argument.
+This one-iteration path establishes pipeline behavior,
 not learning quality. External plugin installation still needs its own UE result.
+
+The full runner maps each registered native Automation case to one execution
+group or a dedicated E2E owner, and requires every selected name in the completed
+results. The shared `parity/cases/inputs/invalid_contracts.json` corpus is rejected
+by both Python and native readers. Native artifact tests also reject version 1
+with an input contract and version 2 without one.

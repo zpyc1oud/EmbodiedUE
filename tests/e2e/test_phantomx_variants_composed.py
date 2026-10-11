@@ -26,7 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # baselines (e.g. last-30-iter mean return within 10%) is a longer regression job,
 # not required to close this ticket once the smoke gate is green.
 _VARIANT_TASKS = (
-    PHANTOMX_TASK_ID,
+    # Walk is trained by the train/export test below.
     PHANTOMX_PURSUIT_TASK_ID,
     PHANTOMX_TERRAIN_TASK_ID,
     PHANTOMX_DISCRETE_TERRAIN_TASK_ID,

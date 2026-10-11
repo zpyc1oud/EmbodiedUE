@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,7 @@ from uerl import (
     UERLSession,
     UERLSessionAdapter,
 )
+from uerl.core.config.robot import ObservationConfig, ObsType
 from uerl.core.config.yaml_loader import load_unique_yaml
 from uerl.core.direct.task import DirectTask
 from uerl.core.direct.types import SessionSchema
@@ -33,7 +36,7 @@ from uerl.training import build_launch_overrides, build_run_config
 
 SLOT_COUNT = 64
 RAY = RayGroundFactory().validate(InputSpec(
-    "ground_probe", "uerl.ray_ground", 1, attachment="root",
+    "ground_probe", "uerl.ray_ground", 1, attachment="pole",
     parameters={"offsets_m": [[0.0, 0.0], [0.25, 0.0]], "alignment": "world"},
 ))
 
@@ -60,6 +63,18 @@ class _SparseResetCartPoleTask(DirectTask):
                 base.state_requirements + tuple(f.to_mapping() for f in RAY.fields), base.action_schema,
             )
         return base
+
+    def build_observations(
+        self, raw_state: Mapping[str, torch.Tensor], state_valid: torch.Tensor,
+        previous_policy_actions: torch.Tensor, control_frame_dt: torch.Tensor | None = None,
+    ) -> Mapping[str, torch.Tensor]:
+        observations = dict(super().build_observations(
+            raw_state, state_valid, previous_policy_actions, control_frame_dt,
+        ))
+        if self.declared_inputs:
+            observations["rays"] = raw_state["input.ground_probe.height"].clone()
+            observations["pole_pose"] = raw_state["robot.body.pole.body_pose"].clone()
+        return observations
 
     def compute_terminations(self, context: StepContext) -> TerminationResult:
         """Terminate row zero each step and time out the remaining rows at the limit."""
@@ -99,7 +114,14 @@ def _config(run_directory: Path, declared_inputs: bool = False) -> ResolvedRunCo
             ]}).to_mapping(),
             RAY.spec.to_mapping(),
         ])
-    return build_run_config(CARTPOLE_TASK_ID, overrides=overrides)
+    config = build_run_config(CARTPOLE_TASK_ID, overrides=overrides)
+    if declared_inputs:
+        semantics = config.worker.robot_semantics
+        assert semantics is not None
+        config = replace(config, worker=replace(config.worker, robot_semantics=replace(
+            semantics, observations=semantics.observations + (ObservationConfig(ObsType.BODY_POSE, "pole", "body"),),
+        )))
+    return config
 
 
 @pytest.mark.parametrize("declared_inputs", [False, True], ids=["legacy", "declared-inputs"])
@@ -131,7 +153,7 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path, 
             "robot.joint.pole.joint_velocity",
             "robot.joint.cart.joint_position",
             "robot.joint.cart.joint_velocity",
-        ) + (("input.ground_probe.height",) if declared_inputs else ())
+        ) + (("robot.body.pole.body_pose", "input.ground_probe.height") if declared_inputs else ())
         if declared_inputs:
             assert len(raw_session.input_requirements) == 2
             assert raw_session.input_requirements[1] == RAY
@@ -139,10 +161,11 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path, 
         assert resolved_config["normalized_hash"] == config.normalized_hash
         assert manifest["run_seed"] == config.worker.run_seed
         assert manifest["layout_hashes"]
-        initial_policy = env.get_observations()["policy"].clone()
+        initial_obs = {key: value.clone() for key, value in env.get_observations().items()}
+        initial_policy = initial_obs["policy"]
         first_actions = torch.zeros(SLOT_COUNT, 1)
         first_actions[1, 0] = 0.5
-        first_obs, first_reward, first_terminated, first_truncated, _first_info = env.step(first_actions)
+        first_obs, first_reward, first_terminated, first_truncated, first_info = env.step(first_actions)
         first_episode_length_buf = env.episode_length_buf.clone()
         second_obs, second_reward, second_terminated, second_truncated, second_info = env.step(
             torch.zeros(SLOT_COUNT, 1)
@@ -170,10 +193,21 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path, 
     assert second_obs["policy"].shape == (SLOT_COUNT, 4)
     assert second_info["terminal_observation"]["policy"].shape == (SLOT_COUNT, 4)
     if declared_inputs:
-        rays = second_info["terminal_raw_state"]["input.ground_probe.height"]
-        assert rays.shape == (SLOT_COUNT, 2)
-        assert torch.isfinite(rays).all()
-        torch.testing.assert_close(rays[:, 0], rays[:, 1], atol=1e-5, rtol=0)
+        # The procedural plane is at z=0. Body telemetry is an independent SI
+        # oracle for each ray's signed height relative to the pole attachment.
+        for observations in (initial_obs, first_obs, second_obs):
+            _assert_ground_height(observations["rays"], observations["pole_pose"])
+        for info in (first_info, second_info):
+            raw = info["terminal_raw_state"]
+            _assert_ground_height(raw["input.ground_probe.height"], raw["robot.body.pole.body_pose"])
+        first_terminal = first_info["terminal_raw_state"]["input.ground_probe.height"]
+        torch.testing.assert_close(first_obs["rays"][1:], first_terminal[1:], atol=0, rtol=0)
         assert not second_info["slot_fault_code"].any()
     assert raw_session.state is SessionState.CLOSED  # type: ignore[comparison-overlap]
     print("[VERIFY] AC-UE-GENERIC-013: slots=64 action=nonzero step=2 sparse_reset=1 shutdown=PASS")
+
+
+def _assert_ground_height(rays: torch.Tensor, pose: torch.Tensor) -> None:
+    assert rays.shape == (SLOT_COUNT, 2)
+    assert torch.all(pose[:, 2].abs() > 0.05)
+    torch.testing.assert_close(rays, -pose[:, 2:3].expand(-1, 2), atol=1e-5, rtol=0)

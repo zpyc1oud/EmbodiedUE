@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -59,6 +60,7 @@ UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
         "UERL.Integration.Policy.Ground+"
         "UERL.Integration.Policy.Clock+"
         "UERL.Integration.Policy.Controller+"
+        "UERL.Integration.Policy.DeclaredInputs+"
         "UERL.Integration.Policy.Component",
         142,
     ),
@@ -81,6 +83,37 @@ UE_AUTOMATION_GROUPS: tuple[tuple[str, str, int], ...] = (
     ),
 )
 
+# These cases need a client or an artifact produced by their owning E2E test.
+E2E_AUTOMATION_CASES = {
+    "UERL.Integration.Worker.PIEAttach",
+    "UERL.E2E.Policy.FreshExport",
+}
+
+
+def selected_automation_cases() -> tuple[tuple[str, ...], ...]:
+    """Require the checked-in registrations to have exactly one execution owner."""
+    source = REPO_ROOT / "engine/Plugins/UERLEngine/Source"
+    names = [
+        name
+        for path in source.rglob("*.cpp")
+        for name in re.findall(
+            r'IMPLEMENT_\w+_AUTOMATION_TEST\s*\(\s*\w+\s*,\s*"([^"]+)"',
+            path.read_text(encoding="utf-8-sig"),
+        )
+    ]
+    if not names or len(set(names)) != len(names):
+        raise ValueError("native Automation registrations are empty or duplicated")
+    selected = tuple(tuple(sorted(name for name in names if any(
+        part in name for part in filters.split("+")
+    ))) for _, filters, _ in UE_AUTOMATION_GROUPS)
+    for name in names:
+        owners = sum(name in group for group in selected) + int(name in E2E_AUTOMATION_CASES)
+        if owners != 1:
+            raise ValueError(f"Automation case must have exactly one execution owner: {name}")
+    if not all(selected) or not E2E_AUTOMATION_CASES.issubset(names):
+        raise ValueError("Automation execution group or E2E registration is missing")
+    return selected
+
 
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -94,6 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     add_runner_flags(parser)
     args = parser.parse_args(argv)
+    required_cases = selected_automation_cases()
     names = ["Python", *(name for name, _, _ in UE_AUTOMATION_GROUPS), "UE E2E"]
     run = TestRun(args.output_dir, names, args.timeout)
     status = run.run(0, [sys.executable, "-m", "pytest", "-q"])
@@ -114,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
             return status
         status = run.check_automation(
             index, log, minimum,
-            required_names=PHYSICS_RESPONSE_CASES if filters == "UERL.Integration.PhysicsResponse" else (),
+            required_names=required_cases[index - 1],
         )
         if status:
             return status

@@ -1,0 +1,458 @@
+[
+  {
+    "name": "version",
+    "contract": {
+      "version": 2,
+      "requirements": [
+        {
+          "spec": {
+            "name": "proprioception",
+            "provider_id": "uerl.state",
+            "provider_version": 1,
+            "parameters": {
+              "fields": [
+                "robot.joint.pole.joint_position"
+              ]
+            },
+            "attachment": null,
+            "scene_bindings": [],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "robot.joint.pole.joint_position",
+              "shape": [],
+              "dtype": "float32",
+              "unit": "rad",
+              "frame": "constraint",
+              "semantic": "joint_position",
+              "source": "uerl.robot"
+            }
+          ]
+        },
+        {
+          "spec": {
+            "name": "ground",
+            "provider_id": "uerl.ray_ground",
+            "provider_version": 1,
+            "parameters": {
+              "offsets_m": [
+                [
+                  0,
+                  0
+                ]
+              ],
+              "start_height_m": 1,
+              "end_depth_m": 2,
+              "alignment": "world",
+              "output": "clearance"
+            },
+            "attachment": "root",
+            "scene_bindings": [
+              "ground"
+            ],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "input.ground.clearance",
+              "shape": [
+                1
+              ],
+              "dtype": "float32",
+              "unit": "m",
+              "frame": "world/z-relative",
+              "semantic": "ground_clearance",
+              "source": "uerl.ray_ground"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_sampling",
+    "contract": {
+      "version": 1,
+      "requirements": [
+        {
+          "spec": {
+            "name": "proprioception",
+            "provider_id": "uerl.state",
+            "provider_version": 1,
+            "parameters": {
+              "fields": [
+                "robot.joint.pole.joint_position"
+              ]
+            },
+            "attachment": null,
+            "scene_bindings": [],
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "robot.joint.pole.joint_position",
+              "shape": [],
+              "dtype": "float32",
+              "unit": "rad",
+              "frame": "constraint",
+              "semantic": "joint_position",
+              "source": "uerl.robot"
+            }
+          ]
+        },
+        {
+          "spec": {
+            "name": "ground",
+            "provider_id": "uerl.ray_ground",
+            "provider_version": 1,
+            "parameters": {
+              "offsets_m": [
+                [
+                  0,
+                  0
+                ]
+              ],
+              "start_height_m": 1,
+              "end_depth_m": 2,
+              "alignment": "world",
+              "output": "clearance"
+            },
+            "attachment": "root",
+            "scene_bindings": [
+              "ground"
+            ],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "input.ground.clearance",
+              "shape": [
+                1
+              ],
+              "dtype": "float32",
+              "unit": "m",
+              "frame": "world/z-relative",
+              "semantic": "ground_clearance",
+              "source": "uerl.ray_ground"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate",
+    "contract": {
+      "version": 1,
+      "requirements": [
+        {
+          "spec": {
+            "name": "proprioception",
+            "provider_id": "uerl.state",
+            "provider_version": 1,
+            "parameters": {
+              "fields": [
+                "robot.joint.pole.joint_position"
+              ]
+            },
+            "attachment": null,
+            "scene_bindings": [],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "robot.joint.pole.joint_position",
+              "shape": [],
+              "dtype": "float32",
+              "unit": "rad",
+              "frame": "constraint",
+              "semantic": "joint_position",
+              "source": "uerl.robot"
+            }
+          ]
+        },
+        {
+          "spec": {
+            "name": "ground",
+            "provider_id": "uerl.ray_ground",
+            "provider_version": 1,
+            "parameters": {
+              "offsets_m": [
+                [
+                  0,
+                  0
+                ]
+              ],
+              "start_height_m": 1,
+              "end_depth_m": 2,
+              "alignment": "world",
+              "output": "clearance"
+            },
+            "attachment": "root",
+            "scene_bindings": [
+              "ground"
+            ],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "input.ground.clearance",
+              "shape": [
+                1
+              ],
+              "dtype": "float32",
+              "unit": "m",
+              "frame": "world/z-relative",
+              "semantic": "ground_clearance",
+              "source": "uerl.ray_ground"
+            }
+          ]
+        },
+        {
+          "spec": {
+            "name": "proprioception",
+            "provider_id": "uerl.state",
+            "provider_version": 1,
+            "parameters": {
+              "fields": [
+                "robot.joint.pole.joint_position"
+              ]
+            },
+            "attachment": null,
+            "scene_bindings": [],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "robot.joint.pole.joint_position",
+              "shape": [],
+              "dtype": "float32",
+              "unit": "rad",
+              "frame": "constraint",
+              "semantic": "joint_position",
+              "source": "uerl.robot"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "dtype",
+    "contract": {
+      "version": 1,
+      "requirements": [
+        {
+          "spec": {
+            "name": "proprioception",
+            "provider_id": "uerl.state",
+            "provider_version": 1,
+            "parameters": {
+              "fields": [
+                "robot.joint.pole.joint_position"
+              ]
+            },
+            "attachment": null,
+            "scene_bindings": [],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "robot.joint.pole.joint_position",
+              "shape": [],
+              "dtype": "float64",
+              "unit": "rad",
+              "frame": "constraint",
+              "semantic": "joint_position",
+              "source": "uerl.robot"
+            }
+          ]
+        },
+        {
+          "spec": {
+            "name": "ground",
+            "provider_id": "uerl.ray_ground",
+            "provider_version": 1,
+            "parameters": {
+              "offsets_m": [
+                [
+                  0,
+                  0
+                ]
+              ],
+              "start_height_m": 1,
+              "end_depth_m": 2,
+              "alignment": "world",
+              "output": "clearance"
+            },
+            "attachment": "root",
+            "scene_bindings": [
+              "ground"
+            ],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "input.ground.clearance",
+              "shape": [
+                1
+              ],
+              "dtype": "float32",
+              "unit": "m",
+              "frame": "world/z-relative",
+              "semantic": "ground_clearance",
+              "source": "uerl.ray_ground"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "dimension",
+    "contract": {
+      "version": 1,
+      "requirements": [
+        {
+          "spec": {
+            "name": "proprioception",
+            "provider_id": "uerl.state",
+            "provider_version": 1,
+            "parameters": {
+              "fields": [
+                "robot.joint.pole.joint_position"
+              ]
+            },
+            "attachment": null,
+            "scene_bindings": [],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "robot.joint.pole.joint_position",
+              "shape": [
+                0
+              ],
+              "dtype": "float32",
+              "unit": "rad",
+              "frame": "constraint",
+              "semantic": "joint_position",
+              "source": "uerl.robot"
+            }
+          ]
+        },
+        {
+          "spec": {
+            "name": "ground",
+            "provider_id": "uerl.ray_ground",
+            "provider_version": 1,
+            "parameters": {
+              "offsets_m": [
+                [
+                  0,
+                  0
+                ]
+              ],
+              "start_height_m": 1,
+              "end_depth_m": 2,
+              "alignment": "world",
+              "output": "clearance"
+            },
+            "attachment": "root",
+            "scene_bindings": [
+              "ground"
+            ],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "input.ground.clearance",
+              "shape": [
+                1
+              ],
+              "dtype": "float32",
+              "unit": "m",
+              "frame": "world/z-relative",
+              "semantic": "ground_clearance",
+              "source": "uerl.ray_ground"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty_fields",
+    "contract": {
+      "version": 1,
+      "requirements": [
+        {
+          "spec": {
+            "name": "proprioception",
+            "provider_id": "uerl.state",
+            "provider_version": 1,
+            "parameters": {
+              "fields": [
+                "robot.joint.pole.joint_position"
+              ]
+            },
+            "attachment": null,
+            "scene_bindings": [],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": []
+        },
+        {
+          "spec": {
+            "name": "ground",
+            "provider_id": "uerl.ray_ground",
+            "provider_version": 1,
+            "parameters": {
+              "offsets_m": [
+                [
+                  0,
+                  0
+                ]
+              ],
+              "start_height_m": 1,
+              "end_depth_m": 2,
+              "alignment": "world",
+              "output": "clearance"
+            },
+            "attachment": "root",
+            "scene_bindings": [
+              "ground"
+            ],
+            "sampling": "completed_window",
+            "missing_data": "fault"
+          },
+          "fields": [
+            {
+              "name": "input.ground.clearance",
+              "shape": [
+                1
+              ],
+              "dtype": "float32",
+              "unit": "m",
+              "frame": "world/z-relative",
+              "semantic": "ground_clearance",
+              "source": "uerl.ray_ground"
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

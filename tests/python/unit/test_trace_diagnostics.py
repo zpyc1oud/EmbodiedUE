@@ -130,7 +130,7 @@ def test_command_groups_preserve_low_speed_direction_and_missing_coverage(tmp_pa
 
 
 def test_mixed_commands_do_not_hide_failed_direction_or_standing_drift(tmp_path: Path) -> None:
-    targets = [[0, 0, 0], [0.4, 0, 0], [0.4, 0, 0], [-0.4, 0, 0], [0, -0.3, 0], [0.4, 0, -0.5], [0, 0, 0.5]]
+    targets = [[0, 0, 0], [0.4, 0, 0], [0.4, 0, 0], [-0.4, 0, 0], [0, -0.3, 0], [0.4, 0, -0.5], [0, 0, 0.8]]
     durations = [1.0, 0.01, 0.03, 0.02, 0.02, 0.02, 0.02]
     rows = [_row(0, index, dt=dt) for index, dt in enumerate(durations)]
     for row, target in zip(rows, targets, strict=True):
@@ -153,7 +153,9 @@ def test_mixed_commands_do_not_hide_failed_direction_or_standing_drift(tmp_path:
     assert groups["backward"]["linear_velocity_rmse_m_s"] == pytest.approx(0.8)
     assert groups["lateral"]["linear_velocity_rmse_m_s"] == pytest.approx(0.3)
     assert groups["moving_turn"]["yaw_rate_rmse_rad_s"] == pytest.approx(0.5)
-    assert groups["yaw_only"]["yaw_rate_rmse_rad_s"] == pytest.approx(0.5)
+    assert groups["yaw_only"]["yaw_rate_rmse_rad_s"] == pytest.approx(0.8)
+    assert groups["moving_turn"]["linear_velocity_rmse_m_s"] == pytest.approx(0.4)
+    assert groups["yaw_only"]["linear_velocity_rmse_m_s"] == 0.0
     assert sum(group["samples"] for group in groups.values()) == 7
     assert sum(group["measured_seconds"] for group in groups.values()) == pytest.approx(1.12)
 
@@ -166,8 +168,10 @@ def test_grouped_terminal_counts_use_executed_command_before_reset(tmp_path: Pat
     first["reset"] = {"commands": {"velocity": [-0.4, 0, 0]}}
     second["input"]["commands"]["velocity"] = [-0.4, 0, 0]
     second["transition"]["truncated"] = True
-    groups = _report(tmp_path, [first, second])["command_groups"]
-    assert groups["forward"]["terminated_at_command"] == 1
+    third, fourth = _row(2, 0), _row(3, 0)
+    third["transition"]["terminated"] = True
+    groups = _report(tmp_path, [first, second, third, fourth])["command_groups"]
+    assert groups["forward"]["terminated_at_command"] == 2
     assert groups["forward"]["timeout_only_at_command"] == 0
     assert groups["backward"]["timeout_only_at_command"] == 1
     assert groups["standing"]["samples"] == 0
@@ -212,3 +216,15 @@ def test_script_emits_yaml_and_preserves_input(tmp_path: Path, capsys: pytest.Ca
     path.write_text("records: [")
     assert main([str(path)]) == 2
     assert "Trace diagnosis failed" in capsys.readouterr().err
+
+
+def test_grouped_yaw_uses_duration_and_absolute_motion(tmp_path: Path) -> None:
+    first, second = _row(0, 0, dt=0.01), _row(0, 1, dt=0.03)
+    for row, yaw in ((first, -0.2), (second, 0.6)):
+        row["input"]["commands"]["velocity"] = [0, 0, 0]
+        row["transition"]["raw_state"][P + "body_angular_velocity"] = [0, 0, yaw]
+    standing = _report(tmp_path, [first, second])["command_groups"]["standing"]
+    assert standing["samples"] == 2
+    assert standing["measured_seconds"] == pytest.approx(0.04)
+    assert standing["yaw_rate_rmse_rad_s"] == pytest.approx(0.28**0.5)
+    assert standing["mean_absolute_yaw_rate_rad_s"] == pytest.approx(0.5)

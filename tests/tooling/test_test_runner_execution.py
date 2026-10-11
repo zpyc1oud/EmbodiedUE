@@ -144,8 +144,9 @@ def test_cleanup_failure_is_visible(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert "cleanup failed" in str(run.stages[0].detail)
 
 
+@pytest.mark.parametrize("missing_declared_case", [False, True])
 def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing_declared_case: bool,
 ) -> None:
     executable = tmp_path / "editor.exe"
     project = tmp_path / "host.uproject"
@@ -160,9 +161,9 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
         self.stages[index].status = "passed"
         if index in {1, 2, 3}:
             log_argument = next(arg for arg in command if arg.startswith("-abslog="))
-            minimum = {1: 142, 2: 13, 3: len(run_all_tests.PHYSICS_RESPONSE_CASES)}[index]
-            names = (run_all_tests.PHYSICS_RESPONSE_CASES if index == 3
-                     else tuple(f"UERL.Unit.test{case}" for case in range(minimum)))
+            names = run_all_tests.selected_automation_cases()[index - 1]
+            if missing_declared_case and index == 1:
+                names = tuple(name for name in names if name != "UERL.Integration.Policy.DeclaredInputs.GameContract")
             Path(log_argument.removeprefix("-abslog=")).write_text(
                 "".join(f"Test Completed. Result={{Success}} Name={{test}} Path={{{name}}}\n"
                         for name in names) + "**** TEST COMPLETE. EXIT CODE: 0 ****\n",
@@ -172,13 +173,31 @@ def test_full_runner_passes_paths_and_uses_distinct_automation_logs(
     monkeypatch.setattr(TestRun, "run", execute)
     assert run_all_tests.main([
         "--output-dir", str(tmp_path / "reports"), "--ue-executable", str(executable), "--project", str(project),
-    ]) == 0
+    ]) == (1 if missing_declared_case else 0)
+    if missing_declared_case:
+        assert len(commands) == 2
+        return
     assert len(commands) == 5
     assert all(command[:2] == [str(executable), str(project)] for command in commands[1:4])
     logs = [next(arg for arg in command if arg.startswith("-abslog=")) for command in commands[1:4]]
     assert len(set(logs)) == 3
     assert "-ExecCmds=Automation RunTests UERL.Integration.PhysicsResponse;Quit" in commands[3]
     assert commands[-1] == [sys.executable, "-m", "pytest", "-v", "-s", "tests/e2e"]
+
+
+def test_native_registrations_have_one_execution_owner() -> None:
+    groups = run_all_tests.selected_automation_cases()
+    assert "UERL.Integration.Policy.DeclaredInputs.GameContract" in groups[0]
+    assert "UERL.Integration.Policy.DeclaredInputs.ComponentGroundBinding" in groups[0]
+
+
+def test_missing_native_filter_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    groups = list(run_all_tests.UE_AUTOMATION_GROUPS)
+    label, _, minimum = groups[0]
+    groups[0] = (label, "UERL.DoesNotExist", minimum)
+    monkeypatch.setattr(run_all_tests, "UE_AUTOMATION_GROUPS", tuple(groups))
+    with pytest.raises(ValueError, match="execution owner"):
+        run_all_tests.selected_automation_cases()
 
 
 def _linux_process_exited(state_file: Path) -> bool:

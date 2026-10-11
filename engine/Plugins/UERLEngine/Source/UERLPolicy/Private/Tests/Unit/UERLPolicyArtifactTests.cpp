@@ -505,6 +505,25 @@ bool FUERLPolicyArtifactCorruptionsTest::RunTest(const FString& Parameters)
 			LoadError.Contains(ExpectedToken, ESearchCase::IgnoreCase));
 	};
 
+	// These are the same format/segment mismatches rejected by the Python reader.
+	{
+		TArray<uint8> InputBytes;
+		if (!TestTrue(TEXT("read v2 declared-input artifact"), FFileHelper::LoadFileToArray(InputBytes,
+			*FPaths::Combine(FPaths::ProjectDir(), TEXT("../tests/parity/cases/inputs/controller_inputs.uerlpol2"))))) { return false; }
+		FUERLPolicyArtifact InputBaseline;
+		if (!TestTrue(TEXT("valid v2 baseline"), InputBaseline.LoadFromBytes(InputBytes, Error))) { return false; }
+		TArray<uint8> WrongVersion = InputBytes;
+		const uint32 LegacyVersion = 1;
+		FMemory::Memcpy(WrongVersion.GetData() + 8, &LegacyVersion, sizeof(LegacyVersion));
+		ExpectLoadFails(WrongVersion, TEXT("v1_with_contract"), TEXT("input_contract"));
+		TSharedPtr<FJsonObject> Root;
+		if (!TestTrue(TEXT("read v2 JSON"), ReadArtifactJson(InputBytes, Root, Error))) { return false; }
+		Root->RemoveField(TEXT("input_contract"));
+		TArray<uint8> Missing;
+		if (!TestTrue(TEXT("rewrite missing contract"), RewriteArtifactJson(InputBytes, Root.ToSharedRef(), Missing, Error))) { return false; }
+		ExpectLoadFails(Missing, TEXT("v2_without_contract"), TEXT("input_contract"));
+	}
+
 	{
 		TArray<uint8> BadMagic = Good;
 		const ANSICHAR Poison[] = "BADMAGIC";
