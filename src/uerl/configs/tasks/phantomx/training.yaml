@@ -20,6 +20,9 @@ task:
   turn_start_distance: 0.5
   turn_completion_tolerance: 0.1
   command:
+    sampling: staged
+    lateral_speed_min: 0.0
+    lateral_speed_max: 0.0
     initial_speed_min: 0.4
     initial_speed_max: 0.5
     post_turn_speed_min: 0.4
@@ -29,6 +32,10 @@ task:
     resampling_time_min_s: 5.0
     resampling_time_max_s: 10.0
     standing_probability: 0.1
+    heading_command: true
+    yaw_rate_min: -0.5
+    yaw_rate_max: 0.5
+    turn_in_place_probability: 0.0
   curriculum:
     window_episodes: 512
     minimum_episodes: 128
