@@ -56,15 +56,35 @@ bool FUERLDeclaredInputGameTest::RunTest(const FString&)
 	Config.TerrainQueryActors.Reset();
 	TestFalse(TEXT("required ground cannot bind implicitly"), Controller.Initialize(*World, Config, Error));
 	Controller.Shutdown();
-	// Optional freshly trained policy establishes the real export-to-game path.
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLFreshExportGameTest,
+	"UERL.E2E.Policy.FreshExport", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUERLFreshExportGameTest::RunTest(const FString&)
+{
+	// The owning Python E2E must supply its newly trained/exported CartPole policy.
 	FString SmokeArtifact;
-	if (FParse::Value(FCommandLine::Get(), TEXT("uerlinputartifact="), SmokeArtifact))
-	{
-		Config.ArtifactPath = SmokeArtifact;
-		if (!TestTrue(TEXT("fresh training export initializes"), Controller.Initialize(*World, Config, Error)))
-		{ AddError(Error); return false; }
-		TestTrue(TEXT("fresh policy bootstrap inference"), Controller.Step({}, {1.0/60.0, 0}, Error, false, true));
-	}
+	if (!TestTrue(TEXT("fresh artifact argument is required"),
+		FParse::Value(FCommandLine::Get(), TEXT("uerlinputartifact="), SmokeArtifact))) { return false; }
+	FModuleManager::Get().LoadModuleChecked(TEXT("UERLRobot"));
+	FPreviewScene Scene(FPreviewScene::ConstructionValues().SetCreateDefaultLighting(false)
+		.SetCreatePhysicsScene(true).ShouldSimulatePhysics(true).SetTransactional(false).SetEditor(false));
+	UWorld* World = Scene.GetWorld();
+	if (!TestNotNull(TEXT("world"), World)) { return false; }
+	FUERLPolicyControllerConfig Config;
+	Config.ArtifactPath = SmokeArtifact;
+	Config.AssetPath = TEXT("/Game/Robots/CartPole/SKM_CartPole.SKM_CartPole");
+	Config.bClaimAuthoredActor = false;
+	FUERLPolicyController Controller;
+	FString Error;
+	if (!TestTrue(TEXT("fresh training export initializes"), Controller.Initialize(*World, Config, Error)))
+	{ AddError(Error); return false; }
+	TestTrue(TEXT("fresh policy bootstrap inference"), Controller.Step({}, {1.0/60.0, 0}, Error, false, true));
+	TestEqual(TEXT("CartPole observation width"), Controller.LastObservation().Num(), 4);
+	TestEqual(TEXT("CartPole action width"), Controller.LastAction().Num(), 1);
+	for (float Value : Controller.LastAction()) { TestTrue(TEXT("finite fresh inference"), FMath::IsFinite(Value)); }
+	Controller.Shutdown();
 	return true;
 }
 

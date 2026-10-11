@@ -35,6 +35,7 @@ from uerl import (
 )
 from uerl.application.run_config import load_run_config_source
 from uerl.core.codec import Layout
+from uerl.core.inputs import InputSpec, RayGroundFactory
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.registry import create_default_registry
 from uerl.training import build_launch_overrides, build_run_config
@@ -409,3 +410,68 @@ def test_phantomx_native_completed_state_matches_same_session_exchange(tmp_path:
     finally:
         session.close("native_physical_feedback_complete")
     _assert_native_exchange(capture, exchanges, decimation)
+
+
+def test_declared_rays_refresh_after_step_and_sparse_height_reset(tmp_path: Path) -> None:
+    ray = RayGroundFactory().validate(InputSpec(
+        "probe", "uerl.ray_ground", 1, attachment="root",
+        parameters={"offsets_m": [[0, 0], [0.25, 0]], "alignment": "world"},
+    ))
+    config = _config(tmp_path / "ray-height", 2, 1, generated_flat=True)
+    config = replace(config, worker=replace(config.worker, inputs=(ray.spec,)))
+    session = UERLSession.open(config, process_controller=WorkerProcessController())
+    try:
+        session.describe(SessionSchema((), ()).as_request())
+        spec = session.described_robot_spec
+        assert spec is not None
+        shapes = ObservationShapeTable.from_descriptor(session.descriptor)
+        schema = SessionSchema(
+            robot_observation_schema(spec, shapes) + tuple(f.to_mapping() for f in ray.fields),
+            robot_actuator_action_schema(spec),
+        )
+        result = session.initialize(schema.as_request())
+        layouts = {d["layout_kind"]: Layout.parse(d, batch_size=2) for d in result.response["layouts"]}
+        session.acknowledge_ready()
+        reset_layout = layouts["reset_request"]
+        reset = bytearray(reset_layout.payload_length)
+        mask = reset_layout.segment("system.reset_mask")
+        reset[mask.offset] = 0b11
+        values = []
+        for height in (0.3, 0.6):
+            pose = (0.0, 0.0, height, 0.0, 0.0, 0.0, 1.0)
+            for binding in spec.reset:
+                if binding.target_type.value == "root_pose":
+                    values.append(pose[binding.component_index])
+                else:
+                    assert binding.target_type.value == "joint_position" and binding.joint in JOINTS
+                    values.append(DEFAULTS[JOINTS.index(binding.joint)])
+        segment = reset_layout.segment("robot.reset.values")
+        struct.pack_into(f"<{len(values)}f", reset, segment.offset, *values)
+        _, payload = session.reset(reset_layout.layout_id, bytes(reset))
+        names = ("robot.body.base_link.body_pose", "input.probe.height")
+        initial = _wire_state(payload, layouts["reset_result"], names, 2)
+        np.testing.assert_allclose(initial[names[1]], [[-0.3, -0.3], [-0.6, -0.6]], atol=1e-5, rtol=0)
+        action_layout = layouts["step_action"]
+        action = bytearray(action_layout.payload_length)
+        struct.pack_into("<36f", action, action_layout.segment("robot.actuator.target").offset, *(DEFAULTS * 2))
+        struct.pack_into("<i", action, action_layout.segment("step_decimation").offset, 1)
+        _, payload = session.step(action_layout.layout_id, bytes(action))
+        stepped = _wire_state(payload, layouts["step_result"], names, 2)
+        # In free fall, the completed-window heights must change on both Slots.
+        assert np.all(stepped[names[1]] > initial[names[1]] + 1e-4)
+        np.testing.assert_allclose(stepped[names[1]], np.repeat(-stepped[names[0]][:, 2:3], 2, axis=1),
+                                   atol=1e-5, rtol=0)
+        reset[mask.offset] = 1
+        _, payload = session.reset(reset_layout.layout_id, bytes(reset))
+        restored = _wire_state(payload, layouts["reset_result"], names, 2)
+        np.testing.assert_allclose(restored[names[1]][0], [-0.3, -0.3], atol=1e-5, rtol=0)
+        # Reset wire rows outside the mask are zero; DirectEnv merges only selected rows.
+        np.testing.assert_array_equal(restored[names[1]][1], [0.0, 0.0])
+        _, payload = session.step(action_layout.layout_id, bytes(action))
+        continued = _wire_state(payload, layouts["step_result"], names, 2)
+        np.testing.assert_allclose(continued[names[1]], np.repeat(-continued[names[0]][:, 2:3], 2, axis=1),
+                                   atol=1e-5, rtol=0)
+        assert np.all(continued[names[1]][1] > stepped[names[1]][1] + 1e-4)
+        assert np.all(continued[names[1]][1] < -0.55)
+    finally:
+        session.close("declared_ray_height_complete")
