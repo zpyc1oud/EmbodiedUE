@@ -3,6 +3,7 @@
 from .contracts import InputField, InputSpec, ResolvedInput
 from .ray_ground import RayGroundFactory
 from .registry import CompiledInputRequirements, InputFactory, InputFieldBinding, InputRegistry
+from .state import StateInputFactory
 
 __all__ = [
     "CompiledInputRequirements",
@@ -13,4 +14,5 @@ __all__ = [
     "InputSpec",
     "ResolvedInput",
     "RayGroundFactory",
+    "StateInputFactory",
 ]

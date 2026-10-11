@@ -912,3 +912,16 @@ A passing CPU test does not establish UE contact or actuator behavior.
 These cases use a deterministic native provider. They do not establish terrain
 sampling, Worker/game integration, artifact format 2, or external plugin deployment.
 Run them on the changed Editor build before accepting this foundation.
+
+`UERLProvider/Private/Tests/Unit/UERLStateInputTests.cpp` exercises the existing-state adapter:
+
+- `UERL.Unit.InputProvider.State.Lifecycle`: literal field order and values,
+  preserved metadata, owned publication, bootstrap, completed windows, sparse reset and rebind.
+- `UERL.Unit.InputProvider.State.SnapshotFaults`: stale sequence/time/generation,
+  missing/wrong-width/non-finite snapshots, Slot isolation and explicit reset recovery.
+- `UERL.Unit.InputProvider.State.BindingAndSelection`: invalid selection, effective
+  parameter round trip, missing readers and coordinate-frame mismatch.
+
+`python/unit/test_state_inputs.py` checks matching declaration order, metadata,
+YAML round trips and rejected selections. These are snapshot-adapter tests;
+physical collection and Worker/game selection require separate runtime evidence.
