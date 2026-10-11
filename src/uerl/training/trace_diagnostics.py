@@ -4,10 +4,46 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..core.config.yaml_loader import load_unique_yaml
+
+
+@dataclass
+class _CommandGroup:
+    samples: int = 0
+    seconds: float = 0.0
+    linear_squared: float = 0.0
+    yaw_squared: float = 0.0
+    planar_speed: float = 0.0
+    absolute_yaw_rate: float = 0.0
+    terminated: int = 0
+    timeout_only: int = 0
+
+    def report(self) -> dict[str, object]:
+        return {
+            "samples": self.samples,
+            "measured_seconds": self.seconds,
+            "linear_velocity_rmse_m_s": math.sqrt(self.linear_squared / self.seconds) if self.seconds else None,
+            "yaw_rate_rmse_rad_s": math.sqrt(self.yaw_squared / self.seconds) if self.seconds else None,
+            "mean_planar_speed_m_s": self.planar_speed / self.seconds if self.seconds else None,
+            "mean_absolute_yaw_rate_rad_s": self.absolute_yaw_rate / self.seconds if self.seconds else None,
+            "terminated_at_command": self.terminated,
+            "timeout_only_at_command": self.timeout_only,
+        }
+
+
+def _command_group(target: list[float]) -> str:
+    vx, vy, yaw = target
+    if vx == 0 and vy == 0:
+        return "standing" if yaw == 0 else "yaw_only"
+    if yaw != 0:
+        return "moving_turn"
+    if vx != 0:
+        return "forward" if vx > 0 else "backward"
+    return "lateral"
 
 
 def _mapping(value: object, path: str) -> Mapping[str, Any]:
@@ -66,6 +102,9 @@ def diagnose_task_trace(
     previous_key: tuple[int, int] | None = None
     episodes: dict[int, list[float]] = {}
     forces: dict[str, list[float]] = {}
+    groups = {name: _CommandGroup() for name in (
+        "standing", "forward", "backward", "lateral", "moving_turn", "yaw_only",
+    )}
     prefix = f"robot.body.{body}."
     for index, value in enumerate(records):
         row = _mapping(value, f"records[{index}]")
@@ -96,8 +135,17 @@ def diagnose_task_trace(
         angular_body = _body_velocity(angular, pose, label)
         commands = _mapping(before.get("commands"), f"{label}.input.commands")
         target = _vector(commands.get(command), 3, f"{label}.input.commands.{command}")
-        linear_squared += ((linear_body[0] - target[0]) ** 2 + (linear_body[1] - target[1]) ** 2) * dt
-        yaw_squared += (angular_body[2] - target[2]) ** 2 * dt
+        linear_error_squared = (linear_body[0] - target[0]) ** 2 + (linear_body[1] - target[1]) ** 2
+        yaw_error_squared = (angular_body[2] - target[2]) ** 2
+        linear_squared += linear_error_squared * dt
+        yaw_squared += yaw_error_squared * dt
+        group = groups[_command_group(target)]
+        group.samples += 1
+        group.seconds += dt
+        group.linear_squared += linear_error_squared * dt
+        group.yaw_squared += yaw_error_squared * dt
+        group.planar_speed += math.hypot(*linear_body[:2]) * dt
+        group.absolute_yaw_rate += abs(angular_body[2]) * dt
         dx, dy = pose[0] - start[0], pose[1] - start[1]
         distance = math.hypot(dx, dy)
         path_length += distance
@@ -132,6 +180,8 @@ def diagnose_task_trace(
                 raise ValueError(f"{label}.transition.{name}: expected boolean")
         terminated += int(after["terminated"])
         truncated += int(after["truncated"] and not after["terminated"])
+        group.terminated += int(after["terminated"])
+        group.timeout_only += int(after["truncated"] and not after["terminated"])
         duration += dt
         steps += 1
     if not steps:
@@ -151,6 +201,7 @@ def diagnose_task_trace(
         "timeout_only_episodes": truncated,
         "linear_velocity_rmse_m_s": math.sqrt(linear_squared / duration),
         "yaw_rate_rmse_rad_s": math.sqrt(yaw_squared / duration),
+        "command_groups": {name: group.report() for name, group in groups.items()},
         "planar_path_length_m": path_length,
         "episode_measured_displacement_m": {key: value for key, value in episodes.items()},
         "action_rms": math.sqrt(action_squared / action_count),
@@ -170,6 +221,8 @@ def diagnose_task_trace(
         "limitations": [
             "Single recorded Slot only. Success and reward components are not present in this trace.",
             "Displacement sums measured intervals only; reset jumps are excluded.",
+            "Command groups partition executed intervals by exact command zeros; diagonal translation follows vx.",
+            "Grouped terminal counts describe the final command, not whole-episode success or fall criteria.",
         ],
     }
 
