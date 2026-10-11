@@ -1126,6 +1126,7 @@ The command must contain body-frame forward speed, lateral speed and yaw rate.
 The output is YAML. It reports:
 
 - Physical-time-weighted planar velocity and yaw-rate RMSE
+- Command-group coverage, tracking RMSE, actual planar speed and absolute yaw rate
 - Planar path length and measured displacement for each episode
 - Action RMS and successive-action change within an episode
 - Recorded force sample counts and maximum force for each available body
@@ -1136,6 +1137,21 @@ The position calculation uses the decision input and pre-reset transition.
 It excludes reset teleports. A report can include a partial episode.
 Action changes do not cross reset boundaries or gaps in recorded policy steps.
 The report preserves the source trace's completion status.
+
+`command_groups` partitions each executed interval into `standing`, `forward`,
+`backward`, `lateral`, `moving_turn`, or `yaw_only`. Classification uses the
+decision input command: all three components zero means standing; a nonzero yaw
+command selects moving turn or yaw only according to planar motion. Translation
+without yaw follows the sign of forward command; pure lateral motion has zero
+forward command. Diagonal translation follows forward sign. Exact zeros preserve
+low-speed commands without a classification threshold.
+
+Each group reports its samples and measured seconds. Errors and speeds use
+physical-time weighting within that group. Unobserved groups have null metrics,
+so missing command coverage cannot appear as perfect tracking. Standing planar
+speed and absolute yaw rate measure drift. Grouped termination and timeout-only
+counts belong to the last executed command, not whole-episode success. Inspect
+groups separately so long standing intervals cannot hide failed moving commands.
 
 `low_motion_speed_threshold_m_s` defaults to 0.01. The report flags a planar command
 above this threshold when measured path speed is below it. Change the threshold

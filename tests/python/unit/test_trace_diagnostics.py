@@ -114,6 +114,65 @@ def test_zero_command_does_not_trigger_motion_warning(tmp_path: Path) -> None:
     assert _report(tmp_path, [row])["findings"] == []
 
 
+def test_command_groups_preserve_low_speed_direction_and_missing_coverage(tmp_path: Path) -> None:
+    row = _row(0, 0)
+    row["input"]["commands"]["velocity"] = [-0.001, 0.002, 0.0]
+    result = _report(tmp_path, [row])
+    groups = result["command_groups"]
+    assert groups["backward"]["samples"] == 1
+    assert groups["backward"]["linear_velocity_rmse_m_s"] == pytest.approx(0.000005**0.5)
+    assert groups["standing"] == {
+        "samples": 0, "measured_seconds": 0.0,
+        "linear_velocity_rmse_m_s": None, "yaw_rate_rmse_rad_s": None,
+        "mean_planar_speed_m_s": None, "mean_absolute_yaw_rate_rad_s": None,
+        "terminated_at_command": 0, "timeout_only_at_command": 0,
+    }
+
+
+def test_mixed_commands_do_not_hide_failed_direction_or_standing_drift(tmp_path: Path) -> None:
+    targets = [[0, 0, 0], [0.4, 0, 0], [0.4, 0, 0], [-0.4, 0, 0], [0, -0.3, 0], [0.4, 0, -0.5], [0, 0, 0.5]]
+    durations = [1.0, 0.01, 0.03, 0.02, 0.02, 0.02, 0.02]
+    rows = [_row(0, index, dt=dt) for index, dt in enumerate(durations)]
+    for row, target in zip(rows, targets, strict=True):
+        row["input"]["commands"]["velocity"] = target
+    # Standing drift is measured as actual speed, with no reward/success threshold.
+    rows[0]["transition"]["raw_state"][P + "body_linear_velocity"] = [0.03, 0.04, 0]
+    rows[0]["transition"]["raw_state"][P + "body_angular_velocity"] = [0, 0, -0.1]
+    # One exact forward interval followed by 30 ms of no motion.
+    rows[1]["transition"]["raw_state"][P + "body_pose"][5:] = [2**-0.5, 2**-0.5]
+    rows[1]["transition"]["raw_state"][P + "body_linear_velocity"] = [0, 0.4, 0]
+    # Backward command with opposite motion must not be cancelled by forward tracking.
+    rows[3]["transition"]["raw_state"][P + "body_linear_velocity"] = [0.4, 0, 0]
+    result = _report(tmp_path, rows)
+    groups = result["command_groups"]
+    assert groups["standing"]["linear_velocity_rmse_m_s"] == pytest.approx(0.05)
+    assert groups["standing"]["mean_planar_speed_m_s"] == pytest.approx(0.05)
+    assert groups["standing"]["mean_absolute_yaw_rate_rad_s"] == pytest.approx(0.1)
+    assert groups["forward"]["linear_velocity_rmse_m_s"] == pytest.approx(0.12**0.5)
+    assert groups["forward"]["mean_planar_speed_m_s"] == pytest.approx(0.1)
+    assert groups["backward"]["linear_velocity_rmse_m_s"] == pytest.approx(0.8)
+    assert groups["lateral"]["linear_velocity_rmse_m_s"] == pytest.approx(0.3)
+    assert groups["moving_turn"]["yaw_rate_rmse_rad_s"] == pytest.approx(0.5)
+    assert groups["yaw_only"]["yaw_rate_rmse_rad_s"] == pytest.approx(0.5)
+    assert sum(group["samples"] for group in groups.values()) == 7
+    assert sum(group["measured_seconds"] for group in groups.values()) == pytest.approx(1.12)
+
+
+def test_grouped_terminal_counts_use_executed_command_before_reset(tmp_path: Path) -> None:
+    first, second = _row(0, 0), _row(1, 0)
+    first["transition"]["terminated"] = True
+    first["transition"]["truncated"] = True
+    first["transition"]["commands"] = {"velocity": [0, 0, 0]}
+    first["reset"] = {"commands": {"velocity": [-0.4, 0, 0]}}
+    second["input"]["commands"]["velocity"] = [-0.4, 0, 0]
+    second["transition"]["truncated"] = True
+    groups = _report(tmp_path, [first, second])["command_groups"]
+    assert groups["forward"]["terminated_at_command"] == 1
+    assert groups["forward"]["timeout_only_at_command"] == 0
+    assert groups["backward"]["timeout_only_at_command"] == 1
+    assert groups["standing"]["samples"] == 0
+
+
 def test_training_scalar_report_reads_real_events_with_separate_tag_windows(tmp_path: Path) -> None:
     from torch.utils.tensorboard import SummaryWriter
 
@@ -147,6 +206,8 @@ def test_script_emits_yaml_and_preserves_input(tmp_path: Path, capsys: pytest.Ca
     payload = yaml.safe_load(capsys.readouterr().out)
     assert payload["steps"] == 1
     assert payload["linear_velocity_rmse_m_s"] == pytest.approx(0.4)
+    assert payload["command_groups"]["forward"]["linear_velocity_rmse_m_s"] == pytest.approx(0.4)
+    assert payload["command_groups"]["standing"]["linear_velocity_rmse_m_s"] is None
     assert path.read_bytes() == original
     path.write_text("records: [")
     assert main([str(path)]) == 2
