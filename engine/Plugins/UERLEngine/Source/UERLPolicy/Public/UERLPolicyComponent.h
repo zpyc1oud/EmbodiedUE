@@ -152,6 +152,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Policy")
 	TObjectPtr<USkeletalMeshComponent> OwnerMesh = nullptr;
 
+	/** Explicit actors for the declared input's logical "ground" binding. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Policy|Inputs")
+	TArray<TObjectPtr<AActor>> InputGroundActors;
+
 	/** Zero disables stale-command diagnostics. This is not a control-period setting. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Policy", meta = (ClampMin = "0.0"))
 	double CommandStalenessSeconds = 0.0;

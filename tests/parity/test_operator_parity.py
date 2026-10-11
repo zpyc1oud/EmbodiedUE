@@ -24,6 +24,7 @@ _SKIP_CATEGORIES = frozenset(
     {
         "structure",
         "artifact",
+        "inputs",
         "action_plan",
         "deploy",
         "deploy_variable_dt",

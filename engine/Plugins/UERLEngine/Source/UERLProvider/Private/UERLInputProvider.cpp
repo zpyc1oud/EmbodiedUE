@@ -170,7 +170,7 @@ bool FUERLCompiledInputSet::Bind(const FUERLInputRegistry& Registry,
 		Provider.Offset = Width;
 		for (const FUERLFieldDescriptor& Output : Outputs)
 		{
-			if (!Output.IsValid() || Output.Shape.IsEmpty() || FieldNames.Contains(Output.Name)
+			if (!Output.IsValid() || FieldNames.Contains(Output.Name)
 				|| Output.Name.ToString().TrimStartAndEnd() != Output.Name.ToString()
 				|| Output.Unit.TrimStartAndEnd() != Output.Unit
 				|| Output.CoordinateFrame.TrimStartAndEnd() != Output.CoordinateFrame

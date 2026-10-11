@@ -3,22 +3,9 @@
 #include "CoreMinimal.h"
 #include "HAL/CriticalSection.h"
 #include "UERLProvider.h"
+#include "UERLInputContract.h"
 
 class USkeletalMeshComponent;
-
-/** Persist policy-semantic settings, not concrete map object references. */
-struct FUERLInputSpec
-{
-	FString Name;
-	FString ProviderId;
-	int32 ProviderVersion = 1;
-	/** Owned JSON parameter object text; the factory validates its typed contents. */
-	FString ParametersJson = TEXT("{}");
-	FString Attachment;
-	TArray<FString> SceneBindings;
-	FString Sampling = TEXT("completed_window");
-	FString MissingData = TEXT("fault");
-};
 
 /** Identify one host-completed sample without giving a provider clock ownership. */
 struct FUERLInputSampleStamp

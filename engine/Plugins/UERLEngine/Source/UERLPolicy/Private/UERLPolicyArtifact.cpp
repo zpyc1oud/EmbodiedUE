@@ -10,7 +10,7 @@ namespace
 	constexpr int32 GUERLPolicyArtifactMagicSize = 8;
 	constexpr ANSICHAR GUERLPolicyArtifactMagic[GUERLPolicyArtifactMagicSize] = {
 		'U', 'E', 'R', 'L', 'P', 'O', 'L', '2'};
-	constexpr uint32 GUERLPolicyArtifactFormatVersion = 1;
+	constexpr uint32 GUERLPolicyArtifactFormatVersion = 2;
 
 	bool ArtifactFail(FString& OutError, const FString& Message)
 	{
@@ -74,6 +74,7 @@ void FUERLPolicyArtifact::Reset()
 	Observation.Reset();
 	Action.Reset();
 	Runtime.Reset();
+	Inputs.Reset();
 	ArtifactTiming = FUERLPolicyArtifactTiming();
 	Onnx.Reset();
 }
@@ -113,7 +114,7 @@ bool FUERLPolicyArtifact::LoadFromBytes(TConstArrayView<uint8> Bytes, FString& O
 	{
 		return ArtifactFail(OutError, TEXT("artifact header is truncated"));
 	}
-	if (FormatVersion != GUERLPolicyArtifactFormatVersion)
+	if (FormatVersion != 1 && FormatVersion != GUERLPolicyArtifactFormatVersion)
 	{
 		return ArtifactFail(
 			OutError,
@@ -155,6 +156,15 @@ bool FUERLPolicyArtifact::LoadFromBytes(TConstArrayView<uint8> Bytes, FString& O
 		return ArtifactFail(OutError, TEXT("JSON segment is truncated or invalid"));
 	}
 
+	if (FormatVersion == 2)
+	{
+		const TSharedPtr<FJsonObject>* Contract = nullptr;
+		if (!Root->TryGetObjectField(TEXT("input_contract"), Contract))
+		{ return ArtifactFail(OutError, TEXT("format 2 requires input_contract")); }
+		if (!ParseUERLInputContract(*Contract, Inputs, true, OutError)) { return false; }
+	}
+	else if (Root->HasField(TEXT("input_contract")))
+	{ return ArtifactFail(OutError, TEXT("format 1 cannot carry input_contract")); }
 	FString TaskText;
 	FString RobotText;
 	if (!Root->TryGetStringField(TEXT("task_id"), TaskText) || TaskText.IsEmpty())

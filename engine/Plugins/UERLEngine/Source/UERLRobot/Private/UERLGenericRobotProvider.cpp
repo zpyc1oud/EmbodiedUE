@@ -1,6 +1,7 @@
 #include "UERLGenericRobotProvider.h"
 
 #include "UERLBatchBinding.h"
+#include "UERLInputProvider.h"
 #include "UERLGenericRobotAssetLoader.h"
 #include "UERLGenericRobotContactListener.h"
 #include "UERLGenericRobotCommandApplier.h"
@@ -75,6 +76,23 @@ namespace
 		};
 
 	public:
+		virtual void FillInputSlotBinding(int32 SlotId, FUERLInputSlotBinding& Binding) const override
+		{
+			if (!Slots.IsValidIndex(SlotId)) { return; }
+			Binding.Robot = Slots[SlotId].Component;
+			auto AddReader = [&](const FString& Name, int32 BodyIndex)
+			{
+				Binding.TransformReaders.Add(Name, [this, SlotId, BodyIndex](FTransform& Value, FString& Error)
+				{
+					if (!Slots.IsValidIndex(SlotId) || !Slots[SlotId].Component.IsValid())
+					{ Error = TEXT("input attachment Robot is unavailable"); return false; }
+					Value = ObservedBodyWorldTransform(Slots[SlotId], BodyIndex); return true;
+				});
+			};
+			for (int32 I = 0; I < Topology.BodyNames.Num(); ++I) { AddReader(Topology.BodyNames[I].ToString(), I); }
+			AddReader(TEXT("root"), Topology.RootBodyIndex);
+		}
+
 		FUERLGenericRobot(
 			FString InAssetPath,
 			FUERLRobotTopology InTopology,

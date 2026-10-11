@@ -4,6 +4,7 @@
 // (UERLBatchStaging.h); this header must not redefine them.
 #include "UERLBatchStaging.h"
 #include "UERLInterfaceTypes.h"
+#include "UERLInputContract.h"
 
 /** Provide a mutable per-Slot fault-code view over one Worker staging batch. */
 struct FUERLFaultBatchView
@@ -50,6 +51,7 @@ struct FUERLWorkerProjection
 	FUERLProviderConfig RobotConfig;
 	/** Carry the optional pre-generated terrain grid; empty when absent. */
 	FUERLTerrainConfig TerrainConfig;
+	TArray<FUERLResolvedInput> Inputs;
 
 	/** Validate the complete projection required by layout compilation. */
 	bool IsValid() const

@@ -190,6 +190,31 @@ bool FUERLPolicyComponentReflectionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLInputGroundComponentTest,
+	"UERL.Integration.Policy.DeclaredInputs.ComponentGroundBinding",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUERLInputGroundComponentTest::RunTest(const FString&)
+{
+	FDeployPhysicsSettingsGuard Settings;
+	FString Error;
+	UUERLPolicyArtifactAsset* Asset = MakeTransientAsset(Error, TEXT("../inputs/controller_inputs.uerlpol2"));
+	if (!TestNotNull(TEXT("input artifact asset"), Asset)) { AddError(Error); return false; }
+	FPreviewScene Scene(FPreviewScene::ConstructionValues().SetCreateDefaultLighting(false)
+		.SetCreatePhysicsScene(true).ShouldSimulatePhysics(true));
+	UWorld* World = Scene.GetWorld();
+	AActor* Ground = SpawnGround(*World);
+	AActor* Host = World->SpawnActor<ATargetPoint>(ATargetPoint::StaticClass(), FTransform(FVector(0, 0, 25)));
+	if (!TestNotNull(TEXT("ground"), Ground) || !TestNotNull(TEXT("host"), Host)) { return false; }
+	UUERLPolicyComponent* Component = NewObject<UUERLPolicyComponent>(Host);
+	Host->AddInstanceComponent(Component); Component->Artifact = Asset; Component->bClaimOwnerMesh = false;
+	Component->InputGroundActors.Add(Ground); Component->RegisterComponent();
+	Component->SetCommand(TEXT("velocity"), {0.0f});
+	const bool Started = Component->StartPolicy();
+	TestTrue(*FString::Printf(TEXT("component binds declared ground: %s"), *Component->GetLastError()), Started);
+	Component->StopPolicy();
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FUERLPolicyComponentAssetShapeTest,
 	"UERL.Unit.Policy.Component.AC_UE_UNIT_COMPONENT_002.AssetShape",

@@ -16,6 +16,7 @@ from typing import Protocol
 
 from uerl.core.config.models import ResolvedRunConfig
 from uerl.core.direct.task import DirectTask
+from uerl.core.inputs import ResolvedInput
 from uerl.core.mdp.plan import ActionPlan, ObservationPlan
 from uerl.errors import ConfigError
 from uerl.policy.artifact import (
@@ -76,6 +77,7 @@ def export_policy(
     timing: ArtifactTiming,
     task_id: str,
     robot_id: str,
+    input_requirements: tuple[ResolvedInput, ...] = (),
 ) -> PolicyArtifact:
     """Bind plans from a DirectTask with RSL-RL ONNX bytes into a UERLPOL2 artifact.
 
@@ -114,6 +116,7 @@ def export_policy(
         timing=timing,
         task_id=task_id,
         robot_id=robot_id,
+        input_requirements=input_requirements,
     )
 
 
@@ -128,6 +131,7 @@ def _export_policy_artifact(
     timing: ArtifactTiming,
     task_id: str,
     robot_id: str,
+    input_requirements: tuple[ResolvedInput, ...] = (),
 ) -> PolicyArtifact:
     """Package already-approved plans and runner output into an artifact.
 
@@ -164,6 +168,7 @@ def _export_policy_artifact(
             onnx=onnx_bytes,
             metadata=metadata,
             timing=timing,
+            input_requirements=input_requirements,
         )
         artifact.validate()
         artifact.write(Path(output))

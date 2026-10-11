@@ -49,6 +49,7 @@ public:
 	const FUERLActionPlan& ActionPlan() const { return Action; }
 	const FUERLPolicyRobotRuntime& RobotRuntime() const { return Runtime; }
 	const FUERLPolicyArtifactTiming& Timing() const { return ArtifactTiming; }
+	const TArray<FUERLResolvedInput>& InputRequirements() const { return Inputs; }
 	TConstArrayView<uint8> OnnxBytes() const { return Onnx; }
 	FName TaskId() const { return Task; }
 	FName RobotId() const { return Robot; }
@@ -67,4 +68,5 @@ private:
 	FUERLPolicyRobotRuntime Runtime;
 	FUERLPolicyArtifactTiming ArtifactTiming;
 	TArray<uint8> Onnx;
+	TArray<FUERLResolvedInput> Inputs;
 };

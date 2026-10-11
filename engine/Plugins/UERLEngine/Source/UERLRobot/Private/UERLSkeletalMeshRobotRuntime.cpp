@@ -1,6 +1,7 @@
 #include "UERLSkeletalMeshRobotRuntime.h"
 
 #include "UERLBatchBinding.h"
+#include "UERLHostInputs.h"
 #include "UERLGenericRobotProvider.h"
 #include "UERLProvider.h"
 #include "UERLSlotCollisionPlan.h"
@@ -77,6 +78,8 @@ public:
 	bool bFixedBase = false;
 	int32 LastSampledSolverFrame = INDEX_NONE;
 	FUERLBatchBinding Binding;
+	FUERLHostInputs Inputs;
+	int32 SourceWidth = 0;
 	TArray<FUERLFieldDescriptor> SelectedStateFields;
 	TArray<float> State;
 	TArray<float> Actions;
@@ -100,7 +103,7 @@ bool FUERLSkeletalMeshRobotRuntime::Initialize(
 	FString& OutError)
 {
 	Reset();
-	if (Config.AssetPath.IsEmpty() || Config.Actuators.IsEmpty() || Config.Observations.IsEmpty()
+	if (Config.AssetPath.IsEmpty() || Config.Actuators.IsEmpty() || (Config.Observations.IsEmpty() && Config.StateFieldNames.IsEmpty())
 		|| !Config.GroundNormal.IsNormalized() || !FMath::IsFinite(Config.InitialRootHeightMeters))
 	{
 		OutError = TEXT("in-game SkeletalMesh robot configuration is incomplete");
@@ -192,16 +195,37 @@ bool FUERLSkeletalMeshRobotRuntime::Initialize(
 			return false;
 		}
 		SelectedStateFields.Add(*Field);
-		Schema.StateFields.Add({ *Field, Schema.StateWidth });
-		Schema.StateWidth += Field->Width;
 	}
-	if (!Impl->Binding.Compile(Schema, Descriptor.ActionFields, Descriptor.StateFields, OutError))
+	TArray<FUERLResolvedInput> Inputs = Config.Inputs;
+	if (!ResolveUERLHostInputs(Inputs, Descriptor.StateFields, OutError)) { return false; }
+	TArray<FUERLFieldDescriptor> Available = Descriptor.StateFields;
+	for (const auto& Input : Inputs)
 	{
-		return false;
+		for (const auto& Field : Input.Fields)
+		{ if (!Available.ContainsByPredicate([&](const auto& F) { return F.Name == Field.Name; })) { Available.Add(Field); } }
 	}
+	for (FName Name : Config.StateFieldNames)
+	{
+		const auto* Field = Available.FindByPredicate([&](const auto& F) { return F.Name == Name; });
+		if (!Field) { OutError = TEXT("in-game required input field is unavailable"); return false; }
+		SelectedStateFields.Add(*Field);
+	}
+	TArray<FUERLFieldDescriptor> Sources = SelectedStateFields;
+	if (!Inputs.IsEmpty())
+	{
+		if (!Impl->Inputs.Configure(Inputs, Descriptor.StateFields, SelectedStateFields, OutError)) { return false; }
+		Sources = Impl->Inputs.SourceFields();
+	}
+	// The combined binding also owns actuator columns. With input-only observations,
+	// bind the selected output schema while collecting no Robot state columns.
+	for (const auto& Field : Sources.IsEmpty() ? SelectedStateFields : Sources)
+	{ Schema.StateFields.Add({Field, Schema.StateWidth}); Schema.StateWidth += Field.Width; }
+	if (!Impl->Binding.Compile(Schema, Descriptor.ActionFields, Available, OutError)) { Reset(); return false; }
+	Impl->SourceWidth = 0;
+	for (const auto& Field : Sources) { Impl->SourceWidth += Field.Width; }
 
 	Impl->Robot = Factory->Create(EffectiveConfig);
-	if (!Impl->Robot->PrepareState(SelectedStateFields, OutError))
+	if (!Impl->Robot->PrepareState(Sources, OutError))
 	{
 		Reset();
 		return false;
@@ -267,6 +291,13 @@ bool FUERLSkeletalMeshRobotRuntime::Initialize(
 		Reset();
 		return false;
 	}
+	if (Impl->Inputs.IsActive())
+	{
+		FUERLInputSlotBinding InputBinding; InputBinding.World = &World; InputBinding.Slot = Slot;
+		InputBinding.SceneBindings.Add(TEXT("ground"), Config.TerrainQueryActors);
+		Impl->Robot->FillInputSlotBinding(0, InputBinding);
+		if (!Impl->Inputs.Bind({InputBinding}, OutError)) { Reset(); return false; }
+	}
 	Impl->World = &World;
 	Impl->ClaimedMesh = Config.ClaimedMesh;
 	Impl->GroundQueryIgnoreActor = Config.GroundQueryIgnoreActor;
@@ -280,10 +311,11 @@ bool FUERLSkeletalMeshRobotRuntime::Initialize(
 		Impl->LastSampledSolverFrame = Clock.Frame;
 	}
 
-	Impl->StateWidth = Schema.StateWidth;
+	Impl->StateWidth = 0;
+	for (const auto& Field : SelectedStateFields) { Impl->StateWidth += Field.Width; }
 	Impl->ActuatorCount = Schema.ActionWidth;
 	Impl->SelectedStateFields = MoveTemp(SelectedStateFields);
-	Impl->State.SetNumZeroed(Impl->StateWidth);
+	Impl->State.SetNumZeroed(Impl->SourceWidth);
 	Impl->Actions.SetNumZeroed(Impl->ActuatorCount);
 	return true;
 }
@@ -340,6 +372,8 @@ void FUERLSkeletalMeshRobotRuntime::ClearObservationCaches()
 	if (Impl->Robot)
 	{
 		Impl->Robot->ClearObservationCaches();
+		if (Impl->Inputs.IsActive())
+		{ FString Error; ensureMsgf(Impl->Inputs.Reset(TArray<int32>{0}, Error), TEXT("%s"), *Error); }
 	}
 }
 
@@ -350,12 +384,16 @@ bool FUERLSkeletalMeshRobotRuntime::CollectState(TArray<float>& OutState, FStrin
 		OutError = TEXT("in-game SkeletalMesh robot is not initialized");
 		return false;
 	}
-	FUERLNamedStateWriter Writer(
-		Impl->Binding,
-		{ Impl->State.GetData(), 1, Impl->StateWidth });
-	if (!Impl->Robot->TryCollectState({ 0 }, Writer, OutError))
+	if (Impl->SourceWidth > 0)
 	{
-		return false;
+		FUERLNamedStateWriter Writer(Impl->Binding, {Impl->State.GetData(), 1, Impl->SourceWidth});
+		if (!Impl->Robot->TryCollectState({0}, Writer, OutError)) { return false; }
+	}
+	if (Impl->Inputs.IsActive())
+	{
+		FUERLSolverClockSnapshot Clock;
+		if (!ReadCompletedSolverClock(Clock, OutError)) { return false; }
+		return Impl->Inputs.Publish(0, Clock.Frame, Clock.SolverTime, Impl->State, OutState, OutError);
 	}
 	OutState = Impl->State;
 	return true;
@@ -487,11 +525,13 @@ bool FUERLSkeletalMeshRobotRuntime::ResetToReferencePose(FString& OutError)
 		return false;
 	}
 	Impl->Robot->ClearObservationCaches();
+	if (Impl->Inputs.IsActive() && !Impl->Inputs.Reset(TArray<int32>{0}, OutError)) { return false; }
 	return true;
 }
 
 void FUERLSkeletalMeshRobotRuntime::Reset()
 {
+	if (Impl) { Impl->Inputs.Release(); Impl->SourceWidth = 0; }
 	if (Impl && Impl->Robot)
 	{
 		Impl->Robot->DestroySlots();

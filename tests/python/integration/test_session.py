@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import json
 import subprocess
 from collections.abc import Mapping
 from dataclasses import replace
@@ -27,8 +29,46 @@ from uerl import (
 )
 from uerl.core.codec import FrameHeader, IBridgeSession, InitializeDescription, InitializeResult
 from uerl.core.config.robot import parse_robot_config
+from uerl.core.inputs.serialization import input_contract, parse_input_contract
 from uerl.runtime.session import WorkerProcessController
 from uerl.runtime.session.process import PopenFactory
+
+
+@pytest.mark.parametrize("failure", [None, "missing", "identity", "commit"])
+def test_session_input_contract_commit_and_failure_cleanup(tmp_path: Path, failure: str | None) -> None:
+    contract = json.loads((Path(__file__).parents[2] / "parity/cases/inputs/contract.json").read_text(encoding="utf-8"))
+    requirements = parse_input_contract(contract)
+
+    class InputBridge(_FakeBridge):
+        def describe(self, request: dict[str, object]) -> InitializeDescription:
+            result = super().describe(request)
+            return InitializeDescription(copy.deepcopy(result.response))
+
+    bridge = InputBridge()
+    if failure != "missing":
+        bridge.effective_worker_config["input_contract"] = copy.deepcopy(contract)
+    config = _config(tmp_path / "run")
+    config = replace(config, worker=replace(config.worker, inputs=tuple(item.spec for item in requirements)))
+    session = UERLSession.open(config, process_controller=WorkerProcessController(), bridge_factory=lambda _: bridge)
+    schema: dict[str, object] = {"state_requirements": [], "action_schema": []}
+    if failure == "identity":
+        bridge.effective_worker_config["input_contract"]["requirements"][0]["spec"]["name"] = "changed"  # type: ignore[index]
+    session.describe(schema)
+    if failure == "commit":
+        bridge.effective_worker_config["input_contract"] = {"version": 1, "requirements": []}
+    if failure:
+        with pytest.raises((ConfigError, ProtocolError)):
+            session.initialize(schema)
+        assert session.state is SessionState.FAILED
+        assert bridge.closed
+        assert not (tmp_path / "run/manifest.yaml").exists()
+        return
+    session.initialize(schema)
+    assert session.input_requirements == requirements
+    assert bridge.initialize_request is not None
+    assert bridge.initialize_request["worker_config"]["input_contract"] == input_contract(requirements)  # type: ignore[index]
+    session.acknowledge_ready()
+    session.close("input_contract_test")
 
 
 class _FakeBridge:

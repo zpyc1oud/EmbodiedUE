@@ -11,7 +11,7 @@ from typing import Any, Union, get_args, get_origin, get_type_hints
 
 import yaml
 
-from ..core.config import ResolvedRunConfig, RunConfigResolver
+from ..core.config import ResolvedRunConfig, RunConfigResolver, WorkerConfig
 from ..core.config.canonical import canonical_json, to_jsonable
 from ..core.config.configspec import from_mapping
 from ..core.config.snapshot import (
@@ -426,6 +426,9 @@ def _typed(annotation: Any, template: Any, value: Any, path: str, *, strict: boo
             if strict and value is None:
                 raise ConfigError("saved config is missing this section", code="MISSING_RUN_CONFIG", path=path)
             raise ConfigError("expected a JSON object", code="INVALID_RUN_CONFIG", path=path)
+        if annotation is WorkerConfig and "inputs" not in value:
+            # Pre-input Run snapshots have exactly the legacy state contract.
+            value = {**value, "inputs": []}
         declared = {item.name: item for item in fields(annotation) if item.init}
         unknown = sorted(set(value) - set(declared))
         if unknown:

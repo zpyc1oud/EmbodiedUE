@@ -14,6 +14,7 @@ from typing import Any, Protocol, Union, cast, get_args, get_origin, get_type_hi
 
 from ...errors import BridgeProtocolError, ConfigError
 from ..codec.frames import PROTOCOL
+from ..inputs import InputSpec
 from .canonical import canonical_json, sha256_hex, to_jsonable
 from .models import (
     DECIMATION_INT32_MAX,
@@ -203,6 +204,8 @@ def _replace_dataclass(current: Any, changes: dict[str, Any]) -> Any:
 
 
 def _coerce_value(annotation: Any, raw_value: str, path: str) -> Any:
+    if annotation is InputSpec:
+        return InputSpec.from_mapping(raw_value)  # type: ignore[arg-type]
     origin = get_origin(annotation)
     args = get_args(annotation)
     if origin in (Union, types.UnionType):

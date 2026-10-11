@@ -56,11 +56,13 @@ import onnx
 from onnx import ModelProto
 
 from uerl.core.config.canonical import canonical_json, to_jsonable
+from uerl.core.inputs import ResolvedInput
+from uerl.core.inputs.serialization import input_contract, parse_input_contract
 from uerl.core.mdp.plan import ActionPlan, ObservationPlan
 from uerl.errors import ConfigError
 
 ARTIFACT_MAGIC: Final[bytes] = b"UERLPOL2"
-ARTIFACT_FORMAT_VERSION: Final[int] = 1
+ARTIFACT_FORMAT_VERSION: Final[int] = 2
 
 _HEADER = struct.Struct("<8sII")  # magic, format_ver, json_length
 _ONNX_LEN = struct.Struct("<Q")
@@ -74,6 +76,7 @@ _JSON_KEYS: Final[frozenset[str]] = frozenset(
         "robot_runtime",
         "timing",
         "metadata",
+        "input_contract",
     }
 )
 _METADATA_KEYS: Final[frozenset[str]] = frozenset({"run_hash", "git_identity"})
@@ -406,6 +409,7 @@ class PolicyArtifact:
     timing: ArtifactTiming
     onnx: bytes
     metadata: ArtifactMetadata
+    input_requirements: tuple[ResolvedInput, ...] = ()
 
     def __post_init__(self) -> None:
         if type(self.format_version) is not int or isinstance(self.format_version, bool):
@@ -414,7 +418,7 @@ class PolicyArtifact:
                 code="ARTIFACT_VERSION_MISMATCH",
                 path="format_version",
             )
-        if self.format_version != ARTIFACT_FORMAT_VERSION:
+        if self.format_version not in (1, ARTIFACT_FORMAT_VERSION):
             raise ConfigError(
                 f"unsupported format_version {self.format_version}; "
                 f"expected {ARTIFACT_FORMAT_VERSION}",
@@ -446,6 +450,9 @@ class PolicyArtifact:
                 path="onnx",
             )
         object.__setattr__(self, "onnx", bytes(self.onnx))
+        object.__setattr__(self, "input_requirements", parse_input_contract(input_contract(self.input_requirements)))
+        if self.format_version == 1 and self.input_requirements:
+            raise ConfigError("format 1 cannot carry declared inputs", code="ARTIFACT_VERSION_MISMATCH")
 
     def write(self, path: Path) -> None:
         """Atomically write the binary artifact to ``path``."""
@@ -505,7 +512,7 @@ class PolicyArtifact:
                 code="ARTIFACT_BAD_MAGIC",
                 path="magic",
             )
-        if format_version != ARTIFACT_FORMAT_VERSION:
+        if format_version not in (1, ARTIFACT_FORMAT_VERSION):
             raise ConfigError(
                 f"unsupported format_version {format_version}; "
                 f"expected {ARTIFACT_FORMAT_VERSION}",
@@ -554,6 +561,11 @@ class PolicyArtifact:
 
         mapping = _require_mapping(payload, path="")
         _reject_unknown_keys(mapping, _JSON_KEYS, path="")
+        if format_version == 2 and "input_contract" not in mapping:
+            raise ConfigError("missing input_contract", code="ARTIFACT_MISSING_FIELD", path="input_contract")
+        if format_version == 1 and "input_contract" in mapping:
+            raise ConfigError("format 1 cannot carry input_contract", code="ARTIFACT_VERSION_MISMATCH")
+        requirements = parse_input_contract(mapping["input_contract"]) if format_version == 2 else ()
         task_id = _require_nonempty_str(mapping.get("task_id"), path="task_id")
         robot_id = _require_nonempty_str(mapping.get("robot_id"), path="robot_id")
         if "observation_plan" not in mapping:
@@ -615,6 +627,7 @@ class PolicyArtifact:
             onnx=onnx_bytes,
             metadata=metadata,
             timing=timing,
+            input_requirements=requirements,
         )
 
     def validate(self) -> None:
@@ -654,6 +667,7 @@ class PolicyArtifact:
             "robot_runtime": to_jsonable(self.robot_runtime.to_json()),
             "timing": self.timing.to_json(),
             "metadata": to_jsonable(self.metadata.to_json()),
+            **({"input_contract": input_contract(self.input_requirements)} if self.format_version == 2 else {}),
         }
 
 

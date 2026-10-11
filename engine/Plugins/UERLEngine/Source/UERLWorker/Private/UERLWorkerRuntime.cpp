@@ -1,4 +1,5 @@
 #include "UERLWorkerRuntime.h"
+#include "UERLHostInputs.h"
 
 #include "UERLRegistry.h"
 #include "UERLFrameGate.h"
@@ -456,6 +457,18 @@ void FUERLWorkerRuntime::PrepareInitialize(FUERLBridgeRequest& Request)
 	AvailableActionFields = PreparedRobotFactory->Describe().ActionFields;
 	AvailableStateFields = PreparedEnvironmentFactory->Describe().StateFields;
 	AvailableStateFields.Append(PreparedRobotFactory->Describe().StateFields);
+	if (!ResolveUERLHostInputs(Request.Projection.Inputs, AvailableStateFields, Error))
+	{
+		ClearPreparedState(); FailWorker(Error, &Request, UERLBridgeError::ConfigRejected); return;
+	}
+	for (const FUERLResolvedInput& Input : Request.Projection.Inputs)
+	{
+		for (const FUERLFieldDescriptor& Field : Input.Fields)
+		{
+			if (!AvailableStateFields.ContainsByPredicate([&](const auto& F) { return F.Name == Field.Name; }))
+			{ AvailableStateFields.Add(Field); }
+		}
+	}
 	Request.Projection.EnvironmentConfig = EffectiveEnvironmentConfig;
 	Request.Projection.RobotConfig = EffectiveRobotConfig;
 	Request.AvailableActionFields = AvailableActionFields;
@@ -490,6 +503,18 @@ void FUERLWorkerRuntime::CommitInitialize(FUERLBridgeRequest& Request)
 	AvailableActionFields = PreparedRobotFactory->Describe().ActionFields;
 	AvailableStateFields = PreparedEnvironmentFactory->Describe().StateFields;
 	AvailableStateFields.Append(PreparedRobotFactory->Describe().StateFields);
+	if (!ResolveUERLHostInputs(Request.Projection.Inputs, AvailableStateFields, Error))
+	{
+		ClearPreparedState(); FailWorker(Error, &Request, UERLBridgeError::ConfigRejected); return;
+	}
+	for (const FUERLResolvedInput& Input : Request.Projection.Inputs)
+	{
+		for (const FUERLFieldDescriptor& Field : Input.Fields)
+		{
+			if (!AvailableStateFields.ContainsByPredicate([&](const auto& F) { return F.Name == Field.Name; }))
+			{ AvailableStateFields.Add(Field); }
+		}
+	}
 	Request.Projection.EnvironmentConfig = EffectiveEnvironmentConfig;
 	Request.Projection.RobotConfig = EffectiveRobotConfig;
 	Request.AvailableActionFields = AvailableActionFields;
@@ -526,7 +551,7 @@ void FUERLWorkerRuntime::CommitInitialize(FUERLBridgeRequest& Request)
 	if (!Pool->Create(*World, Request.Projection.NumSlots,
 		PreparedEnvironmentFactory.ToSharedRef(), EffectiveEnvironmentConfig,
 		PreparedRobotFactory.ToSharedRef(), EffectiveRobotConfig, SelectedStateFields,
-		Request.Projection.TerrainConfig, Error))
+		Request.Projection.TerrainConfig, Error, Request.Projection.Inputs))
 	{
 		FailWorker(Error, &Request);
 		return;

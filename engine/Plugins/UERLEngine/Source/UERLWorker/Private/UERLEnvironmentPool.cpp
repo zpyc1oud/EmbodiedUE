@@ -1,4 +1,6 @@
 #include "UERLEnvironmentPool.h"
+#include "UERLPhysicsSnapshot.h"
+#include <limits>
 
 #include "Components/PrimitiveComponent.h"
 #include "Engine/World.h"
@@ -43,7 +45,8 @@ bool FUERLEnvironmentPool::Create(
 	const FUERLProviderConfig& RobotConfig,
 	const TArray<FUERLFieldDescriptor>& SelectedStateFields,
 	const FUERLTerrainConfig& InTerrainConfig,
-	FString& OutError)
+	FString& OutError,
+	const TArray<FUERLResolvedInput>& Inputs)
 {
 	Destroy();
 	if (NumSlots <= 0)
@@ -68,7 +71,22 @@ bool FUERLEnvironmentPool::Create(
 		Destroy();
 		return false;
 	}
-	if (!Robot->PrepareState(SelectedStateFields, OutError))
+	if (!Inputs.IsEmpty())
+	{
+		TArray<FUERLFieldDescriptor> HostFields = EnvironmentFactory->Describe().StateFields;
+		HostFields.Append(RobotFactory->Describe().StateFields);
+		if (!HostInputs.Configure(Inputs, HostFields, SelectedStateFields, OutError)) { Destroy(); return false; }
+		InputWorld = &World; OutputFields = SelectedStateFields;
+		FUERLBatchSchema Schema;
+		for (const auto& Field : RobotFactory->Describe().ActionFields)
+		{ Schema.ActionFields.Add({Field, Schema.ActionWidth}); Schema.ActionWidth += Field.Width; }
+		for (const auto& Field : HostInputs.SourceFields())
+		{ Schema.StateFields.Add({Field, Schema.StateWidth}); Schema.StateWidth += Field.Width; }
+		if (Schema.StateWidth > 0 && !SourceBinding.Compile(Schema, RobotFactory->Describe().ActionFields, HostFields, OutError))
+		{ Destroy(); return false; }
+		SourceValues.SetNumUninitialized(NumSlots * Schema.StateWidth);
+	}
+	if (!Robot->PrepareState(HostInputs.IsActive() ? HostInputs.SourceFields() : SelectedStateFields, OutError))
 	{
 		Destroy();
 		return false;
@@ -114,6 +132,19 @@ bool FUERLEnvironmentPool::Create(
 		return false;
 	}
 
+	if (HostInputs.IsActive())
+	{
+		TArray<FUERLInputSlotBinding> Bindings;
+		for (const auto& Slot : Slots)
+		{
+			FUERLInputSlotBinding& Binding = Bindings.AddDefaulted_GetRef();
+			Binding.Slot = Slot; Binding.World = &World;
+			Binding.SceneBindings.Add(TEXT("ground"), Slot.CollisionProfile.Scope() == EUERLEnvironmentCollisionScope::SharedWorld
+				? Slot.TerrainQueryActors : Slot.EnvironmentActors);
+			Robot->FillInputSlotBinding(Slot.SlotId, Binding);
+		}
+		if (!HostInputs.Bind(MoveTemp(Bindings), OutError)) { Destroy(); return false; }
+	}
 	Episodes.SetNumZeroed(NumSlots);
 	bCreated = true;
 	return true;
@@ -121,6 +152,7 @@ bool FUERLEnvironmentPool::Create(
 
 void FUERLEnvironmentPool::Destroy()
 {
+	HostInputs.Release(); SourceBinding.Reset(); SourceValues.Reset(); OutputFields.Reset(); InputWorld.Reset();
 	for (const auto& Entry : OriginalGroundMaterials)
 	{
 		if (UPrimitiveComponent* Ground = Entry.Key.Get())
@@ -434,6 +466,7 @@ bool FUERLEnvironmentPool::ApplyResetSlots(
 	{
 		return false;
 	}
+	if (HostInputs.IsActive() && !HostInputs.Reset(SlotIds, OutError)) { return false; }
 	// A reset is a single lifecycle transaction.  Keep episode indices and the
 	// cached ground frame unchanged when either provider rejects the batch; only
 	// commit them after both Environment and Robot have accepted the same rows.
@@ -461,8 +494,35 @@ bool FUERLEnvironmentPool::ApplyResetSlots(
 bool FUERLEnvironmentPool::CollectState(
 	const TArray<int32>& SlotIds,
 	FUERLNamedStateWriter& Writer,
-	FString& OutError) const
+	FString& OutError)
 {
+	if (HostInputs.IsActive())
+	{
+		FUERLSolverClockSnapshot Clock;
+		if (!InputWorld.IsValid() || !ReadUERLSolverClock(*InputWorld, Clock, OutError)) { return false; }
+		const int32 Width = SourceBinding.StateWidth();
+		if (Width > 0)
+		{
+			FUERLNamedStateWriter SourceWriter(SourceBinding, {SourceValues.GetData(), Slots.Num(), Width});
+			SourceWriter.FillRows(SlotIds, std::numeric_limits<float>::quiet_NaN());
+			Environment->CollectState(SlotIds, SourceWriter);
+			if (!Robot->TryCollectState(SlotIds, SourceWriter, OutError)) { return false; }
+		}
+		for (int32 SlotId : SlotIds)
+		{
+			TArray<float> Values;
+			const auto Source = MakeArrayView(SourceValues).Slice(SlotId * Width, Width);
+			if (!HostInputs.Publish(SlotId, Clock.Frame, Clock.SolverTime, Source, Values, OutError))
+			{
+				Writer.FillRows({SlotId}, std::numeric_limits<float>::quiet_NaN());
+				continue; // Safety converts only this row into a recoverable Slot fault.
+			}
+			int32 Offset = 0;
+			for (const auto& Field : OutputFields)
+			{ Writer.WriteVector(SlotId, Field.Name, MakeArrayView(Values).Slice(Offset, Field.Width)); Offset += Field.Width; }
+		}
+		OutError.Reset(); return true;
+	}
 	if (Environment) { Environment->CollectState(SlotIds, Writer); }
 	if (Robot && !Robot->TryCollectState(SlotIds, Writer, OutError))
 	{

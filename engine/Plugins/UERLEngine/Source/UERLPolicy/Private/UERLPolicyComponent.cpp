@@ -340,6 +340,7 @@ bool UUERLPolicyComponent::StartPolicy()
 	}
 
 	FUERLPolicyControllerConfig Config;
+	for (AActor* Actor : InputGroundActors) { Config.TerrainQueryActors.Add(Actor); }
 	Config.AssetPath = Artifact->RobotMesh->GetPathName();
 	Config.GroundOrigin = GetOwner() ? GetOwner()->GetActorLocation() : FVector::ZeroVector;
 	Config.GroundNormal = FVector::UpVector;
