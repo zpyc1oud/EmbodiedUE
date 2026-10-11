@@ -352,3 +352,26 @@ def test_manifest_yaml_is_a_recovery_source_for_run_identity(tmp_path: Path) -> 
 
     restored = resolve_run_config(None, run, {}, strict=True)
     assert restored.config.worker.decimation == (3, 3)
+
+
+def test_uniform_phantomx_command_overrides_survive_saved_run(tmp_path: Path) -> None:
+    from uerl.tasks.phantomx.config import PHANTOMX_TASK_ID, PhantomXCommandSampling, PhantomXTaskConfig
+
+    config = build_run_config(PHANTOMX_TASK_ID, overrides={
+        "task.command.sampling": "uniform_velocity",
+        "task.command.initial_speed_min": "-1.0",
+        "task.command.initial_speed_max": "1.0",
+        "task.command.lateral_speed_min": "-1.0",
+        "task.command.lateral_speed_max": "1.0",
+        "task.command.standing_probability": "0.02",
+        "task.command.resampling_time_min_s": "10.0",
+        "task.command.resampling_time_max_s": "10.0",
+    })
+    run = _write_run(tmp_path, to_jsonable(config))
+    restored = resolve_run_config(PHANTOMX_TASK_ID, run, {}).config
+    assert restored.task == config.task
+    assert isinstance(restored.task, PhantomXTaskConfig)
+    assert restored.task.command.sampling is PhantomXCommandSampling.UNIFORM_VELOCITY
+    assert restored.task.command.initial_speed_min == -1.0
+    assert restored.task.command.lateral_speed_max == 1.0
+    assert restored.task.command.standing_probability == 0.02

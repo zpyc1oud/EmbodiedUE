@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "UERLGroundQuery.h"
+#include "UERLRayGroundInput.h"
 #include "UERLSlotCollisionPlan.h"
 
 #include "Components/StaticMeshComponent.h"
@@ -124,6 +125,61 @@ bool FUERLGroundQueryBindingsTest::RunTest(const FString& Parameters)
 		QueryUERLGroundHit(Query, *World, FVector(2000.0, 0.0, 200.0),
 			FVector(2000.0, 0.0, -200.0), TEXT("binding-test"), Hit, Error));
 	TestTrue(TEXT("no-hit diagnostic is retained"), Error.Contains(TEXT("no permitted WorldStatic ground")));
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLConfiguredRayTest, "UERL.Unit.Robot.GroundQuery.DeclaredProvider",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUERLConfiguredRayTest::RunTest(const FString&)
+{
+	TUniquePtr<FPreviewScene> Scene = MakeUnique<FPreviewScene>(FPreviewScene::ConstructionValues()
+		.SetCreateDefaultLighting(false).SetCreatePhysicsScene(true).ShouldSimulatePhysics(true)
+		.SetTransactional(false).SetEditor(false));
+	UWorld* World = Scene->GetWorld();
+	if (!TestNotNull(TEXT("world"), World)) { return false; }
+	FUERLSlotCollisionPlan Plan; FString Error;
+	if (!TestTrue(TEXT("shared profiles"), Plan.Compile(2, EUERLEnvironmentCollisionScope::SharedWorld, Error)))
+	{ return false; }
+	TArray<FUERLInputSlotBinding> Bindings;
+	for (int32 Index = 0; Index < 2; ++Index)
+	{
+		const double X = Index * 2000.0;
+		AActor* Floor = UERLGroundQueryTest::SpawnWorldStaticBox(*World, FVector(X, 0.0, -25.0), FVector(10.0, 10.0, 0.5));
+		AActor* Step = UERLGroundQueryTest::SpawnWorldStaticBox(*World, FVector(X+75.0, 0.0, 25.0), FVector(1.0, 1.0, 0.5));
+		AActor* Excluded = UERLGroundQueryTest::SpawnWorldStaticBox(*World, FVector(X, 0.0, 150.0), FVector(10.0, 10.0, 0.1));
+		if (!TestNotNull(TEXT("floor"), Floor) || !TestNotNull(TEXT("step"), Step)
+			|| !TestNotNull(TEXT("excluded overhead"), Excluded)) { return false; }
+		FUERLInputSlotBinding Binding;
+		Binding.Slot.SlotId = Index; Binding.Slot.CollisionProfile = Plan.Profile(Index); Binding.World = World;
+		Binding.Slot.TerrainQueryPurpose = Index == 0 ? EUERLTerrainQueryPurpose::TrainingOwned
+			: EUERLTerrainQueryPurpose::DeploymentWorldStatic;
+		Binding.SceneBindings.Add(TEXT("ground"), {Floor, Step});
+		Binding.TransformReaders.Add(TEXT("root"), [X](FTransform& Transform, FString&)
+		{
+			Transform = FTransform(FQuat::Identity, FVector(X, 0.0, 100.0)); return true;
+		});
+		Bindings.Add(MoveTemp(Binding));
+	}
+	FUERLInputSpec Spec; Spec.Name = TEXT("scan"); Spec.ProviderId = TEXT("uerl.ray_ground");
+	Spec.Attachment = TEXT("root"); Spec.ParametersJson = TEXT("{\"offsets_m\":[[0,0],[0.75,0]]}");
+	FUERLInputSpec Clearance = Spec; Clearance.Name = TEXT("clearance");
+	Clearance.ParametersJson = TEXT("{\"output\":\"clearance\"}");
+	const TArray<FUERLInputSpec> Specs = {Spec, Clearance};
+	FUERLInputRegistry Registry;
+	if (!TestTrue(TEXT("register rays"), Registry.RegisterFactory(MakeUERLRayGroundInputFactory(), Error))) { return false; }
+	FUERLCompiledInputSet Inputs;
+	if (!TestTrue(TEXT("bind declared rays"), Inputs.Bind(Registry, Specs, Bindings, Error))) { AddError(Error); return false; }
+	FUERLInputSampleStamp Stamp; Stamp.Sequence = 1; Stamp.SolverTimeSeconds = 0.02;
+	for (int32 Slot = 0; Slot < 2; ++Slot)
+	{
+		TConstArrayView<float> Values;
+		if (!TestTrue(TEXT("sample scene binding"), Inputs.Sample(Slot, Stamp, Values, Error))) { AddError(Error); return false; }
+		if (!TestEqual(TEXT("two height rays and one clearance"), Values.Num(), 3)) { return false; }
+		TestTrue(TEXT("plane height is -1 metre"), FMath::IsNearlyEqual(Values[0], -1.0f, 1.e-5f));
+		TestTrue(TEXT("step height is -0.5 metre"), FMath::IsNearlyEqual(Values[1], -0.5f, 1.e-5f));
+		TestTrue(TEXT("clearance is positive 1 metre"), FMath::IsNearlyEqual(Values[2], 1.0f, 1.e-5f));
+	}
 	return true;
 }
 

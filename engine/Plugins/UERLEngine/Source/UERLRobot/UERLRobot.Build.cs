@@ -19,6 +19,7 @@ public class UERLRobot : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new[]
 		{
 			"Chaos",
+			"Json",
 			"TraceLog",
 		});
 	}

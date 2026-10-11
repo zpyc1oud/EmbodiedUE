@@ -19,7 +19,7 @@ bool QueryUERLGroundHit(
 	QueryParams.TraceTag = FName(QueryName);
 	QueryParams.bTraceComplex = false;
 	QueryParams.AddIgnoredActor(Query.IgnoredActor);
-	if (!bSharedWorld)
+	if (!bSharedWorld && Query.Purpose != EUERLTerrainQueryPurpose::ExplicitBinding)
 	{
 		if (!World.LineTraceSingleByChannel(
 			OutHit, Start, End, Query.CollisionProfile.Channel(), QueryParams))
@@ -41,7 +41,7 @@ bool QueryUERLGroundHit(
 	TArray<FHitResult>* Hits = Query.ScratchHits ? Query.ScratchHits : &LocalHits;
 	Hits->Reset();
 	const bool bHit = World.LineTraceMultiByObjectType(
-		*Hits, Start, End, FCollisionObjectQueryParams(ECC_WorldStatic), QueryParams);
+		*Hits, Start, End, FCollisionObjectQueryParams(bSharedWorld ? ECC_WorldStatic : Query.CollisionProfile.Channel()), QueryParams);
 	const FHitResult* MatchedHit = nullptr;
 	if (bHit)
 	{

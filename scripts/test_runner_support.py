@@ -7,6 +7,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass
@@ -75,7 +76,7 @@ def _stop_windows_process(process: subprocess.Popen[bytes]) -> None:
 
 def stop_owned_process(process: subprocess.Popen[bytes]) -> None:
     """Stop only this invocation's child tree or POSIX process group."""
-    if os.name == "nt":
+    if sys.platform == "win32":
         _stop_windows_process(process)
     else:
         # Every stage starts a new session. Its children inherit this group.
