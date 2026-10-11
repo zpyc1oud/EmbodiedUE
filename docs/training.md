@@ -1213,9 +1213,33 @@ Use training and evaluation results to assess whether the policy learns the task
 
 ## Extend numeric input declarations
 
-The first provider slice supplies Python declarations and a native lifecycle.
-It is not yet selected by a Task or loaded from a policy artifact. Worker/game
-integration and the artifact version change remain pending under Issue #52.
+Worker and game hosts resolve the same versioned numeric input declarations.
+Put ordered `InputSpec` values in `WorkerConfig.inputs`. Describe publishes the
+effective parameters and output fields. A custom Task selects those descriptors
+in its `SessionSchema` and consumes them through ordinary observation-plan
+`select` operations. Existing Robot observations keep their current meaning.
+
+For example, this declaration routes two existing CartPole fields through the
+state input adapter:
+
+```python
+from uerl.core.inputs import InputSpec
+
+inputs = (InputSpec(
+    name="proprioception", provider_id="uerl.state", provider_version=1,
+    parameters={"fields": [
+        "robot.joint.pole.joint_position",
+        "robot.joint.cart.joint_velocity",
+    ]},
+),)
+```
+
+Assign `inputs` when constructing the Task registration's `WorkerConfig`.
+The CLI resolver also accepts a JSON sequence through `--worker.inputs`.
+Saved Run configuration retains these declarations; the Manifest's effective
+Worker configuration retains the resolved specifications and descriptors.
+Export reads the initialized Session contract and writes it into the policy.
+Snapshots created before `inputs` existed restore with an empty input list.
 
 ### Declare an input
 
@@ -1232,6 +1256,7 @@ Validate provider-specific parameters, add explicit defaults, then return a
 The result contains effective specifications, field descriptors and stable offsets.
 
 Output fields use float32 values. Declare shape, unit, frame, semantic and source.
+An empty shape `[]` is a scalar; `[1]` is a one-element vector.
 Duplicate field names fail compilation, including case-only differences that
 collide in native FName lookup. Unsupported provider versions fail before binding.
 Input declaration tests use an external factory without a core dispatch branch.
@@ -1286,12 +1311,11 @@ weak owners must return a diagnostic if their source is gone.
 
 #### Limitations
 
-This adapter exposes native snapshots and Python declarations. Task selection,
-Worker/game wiring, saved-Run requirements and paired artifact/wire readers remain
-pending under Issue #52. The adapter preserves the existing host frame; attachment,
-scene-binding and value-transformation parameters are unsupported. Missing data,
-wrong widths, stale snapshots and non-finite values fault the sampled Slot and
-require an explicit reset before recovery.
+The state adapter preserves the existing host frame. Missing data, wrong widths,
+stale snapshots and non-finite values fault the sampled Slot and require reset
+before recovery. The current hosts expose `ground` as their scene binding and
+`root` plus reflected body names as attachment transforms. Additional scene roles
+require an explicit host binding implementation.
 
 ### Validate the extension
 
@@ -1299,7 +1323,7 @@ Follow [Write tests](../tests/README.md#write-tests). The current native foundat
 listed in [UE tests](../tests/README.md#numeric-input-provider-foundation).
 A deterministic provider proves field offsets, cache behavior and lifecycle only.
 Real terrain sampling, scene filtering, serialization parity and installed-plugin
-inference need separate tests before the extension is ready for deployment.
+inference require their own behavior tests.
 
 ### Configure ground rays
 

@@ -211,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
             restore_curriculum=False,
         )
         artifact = export_policy(
+            input_requirements=raw_session.input_requirements,
             task=task,
             runner=runner,
             output=output,

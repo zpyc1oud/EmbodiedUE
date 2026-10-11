@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "UERLBatchBinding.h"
 #include "UERLProvider.h"
+#include "UERLHostInputs.h"
 #include "UObject/StrongObjectPtr.h"
 
 class UWorld;
@@ -41,7 +42,8 @@ public:
 		const FUERLProviderConfig& RobotConfig,
 		const TArray<FUERLFieldDescriptor>& SelectedStateFields,
 		const FUERLTerrainConfig& TerrainConfig,
-		FString& OutError);
+		FString& OutError,
+		const TArray<FUERLResolvedInput>& Inputs = {});
 
 	/** Destroy providers and clear all stable Slot and episode state. */
 	void Destroy();
@@ -70,7 +72,7 @@ public:
 	bool CollectState(
 		const TArray<int32>& SlotIds,
 		FUERLNamedStateWriter& Writer,
-		FString& OutError) const;
+		FString& OutError);
 	/** Validate selected Slots and return a full aligned recoverable fault batch. */
 	void ValidateSlots(const TArray<int32>& SlotIds, TArray<EUERLSlotFaultCode>& OutFaults) const;
 
@@ -117,4 +119,9 @@ private:
 	TArray<uint16> ActiveTerrainLevels;
 	TArray<bool> TerrainLevelEventPending;
 	bool bCreated = false;
+	FUERLHostInputs HostInputs;
+	FUERLBatchBinding SourceBinding;
+	TArray<float> SourceValues;
+	TArray<FUERLFieldDescriptor> OutputFields;
+	TWeakObjectPtr<UWorld> InputWorld;
 };

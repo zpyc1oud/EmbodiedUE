@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import pytest
 import torch
 
 from tests.e2e.support.worker_runner import TRAIN_MAP, UE_CMD, UPROJECT
@@ -18,6 +20,8 @@ from uerl import (
 )
 from uerl.core.config.yaml_loader import load_unique_yaml
 from uerl.core.direct.task import DirectTask
+from uerl.core.direct.types import SessionSchema
+from uerl.core.inputs import InputSpec, RayGroundFactory
 from uerl.runtime.session import WorkerProcessController
 from uerl.tasks.cartpole import (
     CARTPOLE_CONTROL_DT,
@@ -28,12 +32,17 @@ from uerl.tasks.cartpole import (
 from uerl.training import build_launch_overrides, build_run_config
 
 SLOT_COUNT = 64
+RAY = RayGroundFactory().validate(InputSpec(
+    "ground_probe", "uerl.ray_ground", 1, attachment="root",
+    parameters={"offsets_m": [[0.0, 0.0], [0.25, 0.0]], "alignment": "world"},
+))
 
 
 class _SparseResetCartPoleTask(DirectTask):
     """Keep product RobotSpec binding while making sparse Reset deterministic."""
 
-    def __init__(self, config: object) -> None:
+    def __init__(self, config: object, declared_inputs: bool = False) -> None:
+        self.declared_inputs = declared_inputs
         params = CartPoleTaskConfig.from_direct(config)  # type: ignore[arg-type]
         super().__init__(
             control_dt=CARTPOLE_CONTROL_DT,
@@ -42,6 +51,15 @@ class _SparseResetCartPoleTask(DirectTask):
             cfg_factory=lambda spec: build_cartpole_composed_cfg(params, spec),
             task_config=params,
         )
+
+    @property
+    def schema(self) -> SessionSchema:
+        base = super().schema
+        if self.declared_inputs and base.state_requirements:
+            return SessionSchema(
+                base.state_requirements + tuple(f.to_mapping() for f in RAY.fields), base.action_schema,
+            )
+        return base
 
     def compute_terminations(self, context: StepContext) -> TerminationResult:
         """Terminate row zero each step and time out the remaining rows at the limit."""
@@ -59,7 +77,7 @@ class _SparseResetCartPoleTask(DirectTask):
         return torch.ones(context.episode_steps.shape[0])
 
 
-def _config(run_directory: Path) -> ResolvedRunConfig:
+def _config(run_directory: Path, declared_inputs: bool = False) -> ResolvedRunConfig:
     """Resolve the canonical generic CartPole product with the acceptance batch."""
 
     overrides = build_launch_overrides(
@@ -74,15 +92,23 @@ def _config(run_directory: Path) -> ResolvedRunConfig:
             "logging.run_directory": str(run_directory),
         }
     )
+    if declared_inputs:
+        overrides["worker.inputs"] = json.dumps([
+            InputSpec("proprioception", "uerl.state", 1, parameters={"fields": [
+                "robot.joint.pole.joint_position", "robot.joint.cart.joint_velocity",
+            ]}).to_mapping(),
+            RAY.spec.to_mapping(),
+        ])
     return build_run_config(CARTPOLE_TASK_ID, overrides=overrides)
 
 
-def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path) -> None:
+@pytest.mark.parametrize("declared_inputs", [False, True], ids=["legacy", "declared-inputs"])
+def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path, declared_inputs: bool) -> None:
     """Prove Describe, generic Commit, Step, sparse Reset, and shutdown against UE."""
 
-    config = _config(tmp_path / "run")
+    config = _config(tmp_path / "run", declared_inputs)
     raw_session = UERLSession.open(config, process_controller=WorkerProcessController())
-    task = _SparseResetCartPoleTask(config.task)
+    task = _SparseResetCartPoleTask(config.task, declared_inputs)
     env = UERLDirectEnv(
         UERLSessionAdapter(raw_session),
         task,
@@ -105,7 +131,10 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path) 
             "robot.joint.pole.joint_velocity",
             "robot.joint.cart.joint_position",
             "robot.joint.cart.joint_velocity",
-        )
+        ) + (("input.ground_probe.height",) if declared_inputs else ())
+        if declared_inputs:
+            assert len(raw_session.input_requirements) == 2
+            assert raw_session.input_requirements[1] == RAY
         assert action_names == ("robot.actuator.target",)
         assert resolved_config["normalized_hash"] == config.normalized_hash
         assert manifest["run_seed"] == config.worker.run_seed
@@ -140,5 +169,11 @@ def test_ac_ue_generic_013_cartpole_completes_real_ue_lifecycle(tmp_path: Path) 
     assert torch.equal(env.episode_length_buf, torch.zeros(SLOT_COUNT, dtype=torch.long))
     assert second_obs["policy"].shape == (SLOT_COUNT, 4)
     assert second_info["terminal_observation"]["policy"].shape == (SLOT_COUNT, 4)
+    if declared_inputs:
+        rays = second_info["terminal_raw_state"]["input.ground_probe.height"]
+        assert rays.shape == (SLOT_COUNT, 2)
+        assert torch.isfinite(rays).all()
+        torch.testing.assert_close(rays[:, 0], rays[:, 1], atol=1e-5, rtol=0)
+        assert not second_info["slot_fault_code"].any()
     assert raw_session.state is SessionState.CLOSED  # type: ignore[comparison-overlap]
     print("[VERIFY] AC-UE-GENERIC-013: slots=64 action=nonzero step=2 sparse_reset=1 shutdown=PASS")

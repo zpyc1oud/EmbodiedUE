@@ -258,6 +258,7 @@ def test_artifact_has_no_architecture_or_weight_fields() -> None:
         "robot_runtime",
         "timing",
         "metadata",
+        "input_contract",
     }
     assert set(payload["robot_runtime"]) == {"actuators"}
     assert set(payload["robot_runtime"]["actuators"][0]) == {

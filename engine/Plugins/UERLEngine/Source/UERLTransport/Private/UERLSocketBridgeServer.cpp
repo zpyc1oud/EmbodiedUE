@@ -494,7 +494,7 @@ namespace
 	{
 		if (!CheckKeys(Object,
 			{ TEXT("num_slots"), TEXT("physics_dt"), TEXT("decimation"), TEXT("run_seed"),
-			  TEXT("world_map"), TEXT("environment"), TEXT("robot") }, { TEXT("extensions") }, OutError))
+			  TEXT("world_map"), TEXT("environment"), TEXT("robot") }, { TEXT("extensions"), TEXT("input_contract") }, OutError))
 		{
 			return false;
 		}
@@ -520,6 +520,13 @@ namespace
 		Out.DecimationMin = DecimationMin;
 		Out.DecimationMax = DecimationMax;
 		Out.CommandWidth = 0;
+		if (Object->HasField(TEXT("input_contract")))
+		{
+			const TSharedPtr<FJsonObject>* Contract = nullptr;
+			if (!Object->TryGetObjectField(TEXT("input_contract"), Contract)
+				|| !ParseUERLInputContract(*Contract, Out.Inputs, false, OutError))
+			{ return false; }
+		}
 		if (!ParseProvider(*Environment, Out.EnvironmentId, Out.EnvironmentConfig, true, false, false, OutError)
 			|| !ParseProvider(*Robot, Out.RobotId, Out.RobotConfig, false, true, true, OutError))
 		{
@@ -706,6 +713,8 @@ namespace
 		}
 		Result->SetObjectField(TEXT("environment"), Environment);
 		Result->SetObjectField(TEXT("robot"), ProviderJson(Projection.RobotId, Projection.RobotConfig));
+		if (!Projection.Inputs.IsEmpty())
+		{ Result->SetObjectField(TEXT("input_contract"), WriteUERLInputContract(Projection.Inputs)); }
 		return Result;
 	}
 

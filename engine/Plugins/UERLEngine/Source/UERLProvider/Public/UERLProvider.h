@@ -172,10 +172,14 @@ public:
 	virtual void DestroySlots() = 0;
 };
 
+struct FUERLInputSlotBinding;
+
 class UERLPROVIDER_API IUERLRobot
 {
 public:
 	virtual ~IUERLRobot() = default;
+	/** Supply read-only attachment readers owned by this Robot. */
+	virtual void FillInputSlotBinding(int32 SlotId, FUERLInputSlotBinding& Binding) const {}
 	/**
 	 * Spawn Robot objects into the Environment-provided Slot contexts.
 	 *

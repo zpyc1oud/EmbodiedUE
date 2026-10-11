@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Templates/UniquePtr.h"
 #include "UERLInterfaceTypes.h"
+#include "UERLInputContract.h"
 #include "UERLPhysicsSnapshot.h"
 
 class AActor;
@@ -37,6 +38,9 @@ struct FUERLSkeletalMeshRobotRuntimeConfig
 	bool bHasPlacementTransform = false;
 	TArray<FUERLSkeletalMeshRuntimeActuator> Actuators;
 	TArray<FUERLSkeletalMeshRuntimeObservation> Observations;
+	/** Exact plan field names when using declared inputs. */
+	TArray<FName> StateFieldNames;
+	TArray<FUERLResolvedInput> Inputs;
 	FVector GroundOrigin = FVector::ZeroVector;
 	FVector GroundNormal = FVector::UpVector;
 	TArray<TWeakObjectPtr<AActor>> TerrainQueryActors;

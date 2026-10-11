@@ -13,6 +13,8 @@ from ...core.config.canonical import to_jsonable
 from ...core.config.manifest import GitIdentityError, RunManifest, RunRecorder, capture_git_identity
 from ...core.config.models import ResolvedRunConfig, SessionConfig
 from ...core.config.robot import RobotSpec, merge_robot_spec
+from ...core.inputs import ResolvedInput
+from ...core.inputs.serialization import input_declarations, parse_input_contract
 from ...errors import ConfigError, ProtocolError, SessionError
 from .process import WorkerProcessController
 from .state import SessionState
@@ -198,6 +200,14 @@ class UERLSession:
         return self._description[1] if self._description is not None else None
 
     @property
+    def input_requirements(self) -> tuple[ResolvedInput, ...]:
+        """Return the effective input contract accepted by this initialized Worker."""
+        if self._initialization is None:
+            return ()
+        effective = self._initialization.bridge_result.response["effective_worker_config"]
+        return parse_input_contract(effective["input_contract"]) if "input_contract" in effective else ()
+
+    @property
     def descriptor(self) -> Mapping[str, Any]:
         """Return the last UE Initialize description DTO."""
 
@@ -265,8 +275,21 @@ class UERLSession:
             robot_spec=pending_description[1],
         )
         try:
+            if self.config.worker.inputs:
+                effective = pending_description[0].response["effective_worker_config"]
+                contract = effective.get("input_contract")
+                requirements = parse_input_contract(contract)
+                if [(item.spec.name, item.spec.provider_id, item.spec.provider_version) for item in requirements] != [
+                    (item.name, item.provider_id, item.provider_version) for item in self.config.worker.inputs
+                ]:
+                    raise ProtocolError("Worker input contract changed declaration identities")
+                request["worker_config"]["input_contract"] = contract
+                request["worker_config_hash"] = sha256_json(request["worker_config"])
             result = self._bridge.initialize(request)
             _validate_effective_worker_config(self.config, result.response)
+            committed = result.response["effective_worker_config"].get("input_contract")
+            if committed != request["worker_config"].get("input_contract"):
+                raise ProtocolError("Worker changed input contract during Commit")
             robot_spec = pending_description[1]
             manifest = _build_manifest(self.config, result)
             self._recorder.write_resolved_config(self.config)
@@ -561,6 +584,8 @@ def _build_initialize_request(
         },
         "robot": robot_config,
     }
+    if worker.inputs:
+        worker_config["input_contract"] = input_declarations(worker.inputs)
     return {
         "task_id": config.task_id,
         "task_version": config.task_version,

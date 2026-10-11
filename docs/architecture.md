@@ -359,12 +359,15 @@ The deployment container has this structure:
 magic        "UERLPOL2" (8 bytes)
 format_ver   uint32
 json_length  uint32
-json_bytes   plans, task/robot identity, timing, runtime metadata
+json_bytes   plans, task/robot identity, timing, runtime metadata, input_contract
 onnx_length  uint64
 onnx_bytes   network exported by the training framework
 ```
 
 The JSON does not duplicate network layers, weights, normalization, or deterministic output transforms already in ONNX.
+New exports use container format 2, whose `input_contract` is required even when
+its requirements list is empty. Format 1 policies retain their original semantics
+and cannot carry an input contract. Both Python and C++ readers enforce this rule.
 Loading compares the observation-plan width with network input width.
 It compares network output width with the action-plan policy width.
 
@@ -374,6 +377,29 @@ Host gameplay selects the artifact, map, and commands.
 Actuator and observation definitions come from the artifact.
 Gameplay uses a completed solver clock and a deployment-specific synchronous-substep gate.
 See [deployment](deployment.md#in-game-deployment-guide).
+
+#### Declared input persistence and lifecycle
+
+The optional Worker `input_contract` segment has its own version, currently 1.
+It contains ordered `requirements`, each with a complete `spec` and `fields`.
+The specification records name, provider ID/version, parameters, attachment,
+scene bindings, sampling and missing-data policy. Each field records name,
+shape, dtype, unit, frame, semantic and source. A scalar has shape `[]` and width 1.
+Object references stay in the host binding and are never serialized.
+
+Describe accepts declarations with empty field lists and resolves installed
+factories. Commit includes the exact effective segment returned by Describe;
+the existing Worker configuration identity covers it. Protocol 2.0 framing and
+Step payload layouts are unchanged. Older Workers reject the unknown segment.
+The Manifest and format 2 policy retain the resolved contract. Deployment rejects
+unavailable provider versions and changed field meaning before inference.
+
+`FUERLHostInputs` routes host snapshots and provider outputs into selected field
+order for both hosts. Worker binds after Slot creation and publishes at the final
+completed Chaos clock. A sparse physical reset increments only those Slots'
+input generations, allowing a reset publication at the same solver clock.
+Sampling failure invalidates only the affected Worker row; game control stops
+on a required-input failure. Inputs release before Robot and Environment owners.
 
 <a id="architecture-reproducibility-and-fault-boundaries"></a>
 ### Reproducibility and fault boundaries

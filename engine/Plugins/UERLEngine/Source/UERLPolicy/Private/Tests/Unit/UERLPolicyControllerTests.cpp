@@ -9,8 +9,64 @@
 #include "Misc/Paths.h"
 #include "UERLPolicyController.h"
 #include "UERLSkeletalMeshRobotRuntime.h"
+#include "Misc/FileHelper.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUERLDeclaredInputGameTest,
+	"UERL.Integration.Policy.DeclaredInputs.GameContract", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUERLDeclaredInputGameTest::RunTest(const FString&)
+{
+	FModuleManager::Get().LoadModuleChecked(TEXT("UERLRobot"));
+	FPreviewScene Scene(FPreviewScene::ConstructionValues().SetCreateDefaultLighting(false)
+		.SetCreatePhysicsScene(true).ShouldSimulatePhysics(true).SetTransactional(false).SetEditor(false));
+	UWorld* World = Scene.GetWorld();
+	if (!TestNotNull(TEXT("world"), World)) { return false; }
+	AStaticMeshActor* Ground = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(),
+		FVector(0, 0, -75), FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("ground"), Ground)) { return false; }
+	auto* Mesh = Ground->GetStaticMeshComponent();
+	Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
+	Mesh->SetMobility(EComponentMobility::Static);
+	Mesh->SetWorldScale3D(FVector(10, 10, 1)); // Top is exactly -25 cm; CartPole root is at zero.
+	Mesh->SetCollisionObjectType(ECC_WorldStatic);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	FUERLPolicyControllerConfig Config;
+	Config.ArtifactPath = FPaths::Combine(FPaths::ProjectDir(), TEXT("../tests/parity/cases/inputs/controller_inputs.uerlpol2"));
+	Config.AssetPath = TEXT("/Game/Robots/CartPole/SKM_CartPole.SKM_CartPole");
+	Config.bClaimAuthoredActor = false;
+	Config.TerrainQueryActors.Add(Ground);
+	FUERLPolicyController Controller;
+	FString Error;
+	if (!TestTrue(*FString::Printf(TEXT("initialize: %s"), *Error), Controller.Initialize(*World, Config, Error)))
+	{ AddError(Error); return false; }
+	FUERLPolicyCommands Commands; const float Zero[] = {0}; Commands.Set(TEXT("velocity"), Zero);
+	if (!TestTrue(TEXT("bootstrap with declared inputs"), Controller.Step(Commands, {1.0/60.0, 0}, Error, false, true)))
+	{ AddError(Error); return false; }
+	TestEqual(TEXT("selected raw state width"), Controller.LastRawState().Num(), 2);
+	TestTrue(TEXT("ray clearance in metres"), FMath::IsNearlyEqual(Controller.LastRawState()[0], 0.25f, 1.e-5f));
+	TestTrue(TEXT("state adapter scalar at reference pose"), FMath::IsNearlyZero(Controller.LastRawState()[1], 1.e-5f));
+	TestTrue(TEXT("plan consumes ray"), FMath::IsNearlyEqual(Controller.LastObservation()[0], 0.25f, 1.e-5f));
+	TestTrue(TEXT("reviewed ONNX identity output"), FMath::IsNearlyEqual(Controller.LastAction()[0], 0.25f, 2.e-5f));
+	Controller.Reset();
+	TestTrue(TEXT("reset permits fresh bootstrap"), Controller.Step(Commands, {1.0/60.0, 0}, Error, false, true));
+	Controller.Shutdown();
+	Config.TerrainQueryActors.Reset();
+	TestFalse(TEXT("required ground cannot bind implicitly"), Controller.Initialize(*World, Config, Error));
+	Controller.Shutdown();
+	// Optional freshly trained policy establishes the real export-to-game path.
+	FString SmokeArtifact;
+	if (FParse::Value(FCommandLine::Get(), TEXT("uerlinputartifact="), SmokeArtifact))
+	{
+		Config.ArtifactPath = SmokeArtifact;
+		if (!TestTrue(TEXT("fresh training export initializes"), Controller.Initialize(*World, Config, Error)))
+		{ AddError(Error); return false; }
+		TestTrue(TEXT("fresh policy bootstrap inference"), Controller.Step({}, {1.0/60.0, 0}, Error, false, true));
+	}
+	return true;
+}
 
 namespace
 {

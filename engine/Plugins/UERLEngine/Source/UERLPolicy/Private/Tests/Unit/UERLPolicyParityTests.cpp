@@ -49,7 +49,8 @@ namespace
 			|| DirName.Equals(TEXT("deploy"), ESearchCase::IgnoreCase)
 			|| DirName.Equals(TEXT("deploy_variable_dt"), ESearchCase::IgnoreCase)
 			|| DirName.Equals(TEXT("controller"), ESearchCase::IgnoreCase)
-			|| DirName.Equals(TEXT("policynet"), ESearchCase::IgnoreCase);
+			|| DirName.Equals(TEXT("policynet"), ESearchCase::IgnoreCase)
+			|| DirName.Equals(TEXT("inputs"), ESearchCase::IgnoreCase);
 	}
 
 	bool CollectOperatorCasePaths(const FString& CorpusRoot, TArray<FString>& OutPaths, FString& OutError)

@@ -145,6 +145,17 @@ Make sure that RobotMesh resolves in the artifact editor.
 Save and cook validation also reject a missing mesh.
 The identity value `robot_id` cannot infer or replace RobotMesh.
 
+Format 2 policies carry their resolved numeric input contract. The game validates
+provider versions and field metadata before inference, then uses the same input
+runtime as the Worker. Format 1 policies keep their original state collection.
+For a declared `uerl.ray_ground` input, assign the level's ground actors to the
+Policy component's **Input Ground Actors** list before `StartPolicy`. This is the
+explicit logical `ground` binding; the policy stores its name, not actor paths.
+C++ controller users provide the list through `TerrainQueryActors`.
+The attachment `root` refers to the reflected root body's physical transform;
+other attachment names are reflected body names. Missing bindings or ray hits
+fail the required input. See [input declarations](training.md#extend-numeric-input-declarations).
+
 The demo artifact has **116 observations, 18 actions, `physics_dt=0.005 s`, and decimation `[1,7]`**.
 Its `velocity` command channel contains `[forward, lateral, yaw]`.
 Before another export is used, examine its actual Summary.

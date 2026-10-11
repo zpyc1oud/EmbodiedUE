@@ -925,3 +925,19 @@ Run them on the changed Editor build before accepting this foundation.
 `python/unit/test_state_inputs.py` checks matching declaration order, metadata,
 YAML round trips and rejected selections. These are snapshot-adapter tests;
 physical collection and Worker/game selection require separate runtime evidence.
+
+`UERL.Unit.InputProvider.Host.RoutingResetFault` reads the paired input contract
+in `parity/cases/inputs/contract.json`. It checks scalar metadata, selected output
+order, immutable repeated reads, sparse reset isolation and recovery from faults.
+`python/unit/test_input_persistence.py` checks the same contract, format 1/2
+container rules and saved Run restoration. Session integration tests reject a
+missing or changed contract before persisting the Manifest.
+
+The `p2` E2E suite runs both legacy CartPole and declared state/ground-ray inputs
+through 64-Slot Describe, Commit, physical Step, sparse Reset and shutdown.
+`UERL.Integration.Policy.DeclaredInputs` loads the paired format 2 artifact,
+checks a literal 0.25 metre ground clearance and matching ONNX output, resets
+the controller and verifies explicit component ground binding. The game case
+also accepts `-uerlinputartifact=<fresh-export.uerlpol2>` to load and run a newly
+trained CartPole policy. This one-iteration path establishes pipeline behavior,
+not learning quality. External plugin installation still needs its own UE result.

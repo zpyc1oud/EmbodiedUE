@@ -91,7 +91,7 @@ bool FUERLStateInputFactory::Validate(const FUERLInputSpec& Spec, FUERLInputSpec
 	TMap<FName, const FUERLFieldDescriptor*> Catalog;
 	for (const FUERLFieldDescriptor& Field : Fields)
 	{
-		if (!Field.IsValid() || Field.Shape.IsEmpty() || Catalog.Contains(Field.Name))
+		if (!Field.IsValid() || Catalog.Contains(Field.Name))
 		{
 			OutError = TEXT("state catalog contains an invalid or duplicate field"); return false;
 		}

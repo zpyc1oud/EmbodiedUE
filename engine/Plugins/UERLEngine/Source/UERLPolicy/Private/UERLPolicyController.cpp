@@ -261,8 +261,12 @@ bool FUERLPolicyController::InitializeFromBytes(
 	RuntimeConfig.InitialRootHeightMeters = Config.InitialRootHeightMeters;
 	RuntimeConfig.bClaimAuthoredActor = Config.bClaimAuthoredActor;
 
+	RuntimeConfig.Inputs = Artifact.InputRequirements();
+	if (!RuntimeConfig.Inputs.IsEmpty())
+	{ RuntimeConfig.StateFieldNames = Artifact.ObservationPlan().StateRequirements; }
 	for (const FName FieldName : Artifact.ObservationPlan().StateRequirements)
 	{
+		if (!RuntimeConfig.Inputs.IsEmpty()) { continue; }
 		FUERLSkeletalMeshRuntimeObservation ObservationSelector;
 		if (!ParseObservationSelector(FieldName, ObservationSelector, OutError))
 		{
@@ -270,7 +274,7 @@ bool FUERLPolicyController::InitializeFromBytes(
 		}
 		RuntimeConfig.Observations.Add(ObservationSelector);
 	}
-	if (RuntimeConfig.Observations.Num() == 0)
+	if (RuntimeConfig.Observations.Num() == 0 && RuntimeConfig.StateFieldNames.IsEmpty())
 	{
 		return ControllerFail(OutError, TEXT("observation plan state_requirements is empty"));
 	}

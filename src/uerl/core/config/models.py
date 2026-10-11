@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Any
 
 from ...errors import ConfigError
+from ..inputs import InputSpec
 from .robot import RobotConfig
 
 DECIMATION_INT32_MIN = 1
@@ -148,8 +149,12 @@ class WorkerConfig:
     terrain_config: Mapping[str, object] = field(default_factory=_empty_mapping)
     terrain_config_path: Path | None = field(default=None, metadata={"user_configurable": False})
     run_seed: int = 0
+    inputs: tuple[InputSpec, ...] = ()
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "inputs", tuple(
+            item if isinstance(item, InputSpec) else InputSpec.from_mapping(item) for item in self.inputs
+        ))
         object.__setattr__(self, "environment_config", _freeze_value(self.environment_config))
         object.__setattr__(self, "robot_config", _freeze_value(self.robot_config))
         object.__setattr__(self, "robot_semantics", _freeze_value(self.robot_semantics))

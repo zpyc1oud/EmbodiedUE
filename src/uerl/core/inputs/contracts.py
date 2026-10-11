@@ -135,8 +135,8 @@ class InputField:
             _name(getattr(self, attr), f"field.{attr}")
         if self.name.casefold() == "none":
             raise _error("field.name", "None is reserved by native field names")
-        if not isinstance(self.shape, (tuple, list)) or not self.shape:
-            raise _error(f"fields.{self.name}.shape", "expected a nonempty shape")
+        if not isinstance(self.shape, (tuple, list)):
+            raise _error(f"fields.{self.name}.shape", "expected a shape; an empty shape denotes a scalar")
         shape = tuple(self.shape)
         if any(type(size) is not int or size <= 0 for size in shape):
             raise _error(f"fields.{self.name}.shape", "shape dimensions must be positive integers")
