@@ -21,8 +21,12 @@ then build the Editor target. Plugin startup registers the native factory.
 Release compiled input sets before unloading the plugin. Human configuration is
 YAML; the `.uplugin` file is the engine's required manifest format.
 
+Run `ExampleInput.Integration.RegisteredPublication` through UE Automation in
+that Editor build. It checks startup registration, two distinct configured
+outputs, sparse Slot reset and release through the public input API.
+
 The current core slice does not yet load these declarations through a Task or
 policy artifact. An installed Python test establishes packaging and declaration
-compilation only. Native plugin build, actual output, Worker/game selection and
-packaged inference remain validation gates. Do not treat this example as a
+compilation only. The native Automation case checks plugin publication separately.
+Worker/game selection and packaged inference remain integration work. Do not treat this example as a
 working end-to-end deployment command.

@@ -29,7 +29,7 @@ namespace UERLRayGroundPrivate
 			TEXT("alignment"), TEXT("output")};
 		for (const auto& Pair : Json->Values)
 		{
-			if (!Allowed.Contains(Pair.Key))
+			if (!Allowed.Contains(FString(Pair.Key)))
 			{
 				OutError = FString::Printf(TEXT("unknown ray parameter '%s'"), *Pair.Key); return false;
 			}

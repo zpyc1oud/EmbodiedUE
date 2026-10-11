@@ -20,7 +20,8 @@ namespace UERLInputPrivate
 		{
 			for (const auto& Pair : Value->AsObject()->Values)
 			{
-				if (Pair.Key.IsEmpty() || Pair.Key.TrimStartAndEnd() != Pair.Key || !FiniteValue(Pair.Value))
+				const FString Key(Pair.Key);
+				if (Key.IsEmpty() || Key.TrimStartAndEnd() != Key || !FiniteValue(Pair.Value))
 				{ return false; }
 			}
 		}
@@ -34,7 +35,8 @@ namespace UERLInputPrivate
 		if (!FJsonSerializer::Deserialize(Reader, Parameters) || !Parameters) { return false; }
 		for (const auto& Pair : Parameters->Values)
 		{
-			if (Pair.Key.IsEmpty() || Pair.Key.TrimStartAndEnd() != Pair.Key || !FiniteValue(Pair.Value)) { return false; }
+			const FString Key(Pair.Key);
+			if (Key.IsEmpty() || Key.TrimStartAndEnd() != Key || !FiniteValue(Pair.Value)) { return false; }
 		}
 		TSet<FString> Names;
 		for (const FString& Name : Spec.SceneBindings)
