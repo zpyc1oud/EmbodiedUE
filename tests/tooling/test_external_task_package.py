@@ -190,5 +190,7 @@ assert main(['check', 'task', 'Example-CartPole-v0']) == 1
 
 
 def test_explicit_source_repository_git_error_is_preserved(tmp_path: Path) -> None:
+    # Make this repository invalid even when basetemp is inside a real checkout.
+    (tmp_path / ".git").write_text("gitdir: missing-git-directory\n", encoding="utf-8")
     with pytest.raises(GitIdentityError, match="cannot capture Git identity"):
         capture_git_identity(tmp_path)
