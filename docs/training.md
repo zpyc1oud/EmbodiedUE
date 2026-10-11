@@ -1239,8 +1239,9 @@ Input declaration tests use an external factory without a core dispatch branch.
 ### Implement the native provider
 
 Implement `IUERLInputFactory` and `IUERLInputProvider` from `UERLInputProvider.h`.
-Register the factory during plugin startup. The factory validates owned parameter
-object text and effective descriptors, then creates the native instance.
+Register catalog-independent factories during plugin startup. Register factories
+that depend on a host's state catalog in a host-local registry. The factory validates
+owned parameter object text and effective descriptors, then creates the native instance.
 Parameters are encoded internally by the host; human configuration remains YAML.
 
 `FUERLCompiledInputSet` validates every declaration and logical binding before
@@ -1256,6 +1257,41 @@ Reset accepts stable Slot IDs. It increments only selected generations and leave
 other caches unchanged. Read `GetResetGeneration` when preparing the next host
 sample stamp. Reset does not advance physics or produce a new observation.
 Release providers before unloading their module or destroying their World.
+
+### Adapt an existing state snapshot
+
+`StateInputFactory` declares `uerl.state` version 1. Supply the host's existing
+`InputField` catalog to its constructor and register it on an `InputRegistry`.
+The native counterpart is `FUERLStateInputFactory` in `UERLStateInput.h`, constructed
+with the matching `FUERLFieldDescriptor` catalog on a host-local registry.
+
+Select fields with `parameters={"fields": ["body_velocity", "support"]}` using
+names present in that catalog. The explicit list determines output order.
+Resolution retains the catalog's names, shapes, units, frames, semantics and
+sources. Names resolve case-insensitively and effective parameters retain the
+catalog's spelling. Two inputs cannot publish the same field.
+
+For each native Slot, populate `FUERLInputSlotBinding::StateReaders` with a
+`FUERLInputStateReader` for each selected field. Its descriptor must match the
+catalog. Its callback returns an already collected float32 view and the snapshot's
+actual completed sequence, solver time and reset generation. These must equal the
+requested sample stamp. The adapter copies the values into the compiled input
+set's publication buffer, so repeated reads retain the completed publication.
+
+The host owns snapshot collection and physical resets. After a sparse reset,
+publish the selected Slots' reset snapshots with `GetResetGeneration` before
+sampling them. The adapter's reset leaves host data and unselected Slots alone.
+Release the compiled input set before destroying callback owners; callbacks using
+weak owners must return a diagnostic if their source is gone.
+
+#### Limitations
+
+This adapter exposes native snapshots and Python declarations. Task selection,
+Worker/game wiring, saved-Run requirements and paired artifact/wire readers remain
+pending under Issue #52. The adapter preserves the existing host frame; attachment,
+scene-binding and value-transformation parameters are unsupported. Missing data,
+wrong widths, stale snapshots and non-finite values fault the sampled Slot and
+require an explicit reset before recovery.
 
 ### Validate the extension
 

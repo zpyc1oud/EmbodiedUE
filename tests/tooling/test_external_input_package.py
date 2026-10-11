@@ -60,7 +60,7 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import uerl
 import example_input
-from uerl.core.inputs import InputRegistry
+from uerl.core.inputs import InputRegistry, InputSpec, StateInputFactory
 assert Path(uerl.__file__).is_relative_to(Path(sys.argv[1]))
 assert Path(example_input.__file__).is_relative_to(Path(sys.argv[1]))
 registry = InputRegistry()
@@ -74,6 +74,13 @@ assert result.fields[0].descriptor.to_mapping() == {
     "name": "input.example.value", "shape": [1], "dtype": "float32", "unit": "1",
     "frame": "none", "semantic": "constant", "source": "example.constant",
 }
+registry.register(StateInputFactory([result.fields[0].descriptor]))
+state = registry.compile([InputSpec(
+    "snapshot", "uerl.state", 1, parameters={"fields": ["input.example.value"]},
+)])
+assert state.width == 1
+assert state.fields[0].descriptor.semantic == "constant"
+assert state.fields[0].descriptor.source == "example.constant"
 """)
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)

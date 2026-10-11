@@ -20,6 +20,22 @@ struct FUERLInputSpec
 	FString MissingData = TEXT("fault");
 };
 
+/** Identify one host-completed sample without giving a provider clock ownership. */
+struct FUERLInputSampleStamp
+{
+	int64 Sequence = 0;
+	int64 ResetGeneration = 0;
+	double SolverTimeSeconds = 0.0;
+};
+
+/** Read an already collected field; the returned view lasts until the next host mutation. */
+struct FUERLInputStateReader
+{
+	FUERLFieldDescriptor Field;
+	/** Return the actual snapshot stamp, not the requesting consumer's stamp. */
+	TFunction<bool(FUERLInputSampleStamp&, TConstArrayView<float>&, FString&)> Read;
+};
+
 /** Bind logical scene names to host-owned actors for one stable Slot. */
 struct FUERLInputSlotBinding
 {
@@ -29,14 +45,8 @@ struct FUERLInputSlotBinding
 	/** Host-owned read-only attachment transforms, in UE world centimetres. */
 	TMap<FString, TFunction<bool(FTransform&, FString&)>> TransformReaders;
 	TMap<FString, TArray<TWeakObjectPtr<AActor>>> SceneBindings;
-};
-
-/** Identify one host-completed sample without giving a provider clock ownership. */
-struct FUERLInputSampleStamp
-{
-	int64 Sequence = 0;
-	int64 ResetGeneration = 0;
-	double SolverTimeSeconds = 0.0;
+	/** Host-owned completed snapshots; release the input set before destroying their owners. */
+	TMap<FName, FUERLInputStateReader> StateReaders;
 };
 
 /** Produce one input's numeric fields. Implementations never advance physics. */
