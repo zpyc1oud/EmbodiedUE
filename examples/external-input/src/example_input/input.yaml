@@ -1,0 +1,5 @@
+name: example
+provider_id: example.constant
+provider_version: 1
+parameters:
+  value: 2.5

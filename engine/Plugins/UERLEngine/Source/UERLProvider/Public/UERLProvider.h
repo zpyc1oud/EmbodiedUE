@@ -59,6 +59,8 @@ enum class EUERLTerrainQueryPurpose : uint8
 	TrainingOwned = 0,
 	/** Direct deployment accepts any blocking WorldStatic ground in the World. */
 	DeploymentWorldStatic = 1,
+	/** A declared logical actor set is required in both training and deployment. */
+	ExplicitBinding = 2,
 };
 
 /** Identify one stable Slot and its world-space placement origin. */
