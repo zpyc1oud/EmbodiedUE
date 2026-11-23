@@ -88,7 +88,7 @@ bool FUERLFreshExportGameTest::RunTest(const FString&)
 	return true;
 }
 
-namespace
+namespace UERLPolicyControllerTestsPrivate
 {
 	constexpr TCHAR CartPoleRobotAsset[] = TEXT("/Game/Robots/CartPole/SKM_CartPole.SKM_CartPole");
 
@@ -206,6 +206,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyControllerInitializeFromArtifactTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyControllerTestsPrivate;
 	FModuleManager::Get().LoadModuleChecked(TEXT("UERLPolicy"));
 	FModuleManager::Get().LoadModuleChecked(TEXT("UERLRobot"));
 
@@ -278,6 +279,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyControllerStepFiniteAndCommandsTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyControllerTestsPrivate;
 	FModuleManager::Get().LoadModuleChecked(TEXT("UERLPolicy"));
 	FModuleManager::Get().LoadModuleChecked(TEXT("UERLRobot"));
 
@@ -395,6 +397,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyControllerPhantomXPursuitLoopTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyControllerTestsPrivate;
 	FModuleManager::Get().LoadModuleChecked(TEXT("UERLPolicy"));
 	FModuleManager::Get().LoadModuleChecked(TEXT("UERLRobot"));
 

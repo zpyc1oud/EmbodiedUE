@@ -4,17 +4,17 @@
 #include "Dom/JsonValue.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformTime.h"
-#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
-#include "Serialization/JsonReader.h"
-#include "Serialization/JsonSerializer.h"
 #include "UERLPolicyArtifact.h"
 #include "UERLPolicyNetwork.h"
+#include "UERLPolicyTestHelpers.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace UERLPolicyNetworkTestsPrivate
 {
+	using namespace UERLPolicyTestHelpers;
+
 	bool ResolvePolicyNetCorpusDir(FString& OutDir, FString& OutError)
 	{
 		TArray<FString> Candidates;
@@ -38,44 +38,6 @@ namespace
 			OutError += FString::Printf(TEXT("\n  %s"), *Candidate);
 		}
 		return false;
-	}
-
-	bool LoadPolicyNetJsonObject(const FString& Path, TSharedPtr<FJsonObject>& OutObject, FString& OutError)
-	{
-		FString Text;
-		if (!FFileHelper::LoadFileToString(Text, *Path))
-		{
-			OutError = FString::Printf(TEXT("could not read '%s'"), *Path);
-			return false;
-		}
-		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
-		if (!FJsonSerializer::Deserialize(Reader, OutObject) || !OutObject.IsValid())
-		{
-			OutError = FString::Printf(TEXT("JSON deserialize failed for '%s'"), *Path);
-			return false;
-		}
-		return true;
-	}
-
-	bool ParsePolicyNetFloatArray(const TArray<TSharedPtr<FJsonValue>>* Values, TArray<float>& Out, FString& OutError)
-	{
-		if (Values == nullptr)
-		{
-			OutError = TEXT("expected a JSON array of numbers");
-			return false;
-		}
-		Out.Reset();
-		Out.Reserve(Values->Num());
-		for (const TSharedPtr<FJsonValue>& Value : *Values)
-		{
-			if (!Value.IsValid() || Value->Type != EJson::Number)
-			{
-				OutError = TEXT("array entry is not a number");
-				return false;
-			}
-			Out.Add(static_cast<float>(Value->AsNumber()));
-		}
-		return true;
 	}
 
 	bool LoadArtifactAndBuild(
@@ -128,7 +90,7 @@ namespace
 		FString Error;
 		TSharedPtr<FJsonObject> ExpectedObject;
 		const FString ExpectedPath = FPaths::Combine(CorpusDir, Stem + TEXT(".expected.json"));
-		if (!LoadPolicyNetJsonObject(ExpectedPath, ExpectedObject, Error))
+		if (!LoadJsonObject(ExpectedPath, ExpectedObject, Error))
 		{
 			Test.AddError(Error);
 			return false;
@@ -140,8 +102,8 @@ namespace
 		const TArray<TSharedPtr<FJsonValue>>* ExpectedValues = nullptr;
 		if (!ExpectedObject->TryGetArrayField(TEXT("input"), InputValues)
 			|| !ExpectedObject->TryGetArrayField(TEXT("expected"), ExpectedValues)
-			|| !ParsePolicyNetFloatArray(InputValues, Input, Error)
-			|| !ParsePolicyNetFloatArray(ExpectedValues, Expected, Error))
+			|| !ParseFloatArray(InputValues, Input, Error)
+			|| !ParseFloatArray(ExpectedValues, Expected, Error))
 		{
 			Test.AddError(FString::Printf(TEXT("%s expected json: %s"), *Stem, *Error));
 			return false;
@@ -185,6 +147,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyNetworkBuildWidthsTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyNetworkTestsPrivate;
 	FString CorpusDir;
 	FString Error;
 	TestTrue(TEXT("resolve policynet corpus"), ResolvePolicyNetCorpusDir(CorpusDir, Error));
@@ -219,6 +182,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyNetworkTwoShapesTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyNetworkTestsPrivate;
 	FString CorpusDir;
 	FString Error;
 	TestTrue(TEXT("resolve policynet corpus"), ResolvePolicyNetCorpusDir(CorpusDir, Error));
@@ -271,6 +235,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyNetworkNoDoubleNormTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyNetworkTestsPrivate;
 	// Critical: mean≠0 / std≠1 fixture. Double-normalization in C++ would miss expected.
 	FString CorpusDir;
 	FString Error;
@@ -290,6 +255,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyNetworkWrongInputWidthTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyNetworkTestsPrivate;
 	FString CorpusDir;
 	FString Error;
 	TestTrue(TEXT("resolve policynet corpus"), ResolvePolicyNetCorpusDir(CorpusDir, Error));
@@ -329,6 +295,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyNetworkPhantomXParityTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyNetworkTestsPrivate;
 	// Same 18 expected floats as the NNE parity fixture, tolerance 2e-5.
 	FString CorpusDir;
 	FString Error;

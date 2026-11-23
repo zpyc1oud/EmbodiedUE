@@ -25,9 +25,5 @@ public class UERLPolicy : ModuleRules
 			"NNE",
 			"NNERuntimeORT",
 		});
-
-		// Test TUs share anonymous-namespace helper names (LoadJsonObject, etc.);
-		// unity blending them into one Module.UERLPolicy.cpp hits C2084.
-		bUseUnity = false;
 	}
 }

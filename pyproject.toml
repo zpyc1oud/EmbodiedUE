@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ue-rl-engine"
-version = "1.0.0"
+version = "0.1.0"
 description = "Early-stage tools to train robot policies in Unreal Engine Chaos and deploy them in games."
 license = "Apache-2.0"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
@@ -26,7 +26,10 @@ dependencies = [
     "torchvision==0.26.0+cu128",
     "numpy>=1.26",
     "imageio-ffmpeg>=0.6.0",
+    "onnx>=1.16",
+    "onnxruntime>=1.29.0",
     "pillow>=11.2.0",
+    "tensorboard>=2.16",
     # Parse RobotConfig text with yaml.safe_load.
     "pyyaml>=6.0",
 ]
@@ -40,7 +43,6 @@ dev = [
     "mypy>=1.11",
     "pytest>=8.0",
     "pre-commit>=3.8",
-    "onnxruntime>=1.29.0",
 ]
 
 [tool.uv]

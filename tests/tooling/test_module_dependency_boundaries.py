@@ -1,15 +1,21 @@
-"""Gate UE Build.cs and Python package dependency direction."""
+"""Gate UE Build.cs, plugin descriptors, and Python package dependency direction."""
 
 from __future__ import annotations
 
 import ast
+import json
 import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_SOURCE = REPO_ROOT / "engine" / "Plugins" / "UERLEngine" / "Source"
+ENGINE_PLUGIN_DIR = REPO_ROOT / "engine" / "Plugins" / "UERLEngine"
+TRAINING_PLUGIN_DIR = REPO_ROOT / "engine" / "Plugins" / "UERLTraining"
+PLUGIN_SOURCE = ENGINE_PLUGIN_DIR / "Source"
+TRAINING_SOURCE = TRAINING_PLUGIN_DIR / "Source"
+PLUGIN_SOURCES = (PLUGIN_SOURCE, TRAINING_SOURCE)
+HOST_UPROJECT = REPO_ROOT / "engine" / "UERLHost.uproject"
 PROVIDER_BUILD = PLUGIN_SOURCE / "UERLProvider" / "UERLProvider.Build.cs"
-TERRAIN_BUILD = PLUGIN_SOURCE / "UERLTerrain" / "UERLTerrain.Build.cs"
+TERRAIN_BUILD = TRAINING_SOURCE / "UERLTerrain" / "UERLTerrain.Build.cs"
 POLICY_BUILD = PLUGIN_SOURCE / "UERLPolicy" / "UERLPolicy.Build.cs"
 POLICY_PACKAGE = REPO_ROOT / "src" / "uerl" / "policy"
 
@@ -27,8 +33,16 @@ SINGLE_ADD_RE = re.compile(
 )
 
 
-def _module_build_path(module: str, source_root: Path = PLUGIN_SOURCE) -> Path:
-    return source_root / module / f"{module}.Build.cs"
+def _module_build_path(
+    module: str,
+    source_roots: Path | tuple[Path, ...] = PLUGIN_SOURCES,
+) -> Path:
+    roots = (source_roots,) if isinstance(source_roots, Path) else source_roots
+    for root in roots:
+        candidate = root / module / f"{module}.Build.cs"
+        if candidate.is_file():
+            return candidate
+    return roots[0] / module / f"{module}.Build.cs"
 
 
 def _direct_dependencies(build_cs: Path) -> set[str]:
@@ -40,7 +54,10 @@ def _direct_dependencies(build_cs: Path) -> set[str]:
     return deps
 
 
-def _dependency_closure(root_module: str, source_root: Path = PLUGIN_SOURCE) -> set[str]:
+def _dependency_closure(
+    root_module: str,
+    source_roots: Path | tuple[Path, ...] = PLUGIN_SOURCES,
+) -> set[str]:
     seen: set[str] = set()
     stack = [root_module]
     while stack:
@@ -48,7 +65,7 @@ def _dependency_closure(root_module: str, source_root: Path = PLUGIN_SOURCE) -> 
         if module in seen:
             continue
         seen.add(module)
-        build_cs = _module_build_path(module, source_root)
+        build_cs = _module_build_path(module, source_roots)
         if not build_cs.is_file():
             continue
         for dep in _direct_dependencies(build_cs):
@@ -194,6 +211,38 @@ def test_policy_gate_fails_when_uerl_worker_is_added(tmp_path: Path) -> None:
     fake.write_text(poisoned, encoding="utf-8")
     leaked = sorted(_direct_dependencies(fake) & FORBIDDEN_MODULES)
     assert leaked == ["UERLWorker"]
+
+
+def test_plugin_descriptors_isolate_game_runtime_from_training_modules() -> None:
+    engine_descriptor = json.loads((ENGINE_PLUGIN_DIR / "UERLEngine.uplugin").read_text(encoding="utf-8"))
+    training_descriptor = json.loads((TRAINING_PLUGIN_DIR / "UERLTraining.uplugin").read_text(encoding="utf-8"))
+    host_uproject = json.loads(HOST_UPROJECT.read_text(encoding="utf-8"))
+
+    engine_modules = {entry["Name"] for entry in engine_descriptor["Modules"]}
+    engine_plugins = {entry["Name"]: entry["Enabled"] for entry in engine_descriptor["Plugins"]}
+    assert engine_modules == {
+        "UERLInterface",
+        "UERLPolicy",
+        "UERLProvider",
+        "UERLRobot",
+        "UERLPolicyEditor",
+    }
+    assert engine_modules.isdisjoint({"UERLWorker", "UERLTransport", "UERLTerrain"})
+    assert engine_plugins == {"NNERuntimeORT": True}
+    assert "ProceduralMeshComponent" not in engine_plugins
+
+    training_modules = {entry["Name"] for entry in training_descriptor["Modules"]}
+    training_plugins = {entry["Name"]: entry["Enabled"] for entry in training_descriptor["Plugins"]}
+    assert training_modules == {"UERLTerrain", "UERLTransport", "UERLWorker"}
+    assert training_plugins == {"UERLEngine": True, "ProceduralMeshComponent": True}
+
+    host_plugins = {entry["Name"]: entry["Enabled"] for entry in host_uproject["Plugins"]}
+    assert host_plugins == {
+        "UERLEngine": True,
+        "UERLTraining": True,
+        "ProceduralMeshComponent": True,
+        "NNERuntimeORT": True,
+    }
 
 
 def test_policy_package_exists() -> None:

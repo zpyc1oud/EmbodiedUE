@@ -4,7 +4,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace UERLPolicyPhysicsGateTestsPrivate
 {
 	FUERLPhysicsSnapshot GoodSnapshot()
 	{
@@ -50,6 +50,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPhysicsGateBaselineTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPhysicsGateTestsPrivate;
 	const FUERLPhysicsGateReport Report = CheckDeployPhysicsRequirements(GoodSnapshot(), GoodTiming());
 	TestTrue(TEXT("synchronous deployment baseline passes"), Report.bPassed);
 	TestTrue(TEXT("baseline has no failures"), Report.Failures.IsEmpty());
@@ -64,6 +65,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPhysicsGateSubstepRequiredTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPhysicsGateTestsPrivate;
 	FUERLPhysicsSnapshot Snapshot = GoodSnapshot();
 	Snapshot.bSubstepping = false;
 	const FUERLPhysicsGateReport Report = CheckDeployPhysicsRequirements(Snapshot, GoodTiming());
@@ -91,6 +93,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPhysicsGateCapacityAndDilationTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPhysicsGateTestsPrivate;
 	FUERLPhysicsSnapshot Snapshot = GoodSnapshot();
 	Snapshot.MaxSubstepDeltaTime = 0.0;
 	FUERLPhysicsGateReport Report = CheckDeployPhysicsRequirements(Snapshot, GoodTiming());
@@ -126,6 +129,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPhysicsGateAsyncSolverTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPhysicsGateTestsPrivate;
 	FUERLPhysicsSnapshot Snapshot = GoodSnapshot();
 	Snapshot.bTickPhysicsAsync = true;
 	FUERLPhysicsGateReport Report = CheckDeployPhysicsRequirements(Snapshot, GoodTiming());
@@ -151,6 +155,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPhysicsGateReadOnlyTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPhysicsGateTestsPrivate;
 	const FUERLPhysicsSnapshot Before = GoodSnapshot();
 	FUERLPhysicsSnapshot After = Before;
 	const FUERLPhysicsGateReport Report = CheckDeployPhysicsRequirements(After, GoodTiming());
@@ -174,6 +179,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPhysicsGateTrainingBaselineTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPhysicsGateTestsPrivate;
 	FUERLPhysicsSnapshot TrainingSnapshot = GoodSnapshot();
 	TrainingSnapshot.bSubstepping = false;
 	const FUERLPhysicsGateReport Report = CheckDeployPhysicsRequirements(TrainingSnapshot, GoodTiming());
@@ -190,6 +196,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPhysicsGateMaxDeltaTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPhysicsGateTestsPrivate;
 	FUERLPhysicsSnapshot Snapshot = GoodSnapshot();
 	Snapshot.MaxPhysicsDeltaTime = 1.0 / 30.0;
 	FUERLPhysicsGateReport Report = CheckDeployPhysicsRequirements(Snapshot, GoodTiming());

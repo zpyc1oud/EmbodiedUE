@@ -36,7 +36,7 @@ Record the exact combined revision; a different subset does not inherit its acce
 | `parity/` | Reviewed operator, action-plan, artifact, and deployment cases |
 | `e2e/` | Real UnrealEditor-Cmd processes and lifecycle tests |
 | `tooling/` | Installation, packaging, dependency boundaries, and profiling |
-| `ue/unit/` | Index of native UE Automation tests |
+| `engine/Plugins/UERLEngine/Source/*/Private/Tests/Unit/` & `engine/Plugins/UERLTraining/Source/*/Private/Tests/Unit/` | Native UE Automation tests |
 
 Native C++ tests must compile inside UBT modules.
 Their sources are in each module's `Private/Tests/Unit/` directory.
@@ -770,11 +770,11 @@ Native UE Automation tests compile in their UBT modules.
 The C++ source directories are:
 
 - `engine/Plugins/UERLEngine/Source/UERLInterface/Private/Tests/Unit/`
-- `engine/Plugins/UERLEngine/Source/UERLTransport/Private/Tests/Unit/`
-- `engine/Plugins/UERLEngine/Source/UERLTerrain/Private/Tests/Unit/`
-- `engine/Plugins/UERLEngine/Source/UERLWorker/Private/Tests/Unit/`
 - `engine/Plugins/UERLEngine/Source/UERLRobot/Private/Tests/Unit/`
 - `engine/Plugins/UERLEngine/Source/UERLPolicy/Private/Tests/Unit/`
+- `engine/Plugins/UERLTraining/Source/UERLTransport/Private/Tests/Unit/`
+- `engine/Plugins/UERLTraining/Source/UERLTerrain/Private/Tests/Unit/`
+- `engine/Plugins/UERLTraining/Source/UERLWorker/Private/Tests/Unit/`
 
 `UERLRobot` cases cover topology reflection, observation plans, kinematics, contact, and provider registration.
 `UERL.Unit.Robot.GroundQuery.Bindings` checks analytic floor and step heights,

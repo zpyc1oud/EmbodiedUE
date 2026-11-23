@@ -84,7 +84,8 @@ The runtime does not silently replay requests.
 
 The deployment controller needs no Python training process, Worker Session, or wire protocol.
 Its core dependency direction is `UERLPolicy → UERLRobot → UERLProvider → UERLInterface`.
-The plugin descriptor still declares Worker and Transport as Runtime modules.
+`UERLEngine` bundles only the deployment and editor modules (`UERLInterface`, `UERLProvider`, `UERLRobot`, `UERLPolicy`, and `UERLPolicyEditor`) with `NNERuntimeORT`.
+The training host modules (`UERLTerrain`, `UERLTransport`, and `UERLWorker`) live in the separate `UERLTraining` plugin enabled by the training host project.
 Examine the actual build to establish a minimal packaged module set.
 The controller dependency graph alone is insufficient.
 
@@ -154,7 +155,7 @@ The same identity is retained in policy artifacts and video audit metadata.
 
 A supported Robot integration adds UE content, a Python Robot declaration, a Task, and trained artifacts.
 It uses existing generic runtime code.
-See [Add a robot](training.md#add-a-robot).
+See [Add a robot](extending.md#add-a-robot).
 
 The runtime rejects missing PhysicsAssets and unsupported structural contracts.
 It does not guess a Robot configuration.

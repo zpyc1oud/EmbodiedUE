@@ -84,8 +84,9 @@ Chaos 仿真在 UE 中运行。选择 CPU 策略执行仍然需要 UE。
 项目锁定 `torch==2.11.0+cu128`、`torchvision==0.26.0+cu128` 和 `rsl-rl-lib==5.4.2`。
 目前没有已验证的最低内存、显存或吞吐保证。
 
-宿主项目启用 `UERLEngine`、`ProceduralMeshComponent` 和 `NNERuntimeORT`。
-构建前请确认引擎提供后两个插件。遇到问题可查阅[故障排查](docs/training.md#troubleshooting)。
+训练宿主项目启用 `UERLEngine`、`UERLTraining`、`ProceduralMeshComponent` 和 `NNERuntimeORT`。
+游戏部署仅需启用 `UERLEngine` 和 `NNERuntimeORT`。
+构建前请确认引擎提供所需插件。遇到问题可查阅[故障排查](docs/troubleshooting.md#troubleshooting)。
 
 ### 安装与构建
 
@@ -169,7 +170,7 @@ uv run uerl export --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir
 uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task UERL-PhantomX-ContinuousTerrain-v0 --artifact $runDir
 ```
 
-导出需要初始化 UE Session，不是离线 checkpoint 转换。
+若训练 Run 目录中包含 `export_contract.yaml`，导出默认离线完成；仅在传入 `--online` 或导出旧版 Run 时才会启动 UE Session。
 部署会复制运行时、修改目标项目设置，并输出导入命令。操作前保留目标项目备份。
 目标 Editor 构建成功后，可以添加 `--import` 执行导入；只读检查使用 `deploy --check`。
 
@@ -195,7 +196,9 @@ uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task
 
 | 我想做什么 | 阅读文档 |
 |---|---|
-| 配置宿主、添加机器人或任务、训练、评估与录制 | [训练指南](docs/training.md) |
+| 配置宿主、训练、评估与录制 | [训练指南](docs/training.md) |
+| 添加机器人、外部任务或数值输入声明 | [扩展指南](docs/extending.md) |
+| 故障排查、运行诊断与逐 Slot 调试 | [故障排查与诊断](docs/troubleshooting.md) |
 | 导入策略、接入游戏指令、验证与打包 | [部署指南](docs/deployment.md) |
 | 理解接口、单位、时序与扩展约定 | [架构说明](docs/architecture.md) |
 | 编写测试、执行检查或测量运行开销 | [测试指南](tests/README.md) |

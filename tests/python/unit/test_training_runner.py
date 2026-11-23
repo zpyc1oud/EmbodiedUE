@@ -797,3 +797,182 @@ def test_training_debug_marks_setup_failure_incomplete_and_closes_worker(
     records = list(yaml.safe_load_all(path.read_text()))
     assert records[-1]["kind"] == "footer"
     assert records[-1]["complete"] is False
+
+
+def test_run_training_persists_clean_export_contract_with_observation_noise(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Persist export_contract.yaml via a clean Task clone when noise marks export unknown."""
+
+    import torch
+    from tensordict import TensorDict
+
+    import uerl.training.runner as module
+    from uerl import ObservationShapeTable
+    from uerl.core.config.robot import (
+        ObsType,
+        RobotSpec,
+        RobotTopology,
+        merge_robot_spec,
+        parse_robot_config,
+    )
+    from uerl.core.direct.capabilities import CapabilityStatus, TaskCapabilities, TaskCapability
+    from uerl.core.inputs import InputField, InputSpec, ResolvedInput
+    from uerl.core.mdp.plan import PLAN_VERSION, ActionPlan, ObservationPlan, PlanOp
+    from uerl.training.export_contract import EXPORT_CONTRACT_FILENAME, load_export_contract
+
+    robot_cfg = parse_robot_config(
+        """
+actuators:
+  - joint: hinge
+    stiffness: 1.0
+    damping: 0.1
+    effort_limit: 10.0
+    default_pos: 0.0
+    action_scale: 1.0
+observations:
+  - type: joint_position
+    joint: hinge
+reset:
+  distributions: []
+"""
+    )
+    topology = RobotTopology.from_response(
+        {
+            "asset_path": "/Game/Robots/Test/SKM_Test",
+            "body_names": ["base", "hinge_body"],
+            "body_motion_types": ["kinematic", "simulated"],
+            "root_body_index": 0,
+            "fixed_base": True,
+            "joints": [
+                {
+                    "name": "hinge",
+                    "parent_body_index": 0,
+                    "child_body_index": 1,
+                    "degrees_of_freedom": 1,
+                    "coordinate": "twist",
+                    "coordinate_type": "revolute",
+                    "unit": "rad",
+                    "default_position": 0.0,
+                    "lower_limit": -1.0,
+                    "upper_limit": 1.0,
+                    "child_frame": {"position_metres": [0.0, 0.0, 0.0], "rotation_xyzw": [0.0, 0.0, 0.0, 1.0]},
+                    "parent_frame": {"position_metres": [0.0, 0.0, 0.0], "rotation_xyzw": [0.0, 0.0, 0.0, 1.0]},
+                }
+            ],
+        }
+    )
+    robot_spec: RobotSpec = merge_robot_spec(robot_cfg, topology)
+    obs_plan = ObservationPlan(
+        state_requirements=("robot.joint.hinge.joint_position",),
+        ops=(
+            PlanOp(
+                op="select",
+                inputs=(),
+                output="hinge_pos",
+                width=4,
+                params={"field": "robot.joint.hinge.joint_position"},
+            ),
+        ),
+        groups={"policy": ("hinge_pos",)},
+        group_widths={"policy": 4},
+        plan_version=PLAN_VERSION,
+    )
+    act_plan = ActionPlan(
+        ops=(
+            PlanOp(op="policy_action", inputs=(), output="raw", width=1),
+            PlanOp(op="clip", inputs=("raw",), output="cmd", width=1, params={"low": -1.0, "high": 1.0}),
+        ),
+        command_fields=("cmd",),
+        policy_width=1,
+        plan_version=PLAN_VERSION,
+    )
+
+    class _NoisyExportTask(DirectTask):
+        def __init__(self) -> None:
+            super().__init__()
+            self._noisy = False
+
+        def enable_observation_corruption(self, generator: torch.Generator) -> None:
+            del generator
+            self._noisy = True
+
+        @property
+        def observation_plan(self) -> ObservationPlan:
+            return obs_plan
+
+        @property
+        def action_plan(self) -> ActionPlan:
+            return act_plan
+
+        @property
+        def capabilities(self) -> TaskCapabilities:
+            export_cap = (
+                TaskCapability(CapabilityStatus.UNKNOWN, "observation corruption disables export check")
+                if self._noisy
+                else TaskCapability(CapabilityStatus.SUPPORTED)
+            )
+            return TaskCapabilities(
+                train=TaskCapability(CapabilityStatus.SUPPORTED),
+                evaluate=TaskCapability(CapabilityStatus.SUPPORTED),
+                export=export_cap,
+            )
+
+    class _Registry:
+        def resolve(self, task_id: str) -> object:
+            del task_id
+            return type("_Reg", (), {"event_manager_factory": None, "robot_id": "robot"})()
+
+        def create_task(self, task_id: str, cfg: object) -> _NoisyExportTask:
+            del task_id, cfg
+            return _NoisyExportTask()
+
+        def create_curriculum(self, *args: object, **kwargs: object) -> None:
+            del args, kwargs
+            return None
+
+    run_dir = tmp_path / "run"
+    config = replace(_config(run_dir), runner=replace(_config(run_dir).runner, checkpoint=None, max_iterations=1))
+    raw_session = Mock()
+    raw_session.input_requirements = (
+        ResolvedInput(
+            spec=InputSpec(name="hinge_pos", provider_id="uerl.test", provider_version=1),
+            fields=(
+                InputField(
+                    name="hinge_pos.value",
+                    shape=(1,),
+                    unit="radians",
+                    frame="local",
+                    semantic="joint_position",
+                    source="input",
+                ),
+            ),
+        ),
+    )
+
+    def fake_direct_env(adapter: object, task: _NoisyExportTask, **kwargs: object) -> Mock:
+        del adapter, kwargs
+        task.bind_robot_spec(robot_spec, observation_shapes=ObservationShapeTable({ObsType.JOINT_POSITION: ()}))
+        return Mock()
+
+    vec_env = Mock()
+    vec_env.get_observations.return_value = TensorDict({"policy": torch.zeros((2, 4))}, batch_size=[2])
+    runner_inst = Mock()
+    runner_inst.log_dir = str(run_dir / "rsl_rl")
+
+    monkeypatch.setattr(module, "create_default_registry", _Registry)
+    monkeypatch.setattr(cast(Any, module).UERLSession, "open", Mock(return_value=raw_session))
+    monkeypatch.setattr(module, "UERLSessionAdapter", Mock())
+    monkeypatch.setattr(module, "UERLDirectEnv", fake_direct_env)
+    monkeypatch.setattr(module, "UERLVecEnvWrapper", Mock(return_value=vec_env))
+    monkeypatch.setattr(module, "UERLOnPolicyRunner", Mock(return_value=runner_inst))
+
+    run_training(config)
+
+    contract = load_export_contract(run_dir / EXPORT_CONTRACT_FILENAME)
+    assert contract.task_id == config.task_id
+    assert contract.robot_id == "robot"
+    assert contract.observation_group_widths == {"policy": 4}
+    assert contract.num_actions == 1
+    assert len(contract.input_requirements) == 1

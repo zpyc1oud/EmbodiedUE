@@ -60,6 +60,8 @@ desktop.ini
 # ===== Training output =====
 runs/
 tmp/
+output/
+torchinductor_*/
 
 # ===== Agent runtime state =====
 .codebuddy/teams/

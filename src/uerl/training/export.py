@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from uerl.core.config.models import ResolvedRunConfig
 from uerl.core.direct.task import DirectTask
@@ -27,6 +27,7 @@ from uerl.policy.artifact import (
     RobotRuntime,
     RobotRuntimeActuator,
 )
+from uerl.training.export_contract import ExportContract
 
 # Default ONNX filename written by RSL-RL ``export_policy_to_onnx``.
 _DEFAULT_ONNX_FILENAME = "policy.onnx"
@@ -175,7 +176,101 @@ def _export_policy_artifact(
         return artifact
 
 
+class _OfflineDirectEnvStub:
+    """Minimal DirectEnv surface required by ``UERLOnPolicyRunner.load`` during offline export."""
+
+    def curriculum_state_dict(self) -> dict[str, object]:
+        return {}
+
+    def load_curriculum_state_dict(self, state: object) -> None:
+        del state
+
+    def load_random_state_dict(self, state: object) -> None:
+        del state
+
+
+def _build_offline_export_vec_env(contract: ExportContract, config: ResolvedRunConfig) -> Any:
+    """Build a minimal ``VecEnv`` implementing only the observation-shape surface."""
+
+    import torch
+    from rsl_rl.env import VecEnv
+    from tensordict import TensorDict
+
+    from uerl.training.runner import ENVIRONMENT_DEVICE
+
+    class _OfflineExportVecEnv(VecEnv):  # type: ignore[misc]
+        def __init__(self) -> None:
+            self.direct_env = _OfflineDirectEnvStub()
+            self.cfg = config
+            self.num_envs = 1
+            self.num_actions = contract.num_actions
+            self.max_episode_length = 1
+            self.device = ENVIRONMENT_DEVICE
+
+        def get_observations(self) -> TensorDict:
+            return TensorDict(
+                {
+                    name: torch.zeros((1, width), dtype=torch.float32, device=self.device)
+                    for name, width in contract.observation_group_widths.items()
+                },
+                batch_size=[1],
+                device=self.device,
+            )
+
+        def step(self, actions: torch.Tensor) -> tuple[TensorDict, torch.Tensor, torch.Tensor, dict[str, Any]]:
+            del actions
+            raise NotImplementedError("offline export environment does not step")
+
+        def reset(self, *, seed: int | None = None) -> tuple[TensorDict, dict[str, Any]]:
+            del seed
+            return self.get_observations(), {}
+
+    return _OfflineExportVecEnv()
+
+
+def export_policy_offline(
+    *,
+    contract: ExportContract,
+    checkpoint: Path,
+    config: ResolvedRunConfig,
+    output: Path,
+    metadata: ArtifactMetadata,
+    robot_runtime: RobotRuntime,
+    timing: ArtifactTiming,
+) -> PolicyArtifact:
+    """Export one checkpoint to ``UERLPOL2`` using a persisted ``ExportContract`` without starting UE."""
+
+    from uerl.training.rsl_rl import UERLOnPolicyRunner
+    from uerl.training.runner import build_rsl_rl_train_config
+
+    vec_env = _build_offline_export_vec_env(contract, config)
+    runner = UERLOnPolicyRunner(
+        vec_env,
+        build_rsl_rl_train_config(config),
+        log_dir=None,
+        device=config.runner.device,
+    )
+    runner.load(
+        str(checkpoint),
+        map_location=config.runner.device,
+        restore_curriculum=False,
+    )
+    return _export_policy_artifact(
+        observation_plan=contract.observation_plan,
+        action_plan=contract.action_plan,
+        runner=runner,
+        output=output,
+        metadata=metadata,
+        robot_runtime=robot_runtime,
+        timing=timing,
+        task_id=contract.task_id,
+        robot_id=contract.robot_id,
+        input_requirements=contract.input_requirements,
+    )
+
+
 __all__ = [
     "export_policy",
+    "export_policy_offline",
     "robot_runtime_from_config",
 ]

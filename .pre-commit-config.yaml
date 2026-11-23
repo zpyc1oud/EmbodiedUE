@@ -26,19 +26,19 @@ repos:
         entry: uv run pytest -q
         language: system
         pass_filenames: false
-        files: ^(src|scripts|tests|configs)/|^pyproject\.toml$
+        files: ^(src|scripts|tests)/|^pyproject\.toml$
         stages: [pre-commit]
       - id: mypy-push
         name: run Mypy on src and tests
         entry: uv run mypy src tests
         language: system
         pass_filenames: false
-        files: ^(src|tests|engine|configs)/|^pyproject\.toml$
+        files: ^(src|tests|engine)/|^pyproject\.toml$
         stages: [pre-push]
       - id: full-tests
         name: run full test suite
         entry: uv run python scripts/run_all_tests.py
         language: system
         pass_filenames: false
-        files: ^(src|tests|engine|configs)/|^pyproject\.toml$
+        files: ^(src|tests|engine)/|^pyproject\.toml$
         stages: [pre-push]

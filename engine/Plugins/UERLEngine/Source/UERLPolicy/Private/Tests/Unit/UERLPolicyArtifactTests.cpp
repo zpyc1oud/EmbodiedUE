@@ -12,7 +12,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace UERLPolicyArtifactTestsPrivate
 {
 	bool ResolveArtifactCorpusDir(FString& OutDir, FString& OutError)
 	{
@@ -208,6 +208,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyArtifactLoadCorpusTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyArtifactTestsPrivate;
 	FString CorpusDir;
 	FString Error;
 	TestTrue(TEXT("resolve artifact corpus directory"), ResolveArtifactCorpusDir(CorpusDir, Error));
@@ -462,6 +463,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyArtifactCorruptionsTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyArtifactTestsPrivate;
 	FString CorpusDir;
 	FString Error;
 	TestTrue(TEXT("resolve artifact corpus directory"), ResolveArtifactCorpusDir(CorpusDir, Error));
@@ -565,6 +567,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyArtifactTimingTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyArtifactTestsPrivate;
 	FString CorpusDir;
 	FString Error;
 	TestTrue(TEXT("resolve artifact corpus directory"), ResolveArtifactCorpusDir(CorpusDir, Error));
@@ -682,6 +685,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyArtifactIgnoresOnnxGraphTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyArtifactTestsPrivate;
 	FString CorpusDir;
 	FString Error;
 	TestTrue(TEXT("resolve artifact corpus directory"), ResolveArtifactCorpusDir(CorpusDir, Error));

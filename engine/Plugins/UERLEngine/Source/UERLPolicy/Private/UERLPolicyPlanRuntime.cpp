@@ -1,6 +1,6 @@
 #include "UERLPolicyPlanRuntime.h"
 
-namespace
+namespace UERLPolicyPlanRuntimePrivate
 {
 	bool Fail(FString& OutError, const FString& Message)
 	{
@@ -100,6 +100,7 @@ bool FUERLPlanRuntime::CompileOps(
 	TMap<FName, int32>& OutSlotByName,
 	FString& OutError)
 {
+	using namespace UERLPolicyPlanRuntimePrivate;
 	TMap<FName, int32> FieldOffsets;
 	TMap<FName, int32> FieldWidths;
 	int32 RawOffset = 0;
@@ -445,6 +446,7 @@ bool FUERLPlanRuntime::Compile(
 	const TMap<FName, int32>& AvailableCommands,
 	FString& OutError)
 {
+	using namespace UERLPolicyPlanRuntimePrivate;
 	Reset();
 	RegisterBuiltinPlanOperators();
 
@@ -534,6 +536,7 @@ bool FUERLPlanRuntime::Compile(
 	const TMap<FName, int32>& AvailableCommands,
 	FString& OutError)
 {
+	using namespace UERLPolicyPlanRuntimePrivate;
 	Reset();
 	RegisterBuiltinPlanOperators();
 
@@ -618,6 +621,7 @@ bool FUERLPlanRuntime::Compile(
 
 bool FUERLPlanRuntime::Execute(const FUERLPlanInputs& Inputs, TArray<float>& OutValues, FString& OutError)
 {
+	using namespace UERLPolicyPlanRuntimePrivate;
 	if (!bCompiled)
 	{
 		return Fail(OutError, TEXT("plan runtime is not compiled"));

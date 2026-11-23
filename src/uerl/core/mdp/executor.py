@@ -39,11 +39,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import torch
 
-from uerl.core.direct.types import PhysicalCommandBatch
 from uerl.core.mdp.operators import (
     EvaluateFn,
     OperatorSpec,
@@ -58,6 +57,9 @@ from uerl.core.mdp.operators import (
     require_operator,
 )
 from uerl.core.mdp.plan import ActionPlan, ObservationPlan, PlanOp
+
+if TYPE_CHECKING:
+    from uerl.core.direct.types import PhysicalCommandBatch
 from uerl.errors import ConfigError
 
 
@@ -194,6 +196,8 @@ class ActionPlanExecutor:
             self._specs,
             PlanInputs(raw_state={}, policy_action=policy_actions),
         )
+        from uerl.core.direct.types import PhysicalCommandBatch
+
         return PhysicalCommandBatch({name: slots[name] for name in self._plan.command_fields})
 
 

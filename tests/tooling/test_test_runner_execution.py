@@ -189,12 +189,14 @@ def test_native_registrations_have_one_execution_owner() -> None:
     groups = run_all_tests.selected_automation_cases()
     assert "UERL.Integration.Policy.DeclaredInputs.GameContract" in groups[0]
     assert "UERL.Integration.Policy.DeclaredInputs.ComponentGroundBinding" in groups[0]
+    assert run_all_tests.PHYSICS_RESPONSE_CASES
+    assert all(name.startswith("UERL.Integration.PhysicsResponse.") for name in run_all_tests.PHYSICS_RESPONSE_CASES)
 
 
 def test_missing_native_filter_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     groups = list(run_all_tests.UE_AUTOMATION_GROUPS)
-    label, _, minimum = groups[0]
-    groups[0] = (label, "UERL.DoesNotExist", minimum)
+    label, _ = groups[0]
+    groups[0] = (label, "UERL.DoesNotExist")
     monkeypatch.setattr(run_all_tests, "UE_AUTOMATION_GROUPS", tuple(groups))
     with pytest.raises(ValueError, match="execution owner"):
         run_all_tests.selected_automation_cases()

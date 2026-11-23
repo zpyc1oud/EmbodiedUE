@@ -122,4 +122,4 @@ def test_installed_framework_records_package_identity_without_using_enclosing_gi
 
     identity = capture_git_identity()
 
-    assert identity == {"commit": "unavailable", "ref": "package:ue-rl-engine==1.0.0", "dirty": False}
+    assert identity == {"commit": "unavailable", "ref": "package:ue-rl-engine==0.1.0", "dirty": False}

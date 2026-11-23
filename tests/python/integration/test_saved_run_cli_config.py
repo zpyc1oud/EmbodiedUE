@@ -221,7 +221,7 @@ def test_checkpoint_inside_historical_json_run_gets_migration_guidance(
     )
 
     assert result == 1
-    assert "run_migration" in capsys.readouterr().out
+    assert "schema version 1" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("command", ["play", "export"])

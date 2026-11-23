@@ -3,21 +3,26 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import re
 import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
 
+from ..application.project_installer import (
+    InstallError,
+    check_project,
+    default_repo_root,
+    install,
+    resolve_project,
+)
 from ..application.run_config import RESOLVED_CONFIG_FILENAME
 from ..core.config.snapshot import resolved_config_from_yaml
 from ..errors import ConfigError
+from ..host import resolve_host_profile
 from ..training.runs import resolve_run_directory
 from .boundary import guard
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_UE_EDITOR = Path(r"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe")
+REPO_ROOT = default_repo_root()
 _ASSET_NAME = re.compile(r"[^A-Za-z0-9_]+")
 
 
@@ -48,19 +53,19 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run the UERLPolicyImport commandlet after preparing the project.",
     )
-    parser.add_argument("--ue-executable", type=Path, default=DEFAULT_UE_EDITOR, help="Path to UnrealEditor.exe.")
+    parser.add_argument(
+        "--host-profile",
+        type=Path,
+        help="TOML profile; else UERL_HOST_PROFILE or ~/.uerl/host.toml.",
+    )
+    parser.add_argument(
+        "--ue-executable",
+        type=Path,
+        default=None,
+        help="Override the profile's UnrealEditor executable path.",
+    )
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Repository that owns the source plugin.")
     return parser
-
-
-def _installer() -> ModuleType:
-    script = REPO_ROOT / "scripts" / "install_into_project.py"
-    spec = importlib.util.spec_from_file_location("install_into_project", script)
-    if spec is None or spec.loader is None:
-        raise FileNotFoundError(f"install script not found: {script}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _resolve_artifact(reference: str, task_id: str | None) -> tuple[Path, Path | None]:
@@ -171,17 +176,16 @@ def main(argv: list[str] | None = None) -> int:
             print("[FAIL] pass --task or both --asset and --robotmesh")
             return 1
 
-    installer = _installer()
     try:
         if args.check:
-            checks = installer.check_project(project_dir=args.project, artifact=artifact)
+            checks = check_project(project_dir=args.project, artifact=artifact)
             for check in checks:
                 status = "PASS" if check.passed else "FAIL"
                 print(f"[{status}] {check.name}: {check.detail}")
             if not all(check.passed for check in checks):
                 return 1
         else:
-            for line in installer.install(
+            for line in install(
                 project_dir=args.project,
                 repo_root=args.repo_root.resolve(),
                 force=args.force,
@@ -195,10 +199,14 @@ def main(argv: list[str] | None = None) -> int:
         if not robotmesh or not asset:
             print("[NEXT] pass --task or both --asset and --robotmesh to print the import command")
             return 1 if args.import_artifact else 0
-        project_root, uproject = installer.resolve_project(args.project)
+        project_root, uproject = resolve_project(args.project)
         del project_root
-        command = _import_command(
+        ue_executable = resolve_host_profile(
+            profile_path=args.host_profile,
             ue_executable=args.ue_executable,
+        ).ue_executable
+        command = _import_command(
+            ue_executable=ue_executable,
             uproject=uproject,
             artifact=artifact,
             asset=asset,
@@ -209,11 +217,11 @@ def main(argv: list[str] | None = None) -> int:
         if not args.import_artifact:
             print("[NEXT] add --import to run that command, then run UERL.CheckProject and place BP_UERLPolicyRobot")
             return 0
-        if not args.ue_executable.is_file():
-            print(f"[FAIL] Unreal Editor not found: {args.ue_executable}")
+        if not ue_executable.is_file():
+            print(f"[FAIL] Unreal Editor not found: {ue_executable}")
             return 1
         return subprocess.run(command, check=False).returncode
-    except installer.InstallError as exc:
+    except InstallError as exc:
         print(f"[FAIL] {exc}", file=sys.stderr)
         return 1
 
