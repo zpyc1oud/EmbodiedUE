@@ -201,8 +201,8 @@ uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task
 | 编写测试、执行检查或测量运行开销 | [测试指南](tests/README.md) |
 | 提出、审阅、验证与合并改动 | [贡献指南](CONTRIBUTING.md) |
 
-开发计划、审查记录和实验进度放在 [Issues](https://github.com/zpyc1oud/EmbodiedUE/issues) 与 PR 中。
-仓库文档保留可复用的使用与维护说明，不为每一步开发新增记录文件。
+开始开发前，先查找或新建 [GitHub Issue](https://github.com/zpyc1oud/EmbodiedUE/issues)。
+优先级和依赖关系见[开发路线图](https://github.com/zpyc1oud/EmbodiedUE/issues/51)。
 
 安装依赖后，可运行纯 Python 测试：
 

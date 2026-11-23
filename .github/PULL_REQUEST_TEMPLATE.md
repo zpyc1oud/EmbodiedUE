@@ -1,7 +1,7 @@
 ## Problem and change
 
 Describe the problem and final behavior.
-Link the related Issue or RFC.
+Link the GitHub Issue for the change and any applicable RFC.
 Use a closing keyword only when this PR completes its acceptance scope.
 
 ## Scope and contracts

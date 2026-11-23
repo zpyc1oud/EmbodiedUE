@@ -11,7 +11,7 @@ Keep implemented capabilities separate from intended adaptive behavior.
 - For domain contracts or timing changes, read `docs/architecture.md`.
 - For system boundaries and design decisions, read `docs/architecture.md`.
 - For topic-specific documentation, use `README.md`.
-- For proposals, validation, review, merge, and release, use `CONTRIBUTING.md`.
+- Before implementation, use `CONTRIBUTING.md` to find or open the GitHub Issue. Use the same guide for validation, review, merge, and release.
 - For shared UE validation, use `CONTRIBUTING.md`.
 - For robot integration, video, and deployment, use `docs/training.md` and `docs/deployment.md`.
 - Before you add or change tests, read `tests/README.md`.
