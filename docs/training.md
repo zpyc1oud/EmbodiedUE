@@ -474,6 +474,17 @@ See [external Tasks](training.md#external-tasks) if you want to keep your Task i
 The result of this guide is a registered integration ready for training and physical validation.
 Generating files alone does not validate the robot's dynamics.
 
+### Import a frozen Isaac Lab map
+
+Export the Go2 flat surface and one frozen rough tile with Isaac Lab 2.3.2. The fixtures capture the collision triangles, spawn origin, physical material, and PhysX ray probes. Enable the Python Editor Script Plugin in the destination UE 5.8 project.
+
+```powershell
+& '<Isaac Lab Python executable>' scripts/export_isaac_go2_terrain.py --output '<fixture-directory>'
+uv run python scripts/import_isaac_terrain.py --fixture '<fixture-directory>/slope.json' --project '<project.uproject>' --ue-executable '<UnrealEditor-Cmd.exe>' --level /Game/Maps/IsaacLabSlope --report-dir '<report-directory>'
+```
+
+Use `flat.json` for the 24 m × 24 m flat surface. Choose a new UE level package for each import. The importer reopens each saved level to check the bounds, spawn marker, physical material, and collision rays. Use the marked origin when configuring the authored-map spawn.
+
 <a id="add-a-robot-create-starter-files"></a>
 ### Create starter files
 
