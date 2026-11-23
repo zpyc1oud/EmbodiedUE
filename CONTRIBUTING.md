@@ -80,7 +80,7 @@ Use repository-relative links and reproducible commands.
 Use placeholders for host-specific paths.
 Keep first-use instructions in the README, operating procedures in `docs/training.md` and `docs/deployment.md`, and shared contracts in `docs/architecture.md`.
 Keep test authoring and execution in `tests/README.md`.
-Record development plans, audits, and experiment progress in Issues, PRs, or external artifacts, not new repository documents.
+Track development plans and experiment progress in GitHub Issues. Link PRs and supporting artifacts from the Issue.
 Keep experiment reports and development journals out of public product guides.
 Measurements from one host do not establish compatibility or performance guarantees.
 
@@ -167,21 +167,20 @@ This page defines the path from proposal to review, merge, and release.
 
 The [roadmap](https://github.com/zpyc1oud/EmbodiedUE/issues/51) defines release scope.
 Accepted [RFCs](docs/architecture.md#architecture-architecture-and-design-rationale) record design decisions.
-Issues track execution.
+GitHub Issues hold the scope, acceptance criteria, and progress for each change.
 PRs record implementation and validation evidence.
 
 <a id="contribution-workflow-1-choose-the-smallest-useful-proposal"></a>
 ### 1. Choose the smallest useful proposal
 
-- **Small repair or documentation correction:** open a focused PR. Describe the problem and expected behavior. A separate Issue is optional.
-- **Feature or behavior change:** open or use an Issue before substantial implementation. Record use, scope, acceptance behavior, dependencies, and validation. Agree on scope with the maintainer.
-- **Architecture or public-contract change:** discuss an RFC before implementation. Record motivation, examples, alternatives, migration, and validation.
+1. Search [GitHub Issues](https://github.com/zpyc1oud/EmbodiedUE/issues) and PRs. Reuse an Issue that covers the work or open a focused one before implementation. This applies to fixes, documentation changes, features, and training experiments.
+2. Record the problem, intended outcome, and evidence that will show it works. Add dependencies and validation details where they affect execution. Keep progress in the Issue and link evidence from it.
+3. For an architecture or public-contract change, link an RFC from the Issue and discuss it before implementation. Include motivation, examples, alternatives, migration, and validation.
 
 Public-contract changes include Task APIs, Run restoration, protocols, artifacts, and training/deployment semantics.
 Use RFC 0001 as an example.
 If an accepted decision changes, update its RFC.
 
-Search existing Issues and PRs first.
 Keep one coherent outcome per PR.
 Separate independent work and state dependencies between related PRs.
 Use a closing keyword only when the PR completes the referenced Issue's acceptance scope.
@@ -212,7 +211,7 @@ Open new PRs as Draft while implementation or required evidence is incomplete.
 Use the existing PR template when one is available.
 Include:
 
-- Problem, final behavior, and related Issue or RFC
+- Problem, final behavior, and the GitHub Issue for the change. Link its RFC when applicable.
 - Scope and user-visible changes, including compatibility or migration effects
 - Validation commands, results, and evidence links
 - Missing host or content requirements

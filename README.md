@@ -211,8 +211,8 @@ See [configuration](docs/training.md#configuration).
 | Write tests, run checks, or measure runtime cost | [Testing](tests/README.md) |
 | Propose, review, validate, or merge a contribution | [Contributing](CONTRIBUTING.md) |
 
-Use [Issues](https://github.com/zpyc1oud/EmbodiedUE/issues) and PRs for development plans, review records, and experiment progress.
-Maintain reusable instructions in these guides instead of adding a document for each development step.
+Find or open a [GitHub Issue](https://github.com/zpyc1oud/EmbodiedUE/issues) before implementation.
+Follow the [development roadmap](https://github.com/zpyc1oud/EmbodiedUE/issues/51) for priorities and dependencies.
 
 For Python-only development after installation:
 
