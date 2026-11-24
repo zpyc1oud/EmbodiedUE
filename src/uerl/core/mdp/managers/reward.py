@@ -116,10 +116,13 @@ class RewardManager:
 
         values: dict[str, torch.Tensor] = {}
         for term in self._terms:
-            kwargs = dict(term.params)
             if term.consumes_terminations:
+                kwargs = dict(term.params)
                 kwargs["terminations"] = terminations
-            value = term.func(ctx, **kwargs) * term.weight
+                raw_value = term.func(ctx, **kwargs)
+            else:
+                raw_value = term.func(ctx, **term.params)
+            value = raw_value * term.weight
             if term.time_mode == "rate":
                 if self._reference_dt_s is None or ctx.transition_dt is None:
                     raise ValueError("rate reward requires reference_dt_s and transition_dt")
@@ -139,11 +142,18 @@ class RewardManager:
         self.debug_step_values = parts if self.capture_step_values else None
         total = torch.zeros(rows, device=ctx.episode_steps.device, dtype=torch.float32)
         slot_ids = ctx.slot_ids
-        if slot_ids is None:
-            slot_ids = torch.arange(rows, device=ctx.episode_steps.device)
-        for name, value in parts.items():
-            self._episode_sums[name][slot_ids] += value
-            total = total + value
+        if slot_ids is None or ctx._all_slots_contiguous:
+            for name, value in parts.items():
+                sums = self._episode_sums[name]
+                if sums.shape[0] == rows:
+                    sums.add_(value)
+                else:
+                    sums[:rows].add_(value)
+                total.add_(value)
+        else:
+            for name, value in parts.items():
+                self._episode_sums[name][slot_ids] += value
+                total.add_(value)
         return total
 
     def episode_log(self, reset_mask: torch.Tensor) -> Mapping[str, float]:

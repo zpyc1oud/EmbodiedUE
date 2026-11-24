@@ -719,7 +719,7 @@ private:
 	{
 		if (!PerformanceLog) { return; }
 		const double AccountedWorkerSeconds = Timing.QueueWaitSeconds + Timing.ActionApplySeconds
-			+ Timing.PhysicsFrameSeconds + Timing.ContactSampleSeconds + Timing.StateCollectSeconds;
+			+ Timing.PhysicsFrameSeconds + Timing.StateCollectSeconds;
 		TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
 		Record->SetStringField(TEXT("request_type"), TEXT("step"));
 		Record->SetStringField(TEXT("sequence"), LexToString(Sequence));

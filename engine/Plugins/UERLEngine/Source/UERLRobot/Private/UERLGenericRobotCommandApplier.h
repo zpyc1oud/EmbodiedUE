@@ -5,6 +5,7 @@
 
 class USkeletalMeshComponent;
 class UWorld;
+struct FBodyInstance;
 struct FConstraintInstance;
 
 /**
@@ -16,6 +17,9 @@ struct FUERLRobotCommandSlotView
 	USkeletalMeshComponent* Component = nullptr;
 	const TArray<int32>* ConstraintIndices = nullptr;
 	const TArray<float>* Targets = nullptr;
+	const TArray<FBodyInstance*>* BodyInstances = nullptr;
+	const TArray<FConstraintInstance*>* Constraints = nullptr;
+	TArray<float>* LastAppliedDriveTargets = nullptr;
 };
 
 /** Return whether an actuator is held by a Chaos joint drive instead of an applied effort. */

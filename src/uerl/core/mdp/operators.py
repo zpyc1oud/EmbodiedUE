@@ -35,6 +35,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from functools import lru_cache
 from types import MappingProxyType
 from typing import Final, TypeGuard, cast
 
@@ -138,6 +139,24 @@ def _rotate_inverse_evaluate(
     return _quat_rotate_inverse(args[0], args[1])
 
 
+@lru_cache(maxsize=64)
+def _cached_vec3(
+    gravity: tuple[float, float, float],
+    dtype: torch.dtype,
+    device: torch.device,
+) -> torch.Tensor:
+    return torch.tensor(gravity, dtype=dtype, device=device)
+
+
+@lru_cache(maxsize=128)
+def _cached_row(
+    values: tuple[float, ...],
+    dtype: torch.dtype,
+    device: torch.device,
+) -> torch.Tensor:
+    return torch.tensor(values, dtype=dtype, device=device).unsqueeze(0)
+
+
 def _broadcast_vec3(gravity: ParamValue, quat: torch.Tensor) -> torch.Tensor:
     if not isinstance(gravity, tuple) or len(gravity) != 3:
         raise ConfigError(
@@ -145,7 +164,12 @@ def _broadcast_vec3(gravity: ParamValue, quat: torch.Tensor) -> torch.Tensor:
             code="OP_PARAM",
             path="params.gravity",
         )
-    return torch.as_tensor(gravity, dtype=quat.dtype, device=quat.device).expand(quat.shape[0], 3)
+    vec = _cached_vec3(
+        (float(gravity[0]), float(gravity[1]), float(gravity[2])),
+        quat.dtype,
+        quat.device,
+    )
+    return vec.expand(quat.shape[0], 3)
 
 
 def _projected_gravity_evaluate(
@@ -188,14 +212,14 @@ def _as_row(value: ParamValue, reference: torch.Tensor, *, path: str = "params")
             device=reference.device,
         )
     if isinstance(value, tuple):
-        row = torch.as_tensor(value, dtype=reference.dtype, device=reference.device)
-        if row.ndim != 1 or row.shape[0] != width:
+        if len(value) != width:
             raise ConfigError(
-                f"vector param has {row.numel()} entries but its input is {width} wide",
+                f"vector param has {len(value)} entries but its input is {width} wide",
                 code="OP_PARAM",
                 path=path,
             )
-        return row.unsqueeze(0).expand(reference.shape[0], -1)
+        vals = tuple(float(item) for item in value)
+        return _cached_row(vals, reference.dtype, reference.device).expand(reference.shape[0], -1)
     raise ConfigError(
         f"param must be a number or numeric tuple, got {type(value).__name__}",
         code="OP_PARAM",
@@ -207,7 +231,10 @@ def _joint_pos_rel_evaluate(
     args: Sequence[torch.Tensor],
     params: Mapping[str, ParamValue],
 ) -> torch.Tensor:
-    return args[0] - _as_row(params["default"], args[0], path="params.default")
+    default = params["default"]
+    if _is_numeric_scalar(default):
+        return args[0] - float(default)
+    return args[0] - _as_row(default, args[0], path="params.default")
 
 
 def check_joint_pos_rel(op: PlanOp, input_widths: Sequence[int], *, path: str) -> None:
@@ -325,14 +352,20 @@ def _scale_evaluate(
     args: Sequence[torch.Tensor],
     params: Mapping[str, ParamValue],
 ) -> torch.Tensor:
-    return args[0] * _as_row(params["factor"], args[0], path="params.factor")
+    factor = params["factor"]
+    if _is_numeric_scalar(factor):
+        return args[0] * float(factor)
+    return args[0] * _as_row(factor, args[0], path="params.factor")
 
 
 def _offset_evaluate(
     args: Sequence[torch.Tensor],
     params: Mapping[str, ParamValue],
 ) -> torch.Tensor:
-    return args[0] + _as_row(params["bias"], args[0], path="params.bias")
+    bias = params["bias"]
+    if _is_numeric_scalar(bias):
+        return args[0] + float(bias)
+    return args[0] + _as_row(bias, args[0], path="params.bias")
 
 
 def _clip_evaluate(

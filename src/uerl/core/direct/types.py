@@ -13,6 +13,8 @@ import torch
 def _readonly_mapping(values: Mapping[str, torch.Tensor]) -> Mapping[str, torch.Tensor]:
     """Prevent replacement of named fields after a batch crosses the seam."""
 
+    if isinstance(values, MappingProxyType):
+        return values
     return MappingProxyType(dict(values))
 
 
@@ -186,6 +188,8 @@ class StepContext:
     transition_dt: float | None = None
     slot_ids: torch.Tensor | None = None
     episode_elapsed_s: torch.Tensor | None = None
+    _all_slots_contiguous: bool = field(default=False, repr=False, compare=False)
+    _cache: dict[Any, Any] = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "raw_state", _readonly_mapping(self.raw_state))

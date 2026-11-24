@@ -289,7 +289,24 @@ bool SpawnGenericRobotSlots(
 		}
 		Context.CollisionProfile.ApplyRobot(*Component);
 		Component->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		Component->SetNotifyRigidBodyCollision(true);
+		if (bOwnsActor)
+		{
+			Component->SetGenerateOverlapEvents(false);
+			if (!FApp::CanEverRender())
+			{
+				Component->SetNotifyRigidBodyCollision(false);
+				Component->bUpdateOverlapsOnAnimationFinalize = false;
+				Component->SetCastShadow(false);
+			}
+			else
+			{
+				Component->SetNotifyRigidBodyCollision(true);
+			}
+		}
+		else
+		{
+			Component->SetNotifyRigidBodyCollision(true);
+		}
 		if (!Component->IsRegistered())
 		{
 			Component->RegisterComponent();
@@ -346,6 +363,7 @@ bool SpawnGenericRobotSlots(
 		Slot.ClaimedAttachParent = ClaimedAttachParent;
 		Slot.ClaimedRelativeTransform = ClaimedRelativeTransform;
 		Slot.ClaimedPhysMaterialOverride.Reset(bOwnsActor ? nullptr : Component->GetPhysicsMaterialOverride());
+		Slot.BodyInstances.Reserve(Topology.BodyNames.Num());
 		for (const FName BodyName : Topology.BodyNames)
 		{
 			FBodyInstance* Body = Component->GetBodyInstance(BodyName);
@@ -357,6 +375,7 @@ bool SpawnGenericRobotSlots(
 				DestroyGenericRobotSpawnedSlots(OutSlots);
 				return false;
 			}
+			Slot.BodyInstances.Add(Body);
 		}
 
 		Slot.Origin = PlacementOrigin;
@@ -394,10 +413,12 @@ bool SpawnGenericRobotSlots(
 			DestroyGenericRobotSpawnedSlots(OutSlots);
 			return false;
 		}
+		Slot.Constraints.Reserve(Slot.ConstraintIndices.Num());
 		for (const int32 ConstraintIndex : Slot.ConstraintIndices)
 		{
 			FConstraintInstance* Constraint = Component->GetConstraintInstanceByIndex(ConstraintIndex);
 			checkf(Constraint, TEXT("generic Robot runtime constraint %d is missing"), ConstraintIndex);
+			Slot.Constraints.Add(Constraint);
 			if (!bOwnsActor)
 			{
 				Slot.ClaimedProjection.Emplace(ConstraintIndex, Constraint->IsProjectionEnabled());
@@ -432,10 +453,10 @@ bool SpawnGenericRobotSlots(
 		const FTransform CanonicalFrame = !bOwnsActor && bFloatingRoot
 			? Component->GetComponentTransform() : SlotFrame;
 		Slot.CanonicalBodies.Reserve(Topology.BodyNames.Num());
-		for (const FName BodyName : Topology.BodyNames)
+		for (int32 BodyIndex = 0; BodyIndex < Topology.BodyNames.Num(); ++BodyIndex)
 		{
-			FBodyInstance* Body = Component->GetBodyInstance(BodyName);
-			checkf(Body, TEXT("generic Robot canonical body '%s' is missing"), *BodyName.ToString());
+			FBodyInstance* Body = Slot.BodyInstances[BodyIndex];
+			checkf(Body, TEXT("generic Robot canonical body '%s' is missing"), *Topology.BodyNames[BodyIndex].ToString());
 			FUERLGenericRobotCanonicalBody& Canonical = Slot.CanonicalBodies.AddDefaulted_GetRef();
 			Canonical.SlotTransform = Body->GetUnrealWorldTransform().GetRelativeTransform(CanonicalFrame);
 			Canonical.SlotLinearVelocity = Slot.GroundRotation.Inverse().RotateVector(
@@ -445,9 +466,11 @@ bool SpawnGenericRobotSlots(
 		}
 		// Changing a Chaos joint drive target does not wake a sleeping island, so a
 		// Robot that settles under an unchanged command would ignore the next one.
-		for (const FName BodyName : Topology.BodyNames)
+		for (int32 BodyIndex = 0; BodyIndex < Topology.BodyNames.Num(); ++BodyIndex)
 		{
-			FPhysicsActorHandle Handle = Component->GetBodyInstance(BodyName)->GetPhysicsActorHandle();
+			const FName BodyName = Topology.BodyNames[BodyIndex];
+			FBodyInstance* Body = Slot.BodyInstances[BodyIndex];
+			FPhysicsActorHandle Handle = Body->GetPhysicsActorHandle();
 			checkf(Handle, TEXT("generic Robot body '%s' has no physics actor"), *BodyName.ToString());
 			if (!bOwnsActor)
 			{
@@ -461,7 +484,6 @@ bool SpawnGenericRobotSlots(
 				// pose when Chaos first consumes the actor updates. Publish a None
 				// target without advancing the solver or changing kinematic bodies.
 				PhysicsBody.SetKinematicTarget(Chaos::FKinematicTarget());
-				FBodyInstance* Body = Component->GetBodyInstance(BodyName);
 				if (!bOwnsActor)
 				{
 					Slot.ClaimedIterations.Add({BodyName, Body->PositionSolverIterationCount,

@@ -212,6 +212,7 @@ class UERLDirectEnv:
         self._episode_return = torch.zeros(self.num_envs, dtype=torch.float32, device=self.device)
         self.episode_length_buf = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self.episode_solver_steps = torch.zeros(self.num_envs, dtype=torch.int64, device=self.device)
+        self._all_slot_ids = torch.arange(self.num_envs, dtype=torch.int64, device=self.device)
         self._previous_policy_actions: torch.Tensor
         self._closed = False
         self._current_state: StateBatch
@@ -454,43 +455,76 @@ class UERLDirectEnv:
         # valid rows so task mathematics cannot consume fallback state values.
         with self._stage("reward_term"):
             task_valid = transition.state_valid & transition.slot_fault_code.eq(0)
-            valid_ids = torch.nonzero(task_valid, as_tuple=False).flatten()
+            all_valid = bool(task_valid.all())
             valid_context: StepContext | None = None
             valid_terminations: TerminationResult | None = None
-            terminated = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-            truncated = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-            terminated[~task_valid] = True
-            rewards = torch.full(
-                (self.num_envs,),
-                self.task.slot_fault_reward,
-                dtype=torch.float32,
-                device=self.device,
-            )
             metrics: Mapping[str, torch.Tensor | float] = {}
 
-            if valid_ids.numel():
-                valid_context = _compact_context(
-                    previous_task_state,
-                    scored_state,
-                    physical_command,
-                    self._previous_policy_actions,
-                    policy_actions,
-                    transition_dt,
-                    self.episode_length_buf,
-                    episode_elapsed_s,
-                    valid_ids,
+            if all_valid:
+                valid_ids = self._all_slot_ids
+                valid_context = StepContext(
+                    raw_state=previous_task_state.values,
+                    previous_policy_actions=self._previous_policy_actions,
+                    policy_actions=policy_actions,
+                    physical_command=physical_command,
+                    transition_state=scored_state.values,
+                    state_valid=scored_state.state_valid,
+                    slot_fault_code=scored_state.slot_fault_code,
+                    episode_steps=self.episode_length_buf,
+                    transition_dt=transition_dt,
+                    slot_ids=valid_ids,
+                    episode_elapsed_s=episode_elapsed_s,
+                    _all_slots_contiguous=True,
                 )
                 valid_terminations = self.task.compute_terminations(valid_context)
-                terminated[valid_ids] = valid_terminations.terminated.to(device=self.device, dtype=torch.bool)
-                truncated[valid_ids] = valid_terminations.truncated.to(device=self.device, dtype=torch.bool)
-                valid_rewards = self.task.compute_rewards(valid_context, valid_terminations)
-                rewards[valid_ids] = valid_rewards.to(device=self.device, dtype=torch.float32)
-                metrics = _expand_mapping(
-                    self.task.collect_metrics(valid_context, valid_terminations),
-                    valid_ids,
-                    self.num_envs,
-                    self.device,
+                terminated = valid_terminations.terminated.to(device=self.device, dtype=torch.bool)
+                truncated = valid_terminations.truncated.to(device=self.device, dtype=torch.bool)
+                rewards = self.task.compute_rewards(valid_context, valid_terminations).to(
+                    device=self.device, dtype=torch.float32
                 )
+                raw_metrics = self.task.collect_metrics(valid_context, valid_terminations)
+                metrics = {
+                    name: value.to(device=self.device) if isinstance(value, torch.Tensor) else value
+                    for name, value in raw_metrics.items()
+                }
+            else:
+                valid_ids = torch.nonzero(task_valid, as_tuple=False).flatten()
+                terminated = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                truncated = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                terminated[~task_valid] = True
+                rewards = torch.full(
+                    (self.num_envs,),
+                    self.task.slot_fault_reward,
+                    dtype=torch.float32,
+                    device=self.device,
+                )
+                if valid_ids.numel():
+                    valid_context = _compact_context(
+                        previous_task_state,
+                        scored_state,
+                        physical_command,
+                        self._previous_policy_actions,
+                        policy_actions,
+                        transition_dt,
+                        self.episode_length_buf,
+                        episode_elapsed_s,
+                        valid_ids,
+                    )
+                    valid_terminations = self.task.compute_terminations(valid_context)
+                    terminated[valid_ids] = valid_terminations.terminated.to(
+                        device=self.device, dtype=torch.bool
+                    )
+                    truncated[valid_ids] = valid_terminations.truncated.to(
+                        device=self.device, dtype=torch.bool
+                    )
+                    valid_rewards = self.task.compute_rewards(valid_context, valid_terminations)
+                    rewards[valid_ids] = valid_rewards.to(device=self.device, dtype=torch.float32)
+                    metrics = _expand_mapping(
+                        self.task.collect_metrics(valid_context, valid_terminations),
+                        valid_ids,
+                        self.num_envs,
+                        self.device,
+                    )
 
         self._episode_return += rewards
         if debug is not None:
@@ -521,36 +555,32 @@ class UERLDirectEnv:
         # faulted rows are Slot-lifecycle fallbacks, not observation semantics.
         # Copy the previous valid observation so terminal_obs stays finite without
         # feeding Worker fault payloads into Task mathematics.
+        next_action_interval_dt = torch.full(
+            (self.num_envs,), transition_dt, dtype=torch.float32, device=self.device
+        )
         with self._stage("terminal_obs"):
             terminal_raw_state = _clone_mapping(transition.values)
-            invalid = ~task_valid
             terminal_observation = _clone_observations(
                 self.task.build_observations(
                     scored_state.values,
                     task_valid,
                     policy_actions,
-                    torch.full(
-                        (self.num_envs,),
-                        transition_dt,
-                        dtype=torch.float32,
-                        device=self.device,
-                    ),
+                    next_action_interval_dt,
                 )
             )
-            for name, value in terminal_observation.items():
-                value[invalid] = self._last_observations[name][invalid]
+            if not all_valid:
+                invalid = ~task_valid
+                for name, value in terminal_observation.items():
+                    value[invalid] = self._last_observations[name][invalid]
 
         # Keep terminal snapshots from TransitionState; only rows selected by
         # the combined mask may be replaced with Post-Reset State.
         reset_mask = terminated | truncated
+        any_reset = bool(reset_mask.any())
         post_reset: StateBatch | None = None
-        if bool(reset_mask.any()):
+        if any_reset:
             metrics = {**metrics, **self.task.episode_reward_log(reset_mask)}
         terminal_episode_length = self.episode_length_buf.clone()
-        next_values = _clone_mapping(transition.values)
-        next_state_valid = transition.state_valid.clone()
-        next_fault_code = transition.slot_fault_code.clone()
-        next_episode_index = transition.episode_index.clone()
         next_policy_actions = policy_actions.clone()
         curriculum_metrics = self.task.on_step(
             CurriculumStep(
@@ -570,10 +600,11 @@ class UERLDirectEnv:
         )
         if manager_levels is not None:
             self._terrain_levels = manager_levels.to(device=self.device, dtype=torch.uint16)
-        next_action_interval_dt = torch.full(
-            (self.num_envs,), transition_dt, dtype=torch.float32, device=self.device
-        )
-        if bool(reset_mask.any()):
+        if any_reset:
+            next_values = _clone_mapping(transition.values)
+            next_state_valid = transition.state_valid.clone()
+            next_fault_code = transition.slot_fault_code.clone()
+            next_episode_index = transition.episode_index.clone()
             with self._stage("reset_roundtrip"):
                 post_reset_state = self._move_state(self._reset_slots(reset_mask))
             post_reset = post_reset_state
@@ -597,19 +628,28 @@ class UERLDirectEnv:
             self._episode_return[reset_mask] = 0.0
             next_policy_actions[reset_mask] = 0.0
             next_action_interval_dt[reset_mask] = self._physics_dt * self._decimation_range[0]
+        else:
+            next_values = dict(transition.values)
+            next_state_valid = transition.state_valid
+            next_fault_code = transition.slot_fault_code
+            next_episode_index = transition.episode_index
 
         self.task.refresh_command(
-            next_values, dt=None if bool(reset_mask.any()) else transition_dt
+            next_values, dt=None if any_reset else transition_dt
         )
         if self.event_manager is not None:
             self.event_manager.apply("interval", dt=transition_dt)
             self._flush_event_effects()
 
-        self._current_state = TransitionState(
-            next_values,
-            next_state_valid,
-            next_fault_code,
-            next_episode_index,
+        self._current_state = (
+            TransitionState(
+                next_values,
+                next_state_valid,
+                next_fault_code,
+                next_episode_index,
+            )
+            if any_reset
+            else transition
         )
         self._action_interval_dt = next_action_interval_dt
         self._previous_policy_actions = next_policy_actions
@@ -625,7 +665,16 @@ class UERLDirectEnv:
         self._last_observations = _clone_observations(observations)
         reason: Mapping[str, Any] = {}
         if valid_terminations is not None:
-            reason = _expand_mapping(valid_terminations.reason, valid_ids, self.num_envs, self.device)
+            reason = (
+                {
+                    name: value.to(device=self.device) if isinstance(value, torch.Tensor) else value
+                    for name, value in valid_terminations.reason.items()
+                }
+                if all_valid
+                else _expand_mapping(
+                    valid_terminations.reason, valid_ids, self.num_envs, self.device
+                )
+            )
         if self._profiler is not None:
             metrics = {**metrics, **self._profiler.commit_step()}
         info: dict[str, Any] = {
@@ -857,10 +906,25 @@ class UERLDirectEnv:
     def _move_state(self, state: _StateBatchT) -> _StateBatchT:
         """Move a typed state batch to the environment device."""
 
-        values = {name: value.to(device=self.device).clone() for name, value in state.values.items()}
-        state_valid = state.state_valid.to(device=self.device, dtype=torch.bool).clone()
-        fault_code = state.slot_fault_code.to(device=self.device).clone()
-        episode_index = state.episode_index.to(device=self.device).clone()
+        values = {
+            name: value.clone() if value.device == self.device else value.to(device=self.device)
+            for name, value in state.values.items()
+        }
+        state_valid = (
+            state.state_valid.to(dtype=torch.bool).clone()
+            if state.state_valid.device == self.device
+            else state.state_valid.to(device=self.device, dtype=torch.bool)
+        )
+        fault_code = (
+            state.slot_fault_code.clone()
+            if state.slot_fault_code.device == self.device
+            else state.slot_fault_code.to(device=self.device)
+        )
+        episode_index = (
+            state.episode_index.clone()
+            if state.episode_index.device == self.device
+            else state.episode_index.to(device=self.device)
+        )
         return type(state)(values, state_valid, fault_code, episode_index)
 
 

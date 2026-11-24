@@ -11,6 +11,8 @@ class AActor;
 class UPhysicalMaterial;
 class USkeletalMeshComponent;
 class UWorld;
+struct FBodyInstance;
+struct FConstraintInstance;
 
 namespace Chaos
 {
@@ -44,6 +46,8 @@ struct FUERLGenericRobotSpawnedSlot
 	TUniquePtr<FGenericRobotContactState> ContactState;
 	TArray<int32> BoneIndices;
 	TArray<int32> ConstraintIndices;
+	TArray<FBodyInstance*> BodyInstances;
+	TArray<FConstraintInstance*> Constraints;
 	FVector Origin = FVector::ZeroVector;
 	FQuat GroundRotation = FQuat::Identity;
 	FUERLSlotCollisionProfile CollisionProfile;

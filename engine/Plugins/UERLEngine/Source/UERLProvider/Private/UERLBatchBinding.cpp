@@ -112,21 +112,37 @@ void FUERLBatchBinding::Reset()
 	bCompiled = false;
 }
 
-bool FUERLNamedActionReader::ReadVector(int32 Row, FName Field, TArrayView<float> OutValues) const
+bool FUERLNamedActionReader::ReadVector(
+	int32 Row,
+	const FUERLBatchFieldBinding& FieldBinding,
+	TArrayView<float> OutValues) const
 {
-	const FUERLBatchFieldBinding* FieldBinding = Binding.FindAction(Field);
-	if (!View.IsValid() || !FieldBinding || OutValues.GetData() == nullptr || OutValues.Num() <= 0
-		|| OutValues.Num() != FieldBinding->Field.Width || Row < 0 || Row >= View.NumRows
-		|| FieldBinding->Column < 0 || FieldBinding->Column > View.NumColumns
-		|| OutValues.Num() > View.NumColumns - FieldBinding->Column)
+	if (!View.IsValid() || OutValues.GetData() == nullptr || OutValues.Num() <= 0
+		|| OutValues.Num() != FieldBinding.Field.Width || Row < 0 || Row >= View.NumRows
+		|| FieldBinding.Column < 0 || FieldBinding.Column > View.NumColumns
+		|| OutValues.Num() > View.NumColumns - FieldBinding.Column)
 	{
 		return false;
 	}
-	for (int32 Offset = 0; Offset < OutValues.Num(); ++Offset)
-	{
-		OutValues[Offset] = View.At(Row, FieldBinding->Column + Offset);
-	}
+	FMemory::Memcpy(
+		OutValues.GetData(),
+		View.Data + static_cast<int64>(Row) * View.NumColumns + FieldBinding.Column,
+		OutValues.Num() * sizeof(float));
 	return true;
+}
+
+bool FUERLNamedActionReader::ReadScalar(
+	int32 Row,
+	const FUERLBatchFieldBinding& FieldBinding,
+	float& OutValue) const
+{
+	return ReadVector(Row, FieldBinding, TArrayView<float>(&OutValue, 1));
+}
+
+bool FUERLNamedActionReader::ReadVector(int32 Row, FName Field, TArrayView<float> OutValues) const
+{
+	const FUERLBatchFieldBinding* FieldBinding = Binding.FindAction(Field);
+	return FieldBinding ? ReadVector(Row, *FieldBinding, OutValues) : false;
 }
 
 bool FUERLNamedActionReader::ReadScalar(int32 Row, FName Field, float& OutValue) const
@@ -134,21 +150,34 @@ bool FUERLNamedActionReader::ReadScalar(int32 Row, FName Field, float& OutValue)
 	return ReadVector(Row, Field, TArrayView<float>(&OutValue, 1));
 }
 
-bool FUERLNamedStateWriter::WriteVector(int32 Row, FName Field, TConstArrayView<float> Values)
+bool FUERLNamedStateWriter::WriteVector(
+	int32 Row,
+	const FUERLBatchFieldBinding& FieldBinding,
+	TConstArrayView<float> Values)
 {
-	const FUERLBatchFieldBinding* FieldBinding = Binding.FindState(Field);
-	if (!View.IsValid() || !FieldBinding || Values.GetData() == nullptr || Values.Num() <= 0
-		|| Values.Num() != FieldBinding->Field.Width || Row < 0 || Row >= View.NumRows
-		|| FieldBinding->Column < 0 || FieldBinding->Column > View.NumColumns
-		|| Values.Num() > View.NumColumns - FieldBinding->Column)
+	if (!View.IsValid() || Values.GetData() == nullptr || Values.Num() <= 0
+		|| Values.Num() != FieldBinding.Field.Width || Row < 0 || Row >= View.NumRows
+		|| FieldBinding.Column < 0 || FieldBinding.Column > View.NumColumns
+		|| Values.Num() > View.NumColumns - FieldBinding.Column)
 	{
 		return false;
 	}
-	for (int32 Offset = 0; Offset < Values.Num(); ++Offset)
-	{
-		View.At(Row, FieldBinding->Column + Offset) = Values[Offset];
-	}
+	FMemory::Memcpy(&View.At(Row, FieldBinding.Column), Values.GetData(), Values.Num() * sizeof(float));
 	return true;
+}
+
+bool FUERLNamedStateWriter::WriteScalar(
+	int32 Row,
+	const FUERLBatchFieldBinding& FieldBinding,
+	float Value)
+{
+	return WriteVector(Row, FieldBinding, TConstArrayView<float>(&Value, 1));
+}
+
+bool FUERLNamedStateWriter::WriteVector(int32 Row, FName Field, TConstArrayView<float> Values)
+{
+	const FUERLBatchFieldBinding* FieldBinding = Binding.FindState(Field);
+	return FieldBinding ? WriteVector(Row, *FieldBinding, Values) : false;
 }
 
 bool FUERLNamedStateWriter::WriteScalar(int32 Row, FName Field, float Value)
