@@ -120,15 +120,30 @@ For a custom host, use the same profile as the product CLI:
 ```powershell
 uv run python scripts/run_e2e.py --suite ue --host-profile E:/uerl/host.toml
 uv run python scripts/run_all_tests.py --host-profile E:/uerl/host.toml --timeout 2400 --output-dir E:/uerl/test-results
+
+# Live progress is enabled by default; add --fast to run E2E across 2 shards.
+uv run python scripts/run_all_tests.py --fast
+uv run python scripts/run_e2e.py --suite all --jobs 2
 ```
 
 `--timeout` limits each stage in seconds; its default is 1800.
 `--output-dir` selects the parent of a new, unique directory.
 Its default is `.scratch/test-runs`.
+`--no-progress` disables the live progress bar.
 Each invocation writes `summary.yaml`, separate stage output, and separate Automation logs.
 Worker helper logs also use unique filenames in that directory.
 Direct helper invocations use unique files in the system temporary directory.
-The scripts capture detailed output in these files and print stage progress to the console.
+The scripts capture detailed output in these files and display live stage progress from `pytest` and UE Automation logs (in-place refresh on a TTY, throttled `[PROGRESS]` lines when redirected).
+
+#### Parallel execution notes
+
+By default, `scripts/run_all_tests.py` and `scripts/run_e2e.py` run all stages serially (`1` worker per stage).
+Optional concurrency flags (`--fast`, `--e2e-jobs N`, `--python-jobs N`, `--automation-jobs N`, and `run_e2e.py --jobs N`) trade memory for shorter wall time:
+
+- **`--fast` preset (`--e2e-jobs 2`, Python and Automation serial):** On a 16 GB RAM Windows host, UE E2E accounts for most of the runtime and speeds up cleanly with 2 parallel shards. Keep `--python-jobs 1` and `--automation-jobs 1` on 16 GB hosts: multiple concurrent `pytest` processes repeat `torch+cu128` DLL cold loads, and running 3 concurrent UE Editor Automation processes causes RAM, Chaos thread, and AssetRegistry contention that slows both stages down compared to serial runs. Higher-memory workstations (32–64 GB+) can override `--python-jobs` and `--automation-jobs` explicitly.
+- **Process isolation in parallel E2E:** E2E tests do not share or reuse one long-lived UE 5.8 process across cases because cases validate distinct launch flags, maps, viewport/PIE modes, and fresh-session determinism. Parallel E2E instead overlaps UE cold starts across separate `pytest` shard processes with staggered launches (2 s), `-p no:cacheprovider`, and per-shard `--basetemp` directories.
+- **Heavy terrain co-location:** The E2E shard planner keeps the 64-slot procedural terrain tests (`test_event_manager.py` and `test_terrain_curriculum.py`, ~3 GB peak working set each) in the same shard so two large procedural terrain worlds do not allocate memory simultaneously.
+- **Headless trace disabled:** Headless UE Automation and E2E Worker launches pass `-notraceserver -trace=none -traceautostart=false` to avoid Unreal Trace Server port-1985 contention across concurrent workers.
 
 The summary records commands, return codes, durations, host paths, and result states.
 A stage can be `passed`, `failed`, `blocked`, `timed_out`, `interrupted`, or `not_run`.
