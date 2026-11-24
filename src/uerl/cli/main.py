@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import check, config, deploy, export, new, play, runs, tasks, train
+from . import check, config, deploy, diagnose, export, new, play, runs, tasks, train
 
 _COMMANDS = {
     "check": check.main,
     "config": config.main,
     "deploy": deploy.main,
+    "diagnose": diagnose.main,
     "export": export.main,
     "new": new.main,
     "play": play.main,

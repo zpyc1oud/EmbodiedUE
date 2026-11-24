@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import cast
 
 import torch
 
@@ -57,8 +58,8 @@ def base_contact_force_exceeds(
 ) -> torch.Tensor:
     """Fail when scalar base contact force exceeds threshold (legacy PhantomX)."""
 
-    forces = _concat_fields(ctx.transition_state, entity.body_field_names, "contact_force")
-    return forces.reshape(forces.shape[0], -1)[:, 0] > threshold_n
+    forces = _ctx_transition_concat(ctx, entity.body_field_names, "contact_force")
+    return forces[:, 0] > threshold_n
 
 
 def lin_vel_tracking(
@@ -81,10 +82,14 @@ def lin_vel_progress(
     command_channel: str,
     moving_threshold: float,
 ) -> torch.Tensor:
+    cache_key = ("lin_vel_progress", entity.body_field_names, command_channel, moving_threshold)
+    cached = ctx._cache.get(cache_key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
     velocity, command = _body_planar(ctx, entity=entity, command_channel=command_channel)
     command_speed = torch.linalg.vector_norm(command[:, :2], dim=1)
     moving = command_speed >= moving_threshold
-    return torch.where(
+    result = torch.where(
         moving,
         torch.clamp(
             (velocity[:, :2] * command[:, :2]).sum(dim=1)
@@ -94,6 +99,8 @@ def lin_vel_progress(
         ),
         0.0,
     )
+    ctx._cache[cache_key] = result
+    return result
 
 
 def yaw_rate_tracking(
@@ -116,9 +123,13 @@ def yaw_rate_progress(
     command_channel: str,
     moving_threshold: float,
 ) -> torch.Tensor:
+    cache_key = ("yaw_rate_progress", entity.body_field_names, command_channel, moving_threshold)
+    cached = ctx._cache.get(cache_key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
     _, angular_velocity, command = _body_rates(ctx, entity=entity, command_channel=command_channel)
     turning = command[:, 2].abs() >= moving_threshold
-    return torch.where(
+    result = torch.where(
         turning,
         torch.clamp(
             angular_velocity[:, 2]
@@ -129,6 +140,8 @@ def yaw_rate_progress(
         ),
         0.0,
     )
+    ctx._cache[cache_key] = result
+    return result
 
 
 def vertical_velocity_l2(
@@ -160,8 +173,8 @@ def upright_penalty(
     config: PhantomXTaskConfig,
 ) -> torch.Tensor:
     del config
-    pose = mdp_metrics.body_pose(ctx.transition_state, entity)
-    upright = mdp_metrics.upright_from_pose(pose)
+    pose = _ctx_body_pose(ctx, entity)
+    upright = _ctx_upright(ctx, entity, pose)
     return 1.0 - upright.pow(2)
 
 
@@ -171,9 +184,7 @@ def body_clearance_penalty(
     entity: RobotEntityCfg,
     config: PhantomXTaskConfig,
 ) -> torch.Tensor:
-    clearance = mdp_metrics.body_scalar_field(
-        ctx.transition_state, entity, "ground_clearance"
-    )
+    clearance = _ctx_body_scalar(ctx, entity, "ground_clearance")
     return torch.relu(config.body_clearance_penalty_threshold - clearance).pow(2)
 
 
@@ -184,7 +195,7 @@ def joint_velocity_mean_l2(
     config: PhantomXTaskConfig,
 ) -> torch.Tensor:
     del config
-    velocities = _concat_fields(ctx.transition_state, entity.joint_field_names, "joint_velocity")
+    velocities = _ctx_transition_concat(ctx, entity.joint_field_names, "joint_velocity")
     return velocities.pow(2).mean(dim=1)
 
 
@@ -213,49 +224,34 @@ def collect_phantomx_metrics(
     """
 
     del terminations
-    entity = RobotEntityCfg(body_names="base_link")
-    entity.resolve(robot_spec)
-    feet = RobotEntityCfg(body_names=tuple(PHANTOMX_FEET))
-    feet.resolve(robot_spec)
     # Targets, gains, and reset defaults use actuator order, not topology order.
-    joints = RobotEntityCfg(
-        joint_names=tuple(actuator.joint for actuator in robot_spec.actuators),
-        preserve_order=True,
-    )
-    joints.resolve(robot_spec)
+    spec_assets = _resolve_phantomx_spec_assets(robot_spec)
+    entity = spec_assets.base_entity
+    feet = spec_assets.feet_entity
+    joints = spec_assets.joints_entity
 
-    pose = mdp_metrics.body_pose(ctx.transition_state, entity)
+    pose = _ctx_body_pose(ctx, entity)
     velocity = mdp_metrics.body_lin_vel_b(ctx, entity=entity)
     angular_velocity = mdp_metrics.body_ang_vel_b(ctx, entity=entity)
     command = _velocity_from_state(ctx.transition_state, pose, config)
     body_height = pose[:, 2]
-    clearance = mdp_metrics.body_scalar_field(
-        ctx.transition_state, entity, "ground_clearance"
-    )
+    clearance = _ctx_body_scalar(ctx, entity, "ground_clearance")
     terrain_max, terrain_min = mdp_metrics.terrain_height_extrema(
         ctx.transition_state, entity
     )
-    base_contact_force = mdp_metrics.body_scalar_field(
-        ctx.transition_state, entity, "contact_force"
-    )
+    base_contact_force = _ctx_body_scalar(ctx, entity, "contact_force")
     base_contact = base_contact_force > config.base_contact_force_threshold
     foot_contact_fraction = mdp_metrics.body_field_mean(
         ctx.transition_state, feet, "contact"
     )
-    upright = mdp_metrics.upright_from_pose(pose)
+    upright = _ctx_upright(ctx, entity, pose)
     command_speed = torch.linalg.vector_norm(command[:, :2], dim=1)
     displacement = mdp_metrics.planar_displacement(pose)
-    defaults = ctx.policy_actions.new_tensor(
-        [actuator.default_pos for actuator in robot_spec.actuators]
-    )
+    defaults = spec_assets.defaults_tensor(ctx.policy_actions)
     joint_position = _concat_fields(ctx.raw_state, joints.joint_field_names, "joint_position")
     joint_velocity = _concat_fields(ctx.raw_state, joints.joint_field_names, "joint_velocity")
     target = ctx.physical_command[ROBOT_ACTUATOR_TARGET_FIELD]
-    stiffness = joint_position.new_tensor([actuator.stiffness for actuator in robot_spec.actuators])
-    damping = joint_position.new_tensor([actuator.damping for actuator in robot_spec.actuators])
-    effort_limit = joint_position.new_tensor(
-        [actuator.effort_limit for actuator in robot_spec.actuators]
-    )
+    stiffness, damping, effort_limit = spec_assets.actuator_tensors(joint_position)
     requested_effort = stiffness * (target - joint_position) - damping * joint_velocity
     torque_clip = requested_effort.abs() > effort_limit
     metrics = {
@@ -372,6 +368,133 @@ def _velocity_from_state(
     )
 
 
+class _PhantomXSpecAssets:
+    """Resolved entities and actuator parameter tables cached per live RobotSpec."""
+
+    __slots__ = (
+        "robot_spec",
+        "base_entity",
+        "feet_entity",
+        "joints_entity",
+        "_default_values",
+        "_stiffness_values",
+        "_damping_values",
+        "_effort_values",
+        "_defaults_cache",
+        "_actuator_cache",
+    )
+
+    def __init__(self, robot_spec: RobotSpec) -> None:
+        self.robot_spec = robot_spec
+        entity = RobotEntityCfg(body_names="base_link")
+        entity.resolve(robot_spec)
+        feet = RobotEntityCfg(body_names=tuple(PHANTOMX_FEET))
+        feet.resolve(robot_spec)
+        joints = RobotEntityCfg(
+            joint_names=tuple(actuator.joint for actuator in robot_spec.actuators),
+            preserve_order=True,
+        )
+        joints.resolve(robot_spec)
+        self.base_entity = entity
+        self.feet_entity = feet
+        self.joints_entity = joints
+        self._default_values = [actuator.default_pos for actuator in robot_spec.actuators]
+        self._stiffness_values = [actuator.stiffness for actuator in robot_spec.actuators]
+        self._damping_values = [actuator.damping for actuator in robot_spec.actuators]
+        self._effort_values = [actuator.effort_limit for actuator in robot_spec.actuators]
+        self._defaults_cache: dict[tuple[torch.device, torch.dtype], torch.Tensor] = {}
+        self._actuator_cache: dict[
+            tuple[torch.device, torch.dtype],
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        ] = {}
+
+    def defaults_tensor(self, reference: torch.Tensor) -> torch.Tensor:
+        key = (reference.device, reference.dtype)
+        cached = self._defaults_cache.get(key)
+        if cached is not None:
+            return cached
+        if len(self._defaults_cache) >= 8:
+            self._defaults_cache.clear()
+        tensor = reference.new_tensor(self._default_values)
+        self._defaults_cache[key] = tensor
+        return tensor
+
+    def actuator_tensors(
+        self, reference: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        key = (reference.device, reference.dtype)
+        cached = self._actuator_cache.get(key)
+        if cached is not None:
+            return cached
+        if len(self._actuator_cache) >= 8:
+            self._actuator_cache.clear()
+        triplet = (
+            reference.new_tensor(self._stiffness_values),
+            reference.new_tensor(self._damping_values),
+            reference.new_tensor(self._effort_values),
+        )
+        self._actuator_cache[key] = triplet
+        return triplet
+
+
+_SPEC_ASSETS_CACHE: list[_PhantomXSpecAssets] = []
+
+
+def _resolve_phantomx_spec_assets(robot_spec: RobotSpec) -> _PhantomXSpecAssets:
+    for entry in _SPEC_ASSETS_CACHE:
+        if entry.robot_spec is robot_spec:
+            return entry
+    entry = _PhantomXSpecAssets(robot_spec)
+    if len(_SPEC_ASSETS_CACHE) >= 8:
+        _SPEC_ASSETS_CACHE.pop(0)
+    _SPEC_ASSETS_CACHE.append(entry)
+    return entry
+
+
+def _ctx_body_pose(ctx: StepContext, entity: RobotEntityCfg) -> torch.Tensor:
+    key = ("body_pose", entity.body_field_names)
+    cached = ctx._cache.get(key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
+    value = mdp_metrics.body_pose(ctx.transition_state, entity)
+    ctx._cache[key] = value
+    return value
+
+
+def _ctx_upright(ctx: StepContext, entity: RobotEntityCfg, pose: torch.Tensor) -> torch.Tensor:
+    key = ("upright", entity.body_field_names)
+    cached = ctx._cache.get(key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
+    value = mdp_metrics.upright_from_pose(pose)
+    ctx._cache[key] = value
+    return value
+
+
+def _ctx_body_scalar(
+    ctx: StepContext, entity: RobotEntityCfg, semantic: str
+) -> torch.Tensor:
+    key = ("body_scalar_field", entity.body_field_names, semantic)
+    cached = ctx._cache.get(key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
+    value = mdp_metrics.body_scalar_field(ctx.transition_state, entity, semantic)
+    ctx._cache[key] = value
+    return value
+
+
+def _ctx_transition_concat(
+    ctx: StepContext, prefixes: tuple[str, ...], semantic: str
+) -> torch.Tensor:
+    key = ("transition_concat", prefixes, semantic)
+    cached = ctx._cache.get(key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
+    value = _concat_fields(ctx.transition_state, prefixes, semantic)
+    ctx._cache[key] = value
+    return value
+
+
 def _concat_fields(
     state: Mapping[str, torch.Tensor],
     prefixes: tuple[str, ...],
@@ -383,16 +506,26 @@ def _concat_fields(
             code="CONFIG_OUT_OF_RANGE",
             path="entity",
         )
-    tensors = []
-    for prefix in prefixes:
-        name = f"{prefix}.{semantic}"
-        if name not in state:
+    if len(prefixes) == 1:
+        name = f"{prefixes[0]}.{semantic}"
+        value = state.get(name)
+        if value is None:
             raise ConfigError(
                 f"missing state field {name!r}",
                 code="CONFIG_MISSING_FIELD",
                 path=name,
             )
-        value = state[name]
+        return value.reshape(value.shape[0], -1)
+    tensors = []
+    for prefix in prefixes:
+        name = f"{prefix}.{semantic}"
+        value = state.get(name)
+        if value is None:
+            raise ConfigError(
+                f"missing state field {name!r}",
+                code="CONFIG_MISSING_FIELD",
+                path=name,
+            )
         tensors.append(value.reshape(value.shape[0], -1))
     return torch.cat(tensors, dim=1)
 

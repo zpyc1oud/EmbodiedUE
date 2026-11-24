@@ -12,7 +12,15 @@ import pytest
 import yaml
 
 from scripts import run_all_tests, run_e2e
-from scripts.test_runner_support import TestRun, _stop_windows_process, positive_seconds
+from scripts.test_runner_support import (
+    ProgressSnapshot,
+    TestRun,
+    _stop_windows_process,
+    format_progress_line,
+    parse_progress_from_text,
+    positive_int,
+    positive_seconds,
+)
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "nan", "inf"])
@@ -189,12 +197,14 @@ def test_native_registrations_have_one_execution_owner() -> None:
     groups = run_all_tests.selected_automation_cases()
     assert "UERL.Integration.Policy.DeclaredInputs.GameContract" in groups[0]
     assert "UERL.Integration.Policy.DeclaredInputs.ComponentGroundBinding" in groups[0]
+    assert run_all_tests.PHYSICS_RESPONSE_CASES
+    assert all(name.startswith("UERL.Integration.PhysicsResponse.") for name in run_all_tests.PHYSICS_RESPONSE_CASES)
 
 
 def test_missing_native_filter_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     groups = list(run_all_tests.UE_AUTOMATION_GROUPS)
-    label, _, minimum = groups[0]
-    groups[0] = (label, "UERL.DoesNotExist", minimum)
+    label, _ = groups[0]
+    groups[0] = (label, "UERL.DoesNotExist")
     monkeypatch.setattr(run_all_tests, "UE_AUTOMATION_GROUPS", tuple(groups))
     with pytest.raises(ValueError, match="execution owner"):
         run_all_tests.selected_automation_cases()
@@ -395,3 +405,210 @@ def test_physics_runner_requires_every_named_case(tmp_path: Path, fault: str) ->
         0, log, len(run_all_tests.PHYSICS_RESPONSE_CASES),
         required_names=run_all_tests.PHYSICS_RESPONSE_CASES,
     ) == (0 if fault == "nominal" else 1)
+
+
+def test_positive_int_rejects_zero_and_negative() -> None:
+    assert positive_int("3") == 3
+    with pytest.raises(argparse.ArgumentTypeError):
+        positive_int("0")
+    with pytest.raises(argparse.ArgumentTypeError):
+        positive_int("-2")
+
+
+def test_progress_parsers_and_formatter_handle_automation_and_pytest() -> None:
+    auto_text = (
+        "Test Completed. Result={Success} Name={One} Path={UERL.Unit.One}\n"
+        "Test Completed. Result={Fail} Name={Two} Path={UERL.Unit.Two}\n"
+    )
+    auto_snap = parse_progress_from_text("automation", auto_text, configured_total=4)
+    assert auto_snap.done == 2
+    assert auto_snap.total == 4
+    assert auto_snap.percent == 50
+    assert auto_snap.passed == 1
+    assert auto_snap.failed == 1
+    assert "UERL.Unit.Two" in auto_snap.last_case
+
+    verbose_pytest = (
+        "collected 5 items / 3 deselected / 2 selected\n"
+        "tests/e2e/test_a.py::test_one PASSED\n"
+        "tests/e2e/test_a.py::test_two SKIPPED\n"
+        "tests/e2e/test_a.py::test_three\n"
+    )
+    v_snap = parse_progress_from_text("pytest", verbose_pytest)
+    assert v_snap.total == 2
+    assert v_snap.done == 2
+    assert v_snap.passed == 1
+    assert v_snap.skipped == 1
+    assert v_snap.percent == 100
+    assert "test_three" in v_snap.last_case
+
+    quiet_pytest = "..Fs   [ 80%]\n"
+    q_snap = parse_progress_from_text("pytest", quiet_pytest)
+    assert q_snap.done == 4
+    assert q_snap.passed == 2
+    assert q_snap.failed == 1
+    assert q_snap.skipped == 1
+    assert q_snap.percent == 80
+
+    line = format_progress_line(
+        "[Stage 1/5]",
+        ProgressSnapshot(done=2, total=4, percent=50, passed=2, last_case="test_one"),
+        65.0,
+        ascii_only=True,
+    )
+    assert "[#########" in line
+    assert "50%" in line
+    assert "2/4" in line
+    assert "01:05" in line
+
+
+def test_e2e_shard_planner_isolates_terrain_heavy_files_and_covers_all_files() -> None:
+    assert run_e2e.plan_e2e_shards("all", 1) == [["tests/e2e"]]
+    expected_files = sorted(
+        path.relative_to(run_e2e.REPO_ROOT).as_posix()
+        for path in (run_e2e.REPO_ROOT / "tests/e2e").glob("test_*.py")
+    )
+    shards_2 = run_e2e.plan_e2e_shards("all", 2)
+    assert len(shards_2) == 2
+    assert sorted(path for shard in shards_2 for path in shard) == expected_files
+
+    shards_4 = run_e2e.plan_e2e_shards("all", 4)
+    terrain_shards = [
+        idx
+        for idx, shard in enumerate(shards_4)
+        if any(Path(path).name in {"test_event_manager.py", "test_terrain_curriculum.py"} for path in shard)
+    ]
+    assert len(terrain_shards) == 1
+
+
+def test_parallel_runner_aggregates_outcomes_and_enforces_timeout(tmp_path: Path) -> None:
+    run = TestRun(tmp_path, ["fast-ok", "fast-fail"], 10, show_progress=False)
+    rc = run.run_parallel(
+        [
+            (0, [sys.executable, "-c", "print('ok', flush=True)"]),
+            (1, [sys.executable, "-c", "raise SystemExit(3)"]),
+        ],
+        max_workers=2,
+    )
+    assert rc == 3
+    assert [stage.status for stage in run.stages] == ["passed", "failed"]
+
+    timeout_run = TestRun(tmp_path, ["slow-a", "slow-b"], 0.6, show_progress=False)
+    rc_to = timeout_run.run_parallel(
+        [
+            (0, [sys.executable, "-c", "import time; time.sleep(30)"]),
+            (1, [sys.executable, "-c", "import time; time.sleep(30)"]),
+        ],
+        max_workers=2,
+    )
+    assert rc_to == 124
+    assert all(stage.status == "timed_out" for stage in timeout_run.stages)
+
+
+def test_full_runner_fast_preset_uses_parallel_shards(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = tmp_path / "editor.exe"
+    project = tmp_path / "host.uproject"
+    executable.touch()
+    project.touch()
+    monkeypatch.delenv("UERL_HOST_PROFILE", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    parallel_batches: list[tuple[int, list[tuple[int, list[str]]]]] = []
+
+    def fake_parallel(
+        self: TestRun,
+        tasks: list[tuple[int, list[str]]],
+        *,
+        max_workers: int,
+        stagger_s: float = 0.0,
+    ) -> int:
+        del stagger_s
+        parallel_batches.append((max_workers, list(tasks)))
+        groups = run_all_tests.selected_automation_cases()
+        for stage_index, command in tasks:
+            self.stages[stage_index].status = "passed"
+            abslog = next((arg.removeprefix("-abslog=") for arg in command if arg.startswith("-abslog=")), None)
+            if abslog is not None:
+                auto_idx = stage_index - (len(self.stages) - len(run_e2e.plan_e2e_shards("all", 2)) - 3)
+                names = groups[auto_idx]
+                Path(abslog).write_text(
+                    "".join(
+                        f"Test Completed. Result={{Success}} Name={{test}} Path={{{name}}}\n"
+                        for name in names
+                    )
+                    + "**** TEST COMPLETE. EXIT CODE: 0 ****\n",
+                    encoding="utf-8",
+                )
+        return 0
+
+    monkeypatch.setattr(TestRun, "run_parallel", fake_parallel)
+    assert (
+        run_all_tests.main([
+            "--python-jobs",
+            "4",
+            "--automation-jobs",
+            "3",
+            "--fast",
+            "--no-progress",
+            "--output-dir",
+            str(tmp_path / "fast-reports"),
+            "--ue-executable",
+            str(executable),
+            "--project",
+            str(project),
+        ])
+        == 0
+    )
+    assert [batch[0] for batch in parallel_batches] == [4, 3, 2]
+    assert len(parallel_batches[1][1]) == 3
+
+    serial_calls: list[int] = []
+    e2e_batches: list[int] = []
+
+    def fake_serial(self: TestRun, index: int, command: list[str]) -> int:
+        serial_calls.append(index)
+        self.stages[index].status = "passed"
+        abslog = next((arg.removeprefix("-abslog=") for arg in command if arg.startswith("-abslog=")), None)
+        if abslog is not None:
+            names = run_all_tests.selected_automation_cases()[index - 1]
+            Path(abslog).write_text(
+                "".join(
+                    f"Test Completed. Result={{Success}} Name={{test}} Path={{{name}}}\n"
+                    for name in names
+                )
+                + "**** TEST COMPLETE. EXIT CODE: 0 ****\n",
+                encoding="utf-8",
+            )
+        return 0
+
+    def fake_fast_parallel(
+        self: TestRun,
+        tasks: list[tuple[int, list[str]]],
+        *,
+        max_workers: int,
+        stagger_s: float = 0.0,
+    ) -> int:
+        del stagger_s
+        e2e_batches.append(max_workers)
+        for stage_index, _ in tasks:
+            self.stages[stage_index].status = "passed"
+        return 0
+
+    monkeypatch.setattr(TestRun, "run", fake_serial)
+    monkeypatch.setattr(TestRun, "run_parallel", fake_fast_parallel)
+    assert (
+        run_all_tests.main([
+            "--fast",
+            "--no-progress",
+            "--output-dir",
+            str(tmp_path / "fast-default-reports"),
+            "--ue-executable",
+            str(executable),
+            "--project",
+            str(project),
+        ])
+        == 0
+    )
+    assert serial_calls == [0, 1, 2, 3]
+    assert e2e_batches == [2]

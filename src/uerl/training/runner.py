@@ -10,15 +10,18 @@ from typing import Any, cast
 
 from ..core.config import ResolvedRunConfig
 from ..core.config.robot import RobotSpec
+from ..core.direct.capabilities import CapabilityStatus
 from ..core.direct.curriculum import CurriculumManager
 from ..core.direct.env import UERLDirectEnv
 from ..core.direct.profiling import StageProfiler
 from ..core.direct.task import DirectTask
+from ..core.inputs import ResolvedInput
 from ..core.mdp.lib.curriculum import TerrainLevelTerm
 from ..core.mdp.managers.event import EventManager
+from ..core.mdp.plan import ActionPlan, ObservationPlan
 from ..runtime.session import UERLSession, UERLSessionAdapter, WorkerProcessController
 from ..tasks.evaluation import EvaluationSummary, TaskEvaluator
-from ..tasks.registry import create_default_registry
+from ..tasks.registry import TaskRegistry, create_default_registry
 from .checkpoint import TrainingOptions
 from .configuration import (
     DEFAULT_TRAINING_MAP as DEFAULT_TRAINING_MAP,
@@ -32,6 +35,7 @@ from .configuration import (
 from .configuration import (
     build_run_config as build_run_config,
 )
+from .export_contract import EXPORT_CONTRACT_FILENAME, ExportContract, write_export_contract
 from .rsl_rl import UERLOnPolicyRunner, UERLVecEnvWrapper
 from .rsl_rl.time_aware_ppo import PHANTOMX_PHYSICAL_TIME_OBJECTIVE
 
@@ -287,6 +291,14 @@ def run_training(
         capabilities.require("train")
         print(f"[CAPABILITY] {capabilities.format()}")
         vec_env = UERLVecEnvWrapper(direct_env, cfg=config)
+        _maybe_write_export_contract(
+            registry=registry,
+            config=config,
+            task=task,
+            enable_noise=enable_noise,
+            raw_session=raw_session,
+            vec_env=vec_env,
+        )
         runner = UERLOnPolicyRunner(
             vec_env,
             train_config,
@@ -537,6 +549,68 @@ def run_evaluation(
         mean_reward=reward_sum / steps,
     )
     return evaluator.finish(summary) if evaluator is not None else summary
+
+
+def _maybe_write_export_contract(
+    *,
+    registry: TaskRegistry,
+    config: ResolvedRunConfig,
+    task: DirectTask,
+    enable_noise: object,
+    raw_session: object,
+    vec_env: UERLVecEnvWrapper,
+) -> Path | None:
+    """Persist ``export_contract.yaml`` inside the Run when export is statically supported."""
+
+    plan_task = task
+    if task.capabilities.export.status is not CapabilityStatus.SUPPORTED:
+        if not (callable(enable_noise) and isinstance(task.robot_spec, RobotSpec)):
+            return None
+        clean_task = registry.create_task(config.task_id, config.task)
+        clean_task.bind_robot_spec(task.robot_spec, observation_shapes=task.observation_shapes)
+        if clean_task.capabilities.export.status is not CapabilityStatus.SUPPORTED:
+            return None
+        plan_task = clean_task
+
+    observation_plan = getattr(plan_task, "observation_plan", None)
+    action_plan = getattr(plan_task, "action_plan", None)
+    if not isinstance(observation_plan, ObservationPlan) or not isinstance(action_plan, ActionPlan):
+        return None
+    raw_inputs = getattr(raw_session, "input_requirements", None)
+    if not isinstance(raw_inputs, Sequence) or isinstance(raw_inputs, (str, bytes)):
+        return None
+    input_requirements = tuple(item for item in raw_inputs if isinstance(item, ResolvedInput))
+    if len(input_requirements) != len(raw_inputs):
+        return None
+
+    observations = vec_env.get_observations()
+    items = getattr(observations, "items", None)
+    if not callable(items):
+        return None
+    group_widths: dict[str, int] = {}
+    for name, tensor in items():
+        tensor_shape = getattr(tensor, "shape", None)
+        if (
+            not isinstance(name, str)
+            or not isinstance(tensor_shape, tuple)
+            or len(tensor_shape) < 2
+            or type(tensor_shape[-1]) is not int
+        ):
+            return None
+        group_widths[name] = tensor_shape[-1]
+    if not group_widths:
+        return None
+
+    contract = ExportContract(
+        task_id=config.task_id,
+        robot_id=config.worker.robot_id,
+        observation_plan=observation_plan,
+        action_plan=action_plan,
+        input_requirements=input_requirements,
+        observation_group_widths=group_widths,
+        num_actions=action_plan.policy_width,
+    )
+    return write_export_contract(config.logging.run_directory / EXPORT_CONTRACT_FILENAME, contract)
 
 
 def _export_policy_onnx_sha1(

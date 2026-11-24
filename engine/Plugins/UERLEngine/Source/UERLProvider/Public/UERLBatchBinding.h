@@ -57,6 +57,12 @@ public:
 
 	/** Return the number of Slot rows in the Action view. */
 	int32 NumRows() const { return View.NumRows; }
+	/** Resolve one selected Action field binding once for repeated row reads. */
+	const FUERLBatchFieldBinding* ResolveAction(FName Field) const { return Binding.FindAction(Field); }
+	/** Read one pre-resolved field's contiguous scalar span from a Slot row. */
+	bool ReadVector(int32 Row, const FUERLBatchFieldBinding& FieldBinding, TArrayView<float> OutValues) const;
+	/** Read one pre-resolved scalar field value from a Slot row. */
+	bool ReadScalar(int32 Row, const FUERLBatchFieldBinding& FieldBinding, float& OutValue) const;
 	/** Read one selected field's contiguous scalar span from a Slot row. */
 	bool ReadVector(int32 Row, FName Field, TArrayView<float> OutValues) const;
 	/** Read one scalar field value from a Slot row. */
@@ -78,6 +84,12 @@ public:
 	int32 NumRows() const { return View.NumRows; }
 	/** Return the number of scalar columns in the State view. */
 	int32 NumColumns() const { return View.NumColumns; }
+	/** Resolve one selected State field binding once for repeated row writes. */
+	const FUERLBatchFieldBinding* ResolveState(FName Field) const { return Binding.FindState(Field); }
+	/** Write one pre-resolved field's contiguous scalar span to a Slot row. */
+	bool WriteVector(int32 Row, const FUERLBatchFieldBinding& FieldBinding, TConstArrayView<float> Values);
+	/** Write one pre-resolved scalar field value to a Slot row. */
+	bool WriteScalar(int32 Row, const FUERLBatchFieldBinding& FieldBinding, float Value);
 	/** Write one selected field's contiguous scalar span to a Slot row. */
 	bool WriteVector(int32 Row, FName Field, TConstArrayView<float> Values);
 	/** Write one scalar field value to a Slot row. */

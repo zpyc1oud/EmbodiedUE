@@ -337,7 +337,7 @@ def test_unversioned_yaml_sidecar_requires_explicit_migration(tmp_path: Path) ->
         resolve_run_config(None, run, {}, strict=True)
 
     assert error.value.code == "INVALID_RUN_CONFIG"
-    assert "run_migration" in str(error.value)
+    assert "schema version 1" in str(error.value)
     assert old_yaml.read_bytes() == before
 
 

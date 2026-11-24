@@ -9,7 +9,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace UERLPolicyPlanRuntimeTestsPrivate
 {
 	FUERLFieldDescriptor MakeStateField(const TCHAR* Name, int32 Width)
 	{
@@ -86,6 +86,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPlanRuntimeOutputWidthTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPlanRuntimeTestsPrivate;
 	RegisterBuiltinPlanOperators();
 
 	const FUERLObservationPlan Plan = MakeSelectConcatPlan();
@@ -112,6 +113,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPlanRuntimeUnregisteredOpTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPlanRuntimeTestsPrivate;
 	RegisterBuiltinPlanOperators();
 
 	FUERLObservationPlan Plan;
@@ -143,6 +145,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPlanRuntimeCompileErrorsTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPlanRuntimeTestsPrivate;
 	RegisterBuiltinPlanOperators();
 	const TArray<FUERLFieldDescriptor> Available = {
 		MakeStateField(TEXT("robot.body.base_link.body_pose"), 7),
@@ -208,6 +211,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPlanRuntimeNoPartialCompileTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPlanRuntimeTestsPrivate;
 	RegisterBuiltinPlanOperators();
 
 	FUERLObservationPlan Bad;
@@ -405,6 +409,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPlanRuntimeControlFrameDtSourceTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPlanRuntimeTestsPrivate;
 	RegisterBuiltinPlanOperators();
 	const FUERLObservationPlan Plan = MakeControlFrameDtPlan(100.0);
 	FUERLPlanRuntime Runtime;
@@ -438,6 +443,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyPlanRuntimeControlFrameDtValidationTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyPlanRuntimeTestsPrivate;
 	RegisterBuiltinPlanOperators();
 
 	for (const double Scale : {0.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()})

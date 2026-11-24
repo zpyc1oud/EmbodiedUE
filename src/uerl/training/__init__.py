@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 from .configuration import DEFAULT_TRAINING_MAP, WORKER_LOCKSTEP_PHYSICS_ARGS, build_launch_overrides, build_run_config
-from .export import export_policy, robot_runtime_from_config
+from .export import export_policy, export_policy_offline, robot_runtime_from_config
 from .runs import (
     RunSummary,
     list_runs,
@@ -21,6 +21,7 @@ __all__ = [
     "build_rsl_rl_train_config",
     "build_run_config",
     "export_policy",
+    "export_policy_offline",
     "robot_runtime_from_config",
     "parse_config_options",
     "run_evaluation",

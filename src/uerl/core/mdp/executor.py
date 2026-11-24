@@ -39,11 +39,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import torch
 
-from uerl.core.direct.types import PhysicalCommandBatch
 from uerl.core.mdp.operators import (
     EvaluateFn,
     OperatorSpec,
@@ -60,20 +59,45 @@ from uerl.core.mdp.operators import (
 from uerl.core.mdp.plan import ActionPlan, ObservationPlan, PlanOp
 from uerl.errors import ConfigError
 
+if TYPE_CHECKING:
+    from uerl.core.direct.types import PhysicalCommandBatch
+
+
+_EMPTY_MAPPING: MappingProxyType[str, torch.Tensor] = MappingProxyType({})
+
+
+def _empty_mapping() -> MappingProxyType[str, torch.Tensor]:
+    return _EMPTY_MAPPING
+
+
+@dataclass(frozen=True, slots=True)
+class _CompiledOp:
+    """Pre-resolved execution metadata for one PlanOp."""
+
+    op: PlanOp
+    spec: OperatorSpec
+    input_indices: tuple[int, ...]
+    path: str
+    source_kind: str
+    source_key: str | None
+    control_dt_scale: float
+
 
 @dataclass(frozen=True, slots=True)
 class PlanInputs:
     """Runtime inputs consumed by source operators."""
 
     raw_state: Mapping[str, torch.Tensor]
-    commands: Mapping[str, torch.Tensor] = field(default_factory=dict)
+    commands: Mapping[str, torch.Tensor] = field(default_factory=_empty_mapping)
     previous_action: torch.Tensor | None = None
     policy_action: torch.Tensor | None = None
     control_frame_dt: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "raw_state", MappingProxyType(dict(self.raw_state)))
-        object.__setattr__(self, "commands", MappingProxyType(dict(self.commands)))
+        if not isinstance(self.raw_state, MappingProxyType):
+            object.__setattr__(self, "raw_state", MappingProxyType(dict(self.raw_state)))
+        if not isinstance(self.commands, MappingProxyType):
+            object.__setattr__(self, "commands", MappingProxyType(dict(self.commands)))
 
 
 class PlanExecutor:
@@ -97,18 +121,36 @@ class PlanExecutor:
         self._specs = tuple(require_operator(op.op) for op in plan.ops)
         channels = None if command_channels is None else dict(command_channels)
         _check_widths(plan.ops, self._specs, command_channels=channels)
+        self._compiled = _compile_ops(plan.ops, self._specs)
+        name_to_idx = {op.output: idx for idx, op in enumerate(plan.ops)}
+        self._compiled_groups = tuple(
+            (
+                name,
+                tuple(name_to_idx[member] for member in members),
+                self._plan.group_widths[name],
+            )
+            for name, members in self._plan.groups.items()
+        )
 
     def execute(self, inputs: PlanInputs) -> Mapping[str, torch.Tensor]:
         """Evaluate the plan and return group tensors in declared member order."""
 
-        slots = _execute_ops(self._plan.ops, self._specs, inputs)
-        batch_size = next(iter(slots.values())).shape[0] if slots else None
+        slots = _execute_compiled_ops(
+            self._compiled,
+            inputs.raw_state,
+            inputs.commands,
+            inputs.previous_action,
+            inputs.policy_action,
+            inputs.control_frame_dt,
+        )
+        batch_size = slots[0].shape[0] if slots else None
 
         groups: dict[str, torch.Tensor] = {}
-        for name, members in self._plan.groups.items():
-            pieces = [slots[member] for member in members]
-            grouped = torch.cat(pieces, dim=-1)
-            declared = self._plan.group_widths[name]
+        for name, member_indices, declared in self._compiled_groups:
+            if len(member_indices) == 1:
+                grouped = slots[member_indices[0]]
+            else:
+                grouped = torch.cat([slots[idx] for idx in member_indices], dim=-1)
             if grouped.shape[-1] != declared:
                 raise ConfigError(
                     f"group {name!r} width {grouped.shape[-1]} != declared {declared}",
@@ -172,6 +214,14 @@ class ActionPlanExecutor:
                         code="OP_WIDTH",
                         path=f"command_fields[{index}]",
                     )
+        self._compiled = _compile_ops(plan.ops, self._specs)
+        name_to_idx = {op.output: idx for idx, op in enumerate(plan.ops)}
+        self._command_slots = tuple(
+            (name, name_to_idx[name]) for name in self._plan.command_fields
+        )
+        from uerl.core.direct.types import PhysicalCommandBatch
+
+        self._command_batch_cls = PhysicalCommandBatch
 
     def execute(self, policy_actions: torch.Tensor) -> PhysicalCommandBatch:
         """Evaluate the plan and return named physical command tensors."""
@@ -189,12 +239,15 @@ class ActionPlanExecutor:
                 code="OP_WIDTH",
                 path="policy_action",
             )
-        slots = _execute_ops(
-            self._plan.ops,
-            self._specs,
-            PlanInputs(raw_state={}, policy_action=policy_actions),
+        slots = _execute_compiled_ops(
+            self._compiled,
+            _EMPTY_MAPPING,
+            _EMPTY_MAPPING,
+            None,
+            policy_actions,
+            None,
         )
-        return PhysicalCommandBatch({name: slots[name] for name in self._plan.command_fields})
+        return self._command_batch_cls({name: slots[idx] for name, idx in self._command_slots})
 
 
 def _check_widths(
@@ -264,6 +317,170 @@ def _check_widths(
     return produced
 
 
+def _compile_ops(
+    ops: Sequence[PlanOp],
+    specs: Sequence[OperatorSpec],
+) -> tuple[_CompiledOp, ...]:
+    """Pre-resolve slot indices and source metadata once after plan validation."""
+
+    name_to_idx: dict[str, int] = {}
+    compiled: list[_CompiledOp] = []
+    for index, (op, spec) in enumerate(zip(ops, specs, strict=True)):
+        input_indices = tuple(name_to_idx[name] for name in op.inputs)
+        source_kind = op.op if spec.is_source else ""
+        source_key: str | None = None
+        control_dt_scale = 1.0
+        if source_kind == "select":
+            field_name = op.params["field"]
+            assert isinstance(field_name, str)
+            source_key = field_name
+        elif source_kind == "command":
+            channel = op.params["channel"]
+            assert isinstance(channel, str)
+            source_key = channel
+        elif source_kind == "control_frame_dt":
+            scale = op.params["scale"]
+            assert isinstance(scale, (int, float)) and not isinstance(scale, bool)
+            control_dt_scale = float(scale)
+        compiled.append(
+            _CompiledOp(
+                op=op,
+                spec=spec,
+                input_indices=input_indices,
+                path=f"ops[{index}]",
+                source_kind=source_kind,
+                source_key=source_key,
+                control_dt_scale=control_dt_scale,
+            )
+        )
+        name_to_idx[op.output] = index
+    return tuple(compiled)
+
+
+def _execute_compiled_ops(
+    compiled: tuple[_CompiledOp, ...],
+    raw_state: Mapping[str, torch.Tensor],
+    commands: Mapping[str, torch.Tensor],
+    previous_action: torch.Tensor | None,
+    policy_action: torch.Tensor | None,
+    control_frame_dt: torch.Tensor | None,
+) -> list[torch.Tensor]:
+    """Evaluate pre-compiled ops with flat slot indexing."""
+
+    slots: list[torch.Tensor] = [None] * len(compiled)  # type: ignore[list-item]
+    batch_size: int | None = None
+    for index, item in enumerate(compiled):
+        op = item.op
+        source_kind = item.source_kind
+        if source_kind:
+            path = item.path
+            if source_kind == "select":
+                field_name = cast(str, item.source_key)
+                value = raw_state.get(field_name)
+                if value is None:
+                    raise ConfigError(
+                        f"select field {field_name!r} missing from raw_state",
+                        code="OP_MISSING_FIELD",
+                        path=f"{path}.params.field",
+                    )
+                if value.ndim == 1:
+                    if op.width != 1:
+                        raise ConfigError(
+                            f"select field {field_name!r} is rank-1 but plan width is {op.width}",
+                            code="OP_WIDTH",
+                            path=f"{path}.output",
+                        )
+                    value = value.unsqueeze(-1)
+            elif source_kind == "command":
+                channel = cast(str, item.source_key)
+                value = commands.get(channel)
+                if value is None:
+                    raise ConfigError(
+                        f"command channel {channel!r} was not supplied",
+                        code="OP_MISSING_CHANNEL",
+                        path=f"{path}.params.channel",
+                    )
+            elif source_kind == "control_frame_dt":
+                if control_frame_dt is None:
+                    raise ConfigError(
+                        "plan requires control_frame_dt but none was supplied",
+                        code="OP_MISSING_DT",
+                        path=f"{path}.op",
+                    )
+                if control_frame_dt.ndim != 2 or control_frame_dt.shape[-1] != 1:
+                    raise ConfigError(
+                        f"control_frame_dt must have shape (batch, 1), got {tuple(control_frame_dt.shape)}",
+                        code="OP_WIDTH",
+                        path=f"{path}.input",
+                    )
+                if not bool(torch.isfinite(control_frame_dt).all()) or not bool(
+                    (control_frame_dt > 0).all()
+                ):
+                    raise ConfigError(
+                        "control_frame_dt must be finite and positive",
+                        code="OP_INVALID_DT",
+                        path=f"{path}.input",
+                    )
+                value = control_frame_dt * item.control_dt_scale
+            elif source_kind == "previous_action":
+                if previous_action is None:
+                    raise ConfigError(
+                        "plan requires previous_action but none was supplied",
+                        code="OP_MISSING_PREVIOUS",
+                        path=f"{path}.op",
+                    )
+                value = previous_action
+            elif source_kind == "policy_action":
+                if policy_action is None:
+                    raise ConfigError(
+                        "plan requires policy_action but none was supplied",
+                        code="OP_MISSING_POLICY",
+                        path=f"{path}.op",
+                    )
+                value = policy_action
+            else:
+                raise ConfigError(
+                    f"unhandled source operator {op.op!r}",
+                    code="OP_UNKNOWN",
+                    path=f"{path}.op",
+                )
+        else:
+            in_idx = item.input_indices
+            n_in = len(in_idx)
+            if n_in == 1:
+                args: Sequence[torch.Tensor] = (slots[in_idx[0]],)
+            elif n_in == 2:
+                args = (slots[in_idx[0]], slots[in_idx[1]])
+            elif n_in == 0:
+                args = ()
+            else:
+                args = [slots[idx] for idx in in_idx]
+            value = cast(EvaluateFn, item.spec.evaluate)(args, op.params)
+        if value.ndim != 2:
+            raise ConfigError(
+                f"operator {op.op!r} output must be rank-2 (batch, width), got shape {tuple(value.shape)}",
+                code="OP_WIDTH",
+                path=f"{item.path}.output",
+            )
+        if value.shape[-1] != op.width:
+            raise ConfigError(
+                f"operator {op.op!r} output width {value.shape[-1]} != declared {op.width}",
+                code="OP_WIDTH",
+                path=f"{item.path}.width",
+            )
+        rows = int(value.shape[0])
+        if batch_size is None:
+            batch_size = rows
+        elif rows != batch_size:
+            raise ConfigError(
+                f"operator {op.op!r} batch {rows} != expected {batch_size}",
+                code="OP_BATCH",
+                path=f"{item.path}.output",
+            )
+        slots[index] = value
+    return slots
+
+
 def _execute_ops(
     ops: Sequence[PlanOp],
     specs: Sequence[OperatorSpec],
@@ -271,122 +488,13 @@ def _execute_ops(
 ) -> dict[str, torch.Tensor]:
     """Shared op evaluation loop for observation and action plans."""
 
-    slots: dict[str, torch.Tensor] = {}
-    batch_size: int | None = None
-    for index, (op, spec) in enumerate(zip(ops, specs, strict=True)):
-        args = [slots[name] for name in op.inputs]
-        if spec.is_source:
-            value = _evaluate_source(op, inputs, path=f"ops[{index}]")
-        else:
-            value = cast(EvaluateFn, spec.evaluate)(args, op.params)
-        batch_size = _assert_width(value, op, batch_size=batch_size, path=f"ops[{index}]")
-        slots[op.output] = value
-    return slots
-
-
-def _evaluate_source(op: PlanOp, inputs: PlanInputs, *, path: str) -> torch.Tensor:
-    if op.op == "select":
-        field = op.params["field"]
-        assert isinstance(field, str)
-        if field not in inputs.raw_state:
-            raise ConfigError(
-                f"select field {field!r} missing from raw_state",
-                code="OP_MISSING_FIELD",
-                path=f"{path}.params.field",
-            )
-        value = inputs.raw_state[field]
-        # Scalar robot fields negotiate wire shape (N,) while plan width is 1.
-        if value.ndim == 1:
-            if op.width != 1:
-                raise ConfigError(
-                    f"select field {field!r} is rank-1 but plan width is {op.width}",
-                    code="OP_WIDTH",
-                    path=f"{path}.output",
-                )
-            value = value.unsqueeze(-1)
-        return value
-    if op.op == "command":
-        channel = op.params["channel"]
-        assert isinstance(channel, str)
-        if channel not in inputs.commands:
-            raise ConfigError(
-                f"command channel {channel!r} was not supplied",
-                code="OP_MISSING_CHANNEL",
-                path=f"{path}.params.channel",
-            )
-        return inputs.commands[channel]
-    if op.op == "control_frame_dt":
-        control_frame_dt = inputs.control_frame_dt
-        if control_frame_dt is None:
-            raise ConfigError(
-                "plan requires control_frame_dt but none was supplied",
-                code="OP_MISSING_DT",
-                path=f"{path}.op",
-            )
-        if control_frame_dt.ndim != 2 or control_frame_dt.shape[-1] != 1:
-            raise ConfigError(
-                f"control_frame_dt must have shape (batch, 1), got {tuple(control_frame_dt.shape)}",
-                code="OP_WIDTH",
-                path=f"{path}.input",
-            )
-        if not bool(torch.isfinite(control_frame_dt).all()) or not bool((control_frame_dt > 0).all()):
-            raise ConfigError(
-                "control_frame_dt must be finite and positive",
-                code="OP_INVALID_DT",
-                path=f"{path}.input",
-            )
-        scale = op.params["scale"]
-        assert isinstance(scale, (int, float)) and not isinstance(scale, bool)
-        return control_frame_dt * float(scale)
-    if op.op == "previous_action":
-        if inputs.previous_action is None:
-            raise ConfigError(
-                "plan requires previous_action but none was supplied",
-                code="OP_MISSING_PREVIOUS",
-                path=f"{path}.op",
-            )
-        return inputs.previous_action
-    if op.op == "policy_action":
-        if inputs.policy_action is None:
-            raise ConfigError(
-                "plan requires policy_action but none was supplied",
-                code="OP_MISSING_POLICY",
-                path=f"{path}.op",
-            )
-        return inputs.policy_action
-    raise ConfigError(
-        f"unhandled source operator {op.op!r}",
-        code="OP_UNKNOWN",
-        path=f"{path}.op",
+    compiled = _compile_ops(ops, specs)
+    slot_values = _execute_compiled_ops(
+        compiled,
+        inputs.raw_state,
+        inputs.commands,
+        inputs.previous_action,
+        inputs.policy_action,
+        inputs.control_frame_dt,
     )
-
-
-def _assert_width(
-    value: torch.Tensor,
-    op: PlanOp,
-    *,
-    batch_size: int | None,
-    path: str,
-) -> int:
-    """Assert last-dim width and consistent batch; return the batch size."""
-
-    if value.ndim != 2:
-        raise ConfigError(
-            f"operator {op.op!r} output must be rank-2 (batch, width), got shape {tuple(value.shape)}",
-            code="OP_WIDTH",
-            path=f"{path}.output",
-        )
-    if value.shape[-1] != op.width:
-        raise ConfigError(
-            f"operator {op.op!r} output width {value.shape[-1]} != declared {op.width}",
-            code="OP_WIDTH",
-            path=f"{path}.width",
-        )
-    rows = int(value.shape[0])
-    if batch_size is not None and rows != batch_size:
-        raise ConfigError(
-            f"operator {op.op!r} batch {rows} != expected {batch_size}",
-            code="OP_BATCH",
-            path=f"{path}.output",
-        )
-    return rows
+    return {op.output: slot_values[idx] for idx, op in enumerate(ops)}

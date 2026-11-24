@@ -48,9 +48,11 @@ def _launch(
 ) -> subprocess.Popen[str]:
     if presentation not in {"none", "viewport"}:
         raise ValueError(f"unsupported presentation mode: {presentation}")
-    presentation_args = ["-nullrhi"] if presentation == "none" else [
-        "-dx11", "-windowed", "-ResX=640", "-ResY=360",
-    ]
+    presentation_args = (
+        ["-nullrhi", "-notraceserver", "-trace=none", "-traceautostart=false"]
+        if presentation == "none"
+        else ["-dx11", "-windowed", "-ResX=640", "-ResY=360"]
+    )
     return subprocess.Popen(
         [
             UE_CMD, UPROJECT, TRAIN_MAP, "-game", f"-uerlport={port}",

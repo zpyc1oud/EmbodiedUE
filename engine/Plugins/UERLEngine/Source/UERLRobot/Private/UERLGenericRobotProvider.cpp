@@ -11,12 +11,20 @@
 #include "UERLRobotLog.h"
 #include "UERLRobotObservationPlan.h"
 
+#include "Async/ParallelFor.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "HAL/CriticalSection.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/App.h"
+#include "Misc/ScopeLock.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "Physics/Experimental/PhysInterface_Chaos.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+
+#include <limits>
 
 namespace UERLGenericRobot
 {
@@ -36,6 +44,10 @@ namespace
 			TUniquePtr<FGenericRobotContactState> ContactState;
 			TArray<int32> BoneIndices;
 			TArray<int32> ConstraintIndices;
+			TArray<FBodyInstance*> BodyInstances;
+			TArray<FConstraintInstance*> Constraints;
+			TArray<float> LastAppliedDriveTargets;
+			TArray<AActor*> ResolvedTerrainQueryActors;
 			FVector Origin = FVector::ZeroVector;
 			FQuat GroundRotation = FQuat::Identity;
 			FUERLSlotCollisionProfile CollisionProfile;
@@ -46,6 +58,8 @@ namespace
 			FVector TerrainBoundsOriginOffset = FVector::ZeroVector;
 			bool bTerrainBoundsValid = false;
 			mutable bool bTerrainBoundary = false;
+			mutable bool bHasRootTransformCheck = false;
+			mutable bool bLastRootTransformValid = true;
 			TArray<FUERLGenericRobotCanonicalBody> CanonicalBodies;
 			TArray<float> Targets;
 			TUniquePtr<FUERLGenericRobotSolverStepCommands> SolverStepCommands;
@@ -115,6 +129,8 @@ namespace
 			, PlacementTransform(InPlacementTransform)
 			, bHasPlacementTransform(bInHasPlacementTransform)
 		{
+			bFloatingRoot = Topology.BodyMotionTypes.IsValidIndex(Topology.RootBodyIndex)
+				&& Topology.BodyMotionTypes[Topology.RootBodyIndex] == EUERLBodyMotionType::Simulated;
 			ParentBodyIndices.Init(INDEX_NONE, Topology.BodyNames.Num());
 			for (const FUERLJointTopology& Joint : Topology.Joints)
 			{
@@ -135,17 +151,21 @@ namespace
 		{
 			TArray<FUERLFieldDescriptor> SelectedRobotFields;
 			SelectRobotObservationFields(AvailableStateFields, SelectedStateFields, SelectedRobotFields);
-			ContactBodyIndices.Reset();
+			ContactSupportBodyIndices.Reset();
+			ContactForceBodyIndices.Reset();
 			if (!CompileRobotObservationPlan(Topology, SelectedRobotFields, Plan, OutError))
 			{
 				return false;
 			}
 			for (const FUERLRobotObservationPlanEntry& Entry : Plan)
 			{
-				if (Entry.Type == EUERLObservationType::Contact
-					|| Entry.Type == EUERLObservationType::ContactForce)
+				if (Entry.Type == EUERLObservationType::Contact)
 				{
-					ContactBodyIndices.AddUnique(Entry.BodyIndex);
+					ContactSupportBodyIndices.AddUnique(Entry.BodyIndex);
+				}
+				else if (Entry.Type == EUERLObservationType::ContactForce)
+				{
+					ContactForceBodyIndices.AddUnique(Entry.BodyIndex);
 				}
 			}
 			return true;
@@ -182,10 +202,20 @@ namespace
 				Slot.ContactState = MoveTemp(Item.ContactState);
 				Slot.BoneIndices = MoveTemp(Item.BoneIndices);
 				Slot.ConstraintIndices = MoveTemp(Item.ConstraintIndices);
+				Slot.BodyInstances = MoveTemp(Item.BodyInstances);
+				Slot.Constraints = MoveTemp(Item.Constraints);
 				Slot.Origin = Item.Origin;
 				Slot.GroundRotation = Item.GroundRotation;
 				Slot.CollisionProfile = Item.CollisionProfile;
 				Slot.TerrainQueryActors = MoveTemp(Item.TerrainQueryActors);
+				Slot.ResolvedTerrainQueryActors.Reset(Slot.TerrainQueryActors.Num());
+				for (const TWeakObjectPtr<AActor>& WeakActor : Slot.TerrainQueryActors)
+				{
+					if (AActor* RawActor = WeakActor.Get())
+					{
+						Slot.ResolvedTerrainQueryActors.Add(RawActor);
+					}
+				}
 				Slot.TerrainQueryPurpose = Item.TerrainQueryPurpose;
 				Slot.bWorldUpObservationFrame = Item.bWorldUpObservationFrame;
 				Slot.TerrainHalfExtent = Item.TerrainHalfExtent;
@@ -193,6 +223,7 @@ namespace
 				Slot.bTerrainBoundsValid = Item.bTerrainBoundsValid;
 				Slot.CanonicalBodies = MoveTemp(Item.CanonicalBodies);
 				Slot.Targets = MoveTemp(Item.Targets);
+				Slot.LastAppliedDriveTargets.Init(std::numeric_limits<float>::quiet_NaN(), Actuators.Num());
 				Slot.TerrainHeightValues.SetNumUninitialized(UERLTerrainHeightScanWidth);
 				Slot.TerrainHeightWorldHits.SetNumZeroed(UERLTerrainHeightScanWidth);
 				Slot.TerrainHeightHitValid.SetNumZeroed(UERLTerrainHeightScanWidth);
@@ -244,10 +275,16 @@ namespace
 				OutError = TEXT("generic SkeletalMesh Robot has no indexed actuators");
 				return false;
 			}
+			const FUERLBatchFieldBinding* ActionBinding = Reader.ResolveAction(FName(TEXT("robot.actuator.target")));
+			if (!ActionBinding)
+			{
+				OutError = TEXT("generic SkeletalMesh Robot could not read robot.actuator.target");
+				return false;
+			}
 			for (int32 SlotId = 0; SlotId < Slots.Num(); ++SlotId)
 			{
 				FSlot& Slot = Slots[SlotId];
-				if (!Reader.ReadVector(SlotId, FName(TEXT("robot.actuator.target")), Slot.Targets))
+				if (!Reader.ReadVector(SlotId, *ActionBinding, Slot.Targets))
 				{
 					OutError = TEXT("generic SkeletalMesh Robot could not read robot.actuator.target");
 					return false;
@@ -276,36 +313,98 @@ namespace
 		virtual void SamplePhysicsContacts(double SolverStepSeconds) override
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(UERL_GenericRobot_SamplePhysicsContacts);
-			if (ContactBodyIndices.IsEmpty())
+			if (ContactSupportBodyIndices.IsEmpty() && ContactForceBodyIndices.IsEmpty())
 			{
 				return;
 			}
 			checkf(
 				FMath::IsFinite(SolverStepSeconds) && SolverStepSeconds > 0.0,
 				TEXT("generic Robot contact sample requires a positive solver-step dt"));
-			for (FSlot& Slot : Slots)
+			auto SampleSlot = [this, SolverStepSeconds](int32 SlotId)
 			{
+				FSlot& Slot = Slots[SlotId];
 				checkf(Slot.ContactState.IsValid(), TEXT("generic Robot contact state is missing"));
 				Slot.ContactState->BeginPhysicsSample();
 				const FTransform RootCanonical = Slot.CanonicalBodies.IsValidIndex(Topology.RootBodyIndex)
 					? Slot.CanonicalBodies[Topology.RootBodyIndex].SlotTransform
 					: FTransform::Identity;
-				for (const int32 BodyIndex : ContactBodyIndices)
+				SampleGenericRobotSlotPhysicsContacts(
+					*Slot.Component.Get(),
+					*Slot.Owner.Get(),
+					Topology,
+					Slot.BodyInstances,
+					Slot.CollisionProfile,
+					Slot.GroundRotation,
+					RootCanonical,
+					ContactSupportBodyIndices,
+					ContactForceBodyIndices,
+					*Slot.ContactState,
+					Slot.CollisionProfile.Scope(),
+					SolverStepSeconds,
+					Slot.SupportTraceHits);
+			};
+			UWorld* World = !Slots.IsEmpty() && Slots[0].Component.IsValid()
+				? Slots[0].Component->GetWorld() : nullptr;
+			if (Slots.Num() >= 4 && World && World->GetPhysicsScene())
+			{
+				const int32 NumChunks = FMath::Min<int32>(
+					Slots.Num(),
+					FMath::Max<int32>(1, FPlatformMisc::NumberOfWorkerThreadsToSpawn()));
+				const int32 ChunkSize = FMath::DivideAndRoundUp(Slots.Num(), NumChunks);
+				ParallelFor(NumChunks, [&](int32 ChunkIndex)
 				{
-					if (IsGenericRobotBodySupportedByTerrain(
-						*Slot.Component.Get(),
-						*Slot.Owner.Get(),
-						Topology,
-						Slot.CollisionProfile,
-						Slot.GroundRotation,
-						RootCanonical,
-						BodyIndex,
-						Slot.SupportTraceHits))
+					const int32 Start = ChunkIndex * ChunkSize;
+					const int32 End = FMath::Min(Start + ChunkSize, Slots.Num());
+					if (Start >= End)
 					{
-						Slot.ContactState->MarkBodySupported(BodyIndex);
+						return;
 					}
+					const int32 Count = End - Start;
+					TArray<TArray<FGenericRobotSupportProbeInput, TInlineAllocator<16>>, TInlineAllocator<32>> ChunkInputs;
+					ChunkInputs.SetNum(Count);
+					FPhysicsCommand::ExecuteRead(World->GetPhysicsScene(), [&]()
+					{
+						for (int32 LocalIdx = 0; LocalIdx < Count; ++LocalIdx)
+						{
+							FSlot& Slot = Slots[Start + LocalIdx];
+							checkf(Slot.ContactState.IsValid(), TEXT("generic Robot contact state is missing"));
+							Slot.ContactState->BeginPhysicsSample();
+							const FTransform RootCanonical = Slot.CanonicalBodies.IsValidIndex(Topology.RootBodyIndex)
+								? Slot.CanonicalBodies[Topology.RootBodyIndex].SlotTransform
+								: FTransform::Identity;
+							ReadGenericRobotSlotPhysicsContacts_AssumesLocked(
+								*Slot.Component.Get(),
+								Topology,
+								Slot.BodyInstances,
+								RootCanonical,
+								ContactSupportBodyIndices,
+								ContactForceBodyIndices,
+								*Slot.ContactState,
+								Slot.CollisionProfile.Scope(),
+								SolverStepSeconds,
+								ChunkInputs[LocalIdx]);
+						}
+					});
+					for (int32 LocalIdx = 0; LocalIdx < Count; ++LocalIdx)
+					{
+						FSlot& Slot = Slots[Start + LocalIdx];
+						ResolveGenericRobotSlotSupportContacts(
+							*Slot.Component.Get(),
+							*Slot.Owner.Get(),
+							Slot.CollisionProfile,
+							Slot.GroundRotation,
+							ChunkInputs[LocalIdx],
+							*Slot.ContactState,
+							Slot.SupportTraceHits);
+					}
+				});
+			}
+			else
+			{
+				for (int32 SlotId = 0; SlotId < Slots.Num(); ++SlotId)
+				{
+					SampleSlot(SlotId);
 				}
-				SampleContactForces(Slot, SolverStepSeconds);
 			}
 		}
 
@@ -379,6 +478,12 @@ namespace
 					{
 						Valid = 0;
 					}
+					for (float& CachedTarget : Slot.LastAppliedDriveTargets)
+					{
+						CachedTarget = std::numeric_limits<float>::quiet_NaN();
+					}
+					Slot.bHasRootTransformCheck = false;
+					Slot.bLastRootTransformValid = true;
 					if (Slot.SolverStepCommands)
 					{
 						Slot.SolverStepCommands->PublishTargets(Slot.Targets);
@@ -396,7 +501,14 @@ namespace
 				OutError = TEXT("generic Robot has no primary Slot mesh");
 				return false;
 			}
-			OutTransform = Slots[0].Component->GetComponentTransform();
+			if (bFloatingRoot && Slots[0].bOwnsActor && !FApp::CanEverRender())
+			{
+				OutTransform = ObservedBodyWorldTransform(Slots[0], Topology.RootBodyIndex);
+			}
+			else
+			{
+				OutTransform = Slots[0].Component->GetComponentTransform();
+			}
 			if (OutTransform.ContainsNaN())
 			{
 				OutError = TEXT("generic Robot primary Slot mesh transform is non-finite");
@@ -448,25 +560,105 @@ namespace
 			FString& OutError) const override
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(UERL_GenericRobot_CollectState);
-			for (const int32 SlotId : SlotIds)
+			TArray<const FUERLBatchFieldBinding*, TInlineAllocator<64>> PlanBindings;
+			PlanBindings.SetNumZeroed(Plan.Num());
+			for (int32 PlanIndex = 0; PlanIndex < Plan.Num(); ++PlanIndex)
 			{
-				checkf(
-					Slots.IsValidIndex(SlotId) && Slots[SlotId].Component.IsValid(),
-					TEXT("generic Robot cannot collect State for invalid Slot %d"), SlotId);
-				const FSlot& Slot = Slots[SlotId];
-				// State collection runs after the physics step.  Terminate only when
-				// the root reference point itself has left the generated tile; do not
-				// predict a boundary from the Robot footprint or a forward probe.
-				if (Slot.bTerrainBoundsValid && IsTerrainBoundary(Slot))
+				PlanBindings[PlanIndex] = Writer.ResolveState(Plan[PlanIndex].FieldName);
+			}
+
+			bool bCanParallelize = SlotIds.Num() >= 4;
+			if (bCanParallelize)
+			{
+				TBitArray<TInlineAllocator<16>> Seen(false, Slots.Num());
+				for (const int32 SlotId : SlotIds)
 				{
-					Slot.bTerrainBoundary = true;
-					continue;
+					checkf(
+						Slots.IsValidIndex(SlotId) && Slots[SlotId].Component.IsValid(),
+						TEXT("generic Robot cannot collect State for invalid Slot %d"), SlotId);
+					if (Seen[SlotId])
+					{
+						bCanParallelize = false;
+						break;
+					}
+					Seen[SlotId] = true;
 				}
-				if (!WriteGenericRobotObservationFields(
-					SlotId, MakeObservationSlotView(Slot), Topology, Plan, Writer, OutError))
+			}
+
+			if (!bCanParallelize)
+			{
+				for (const int32 SlotId : SlotIds)
 				{
-					return false;
+					checkf(
+						Slots.IsValidIndex(SlotId) && Slots[SlotId].Component.IsValid(),
+						TEXT("generic Robot cannot collect State for invalid Slot %d"), SlotId);
+					const FSlot& Slot = Slots[SlotId];
+					if (Slot.bTerrainBoundsValid && IsTerrainBoundary(Slot))
+					{
+						Slot.bTerrainBoundary = true;
+						continue;
+					}
+					if (!WriteGenericRobotObservationFields(
+						SlotId, MakeObservationSlotView(Slot), Topology, Plan, Writer, OutError, PlanBindings))
+					{
+						return false;
+					}
 				}
+				OutError.Reset();
+				return true;
+			}
+
+			FCriticalSection ErrorMutex;
+			int32 FirstErrorIndex = MAX_int32;
+			FString FirstError;
+			UWorld* World = Slots[SlotIds[0]].Component->GetWorld();
+			const int32 NumChunks = FMath::Min<int32>(
+				SlotIds.Num(),
+				FMath::Max<int32>(1, FPlatformMisc::NumberOfWorkerThreadsToSpawn()));
+			const int32 ChunkSize = FMath::DivideAndRoundUp(SlotIds.Num(), NumChunks);
+			ParallelFor(NumChunks, [&](int32 ChunkIndex)
+			{
+				const int32 Start = ChunkIndex * ChunkSize;
+				const int32 End = FMath::Min(Start + ChunkSize, SlotIds.Num());
+				if (Start >= End)
+				{
+					return;
+				}
+				TArray<int32, TInlineAllocator<32>> ChunkSlotIds;
+				TArray<FUERLRobotObservationSlotView, TInlineAllocator<32>> ChunkSlotViews;
+				ChunkSlotIds.Reserve(End - Start);
+				ChunkSlotViews.Reserve(End - Start);
+				for (int32 Index = Start; Index < End; ++Index)
+				{
+					const int32 SlotId = SlotIds[Index];
+					const FSlot& Slot = Slots[SlotId];
+					// State collection runs after the physics step.  Terminate only when
+					// the root reference point itself has left the generated tile; do not
+					// predict a boundary from the Robot footprint or a forward probe.
+					if (Slot.bTerrainBoundsValid && IsTerrainBoundary(Slot))
+					{
+						Slot.bTerrainBoundary = true;
+						continue;
+					}
+					ChunkSlotIds.Add(SlotId);
+					ChunkSlotViews.Add(MakeObservationSlotView(Slot));
+				}
+				FString LocalError;
+				if (!WriteGenericRobotObservationBatch(
+					World, ChunkSlotIds, ChunkSlotViews, Topology, Plan, Writer, LocalError, PlanBindings))
+				{
+					FScopeLock Lock(&ErrorMutex);
+					if (Start < FirstErrorIndex)
+					{
+						FirstErrorIndex = Start;
+						FirstError = MoveTemp(LocalError);
+					}
+				}
+			});
+			if (FirstErrorIndex != MAX_int32)
+			{
+				OutError = MoveTemp(FirstError);
+				return false;
 			}
 			OutError.Reset();
 			return true;
@@ -490,6 +682,18 @@ namespace
 			{
 				OutReason = TEXT("generic Robot component transform is non-finite");
 				return EUERLSlotFaultCode::PhysicsStateInvalid;
+			}
+			if (bFloatingRoot && Slot->BodyInstances.IsValidIndex(Topology.RootBodyIndex)
+				&& Slot->BodyInstances[Topology.RootBodyIndex])
+			{
+				const bool bRootValid = Slot->bHasRootTransformCheck
+					? Slot->bLastRootTransformValid
+					: !Slot->BodyInstances[Topology.RootBodyIndex]->GetUnrealWorldTransform().ContainsNaN();
+				if (!bRootValid)
+				{
+					OutReason = TEXT("generic Robot component transform is non-finite");
+					return EUERLSlotFaultCode::PhysicsStateInvalid;
+				}
 			}
 			if (Slot->bTerrainBoundary)
 			{
@@ -566,23 +770,15 @@ namespace
 			return true;
 		}
 
-		void SampleContactForces(FSlot& Slot, double SolverStepSeconds)
-		{
-			checkf(Slot.Component.IsValid(), TEXT("generic Robot contact force sample has no component"));
-			SampleGenericRobotContactForces(
-				*Slot.Component.Get(),
-				Topology.BodyNames,
-				*Slot.ContactState,
-				Slot.CollisionProfile.Scope(),
-				SolverStepSeconds);
-		}
-
-		FUERLRobotCommandSlotView MakeCommandSlotView(const FSlot& Slot) const
+		FUERLRobotCommandSlotView MakeCommandSlotView(FSlot& Slot) const
 		{
 			FUERLRobotCommandSlotView View;
 			View.Component = Slot.Component.Get();
 			View.ConstraintIndices = &Slot.ConstraintIndices;
 			View.Targets = &Slot.Targets;
+			View.BodyInstances = &Slot.BodyInstances;
+			View.Constraints = &Slot.Constraints;
+			View.LastAppliedDriveTargets = &Slot.LastAppliedDriveTargets;
 			return View;
 		}
 
@@ -592,12 +788,15 @@ namespace
 			View.Component = Slot.Component.Get();
 			View.Owner = Slot.Owner.Get();
 			View.ConstraintIndices = &Slot.ConstraintIndices;
+			View.BodyInstances = &Slot.BodyInstances;
+			View.Constraints = &Slot.Constraints;
 			View.Origin = Slot.Origin;
 			View.GroundRotation = Slot.GroundRotation;
 			View.ObservationRotation = Slot.bWorldUpObservationFrame
 				? FQuat::Identity : Slot.GroundRotation;
 			View.CollisionProfile = Slot.CollisionProfile;
 			View.TerrainQueryActors = &Slot.TerrainQueryActors;
+			View.ResolvedTerrainQueryActors = Slot.ResolvedTerrainQueryActors;
 			View.TerrainQueryPurpose = Slot.TerrainQueryPurpose;
 			View.ContactState = Slot.ContactState.Get();
 			if (Slot.CanonicalBodies.IsValidIndex(Topology.RootBodyIndex))
@@ -610,6 +809,8 @@ namespace
 			View.TerrainHeightHitValid = &Slot.TerrainHeightHitValid;
 			View.GroundClearanceWorldHits = &Slot.GroundClearanceWorldHits;
 			View.GroundClearanceHitValid = &Slot.GroundClearanceHitValid;
+			View.OutRootTransformChecked = &Slot.bHasRootTransformCheck;
+			View.OutRootTransformValid = &Slot.bLastRootTransformValid;
 			return View;
 		}
 
@@ -637,9 +838,11 @@ namespace
 		TArray<FUERLActuatorConfig> DriveActuators;
 		TArray<FUERLResetBinding> ResetBindings;
 		TArray<FUERLRobotObservationPlanEntry> Plan;
-		TArray<int32> ContactBodyIndices;
+		TArray<int32> ContactSupportBodyIndices;
+		TArray<int32> ContactForceBodyIndices;
 		TArray<int32> ParentBodyIndices;
 		TArray<FSlot> Slots;
+		bool bFloatingRoot = false;
 		bool bClaimAuthoredActor = false;
 		bool bSolverStepCommands = false;
 		USkeletalMeshComponent* ClaimedComponent = nullptr;

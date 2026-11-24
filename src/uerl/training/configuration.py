@@ -18,6 +18,11 @@ WORKER_LOCKSTEP_PHYSICS_ARGS: tuple[str, ...] = (
     "-ini:Engine:[/Script/Engine.PhysicsSettings]:bSubstepping=False",
     "-ini:Engine:[/Script/Engine.PhysicsSettings]:bSubsteppingAsync=False",
 )
+# Subdivide independent Chaos islands into 4x worker groups for multi-core load balancing
+# without altering solver iteration counts or physics math.
+WORKER_CHAOS_SCHEDULING_ARGS: tuple[str, ...] = (
+    "-ini:Engine:[ConsoleVariables]:p.Chaos.Solver.IslandGroups.WorkerMultiplier=4",
+)
 
 
 def build_launch_overrides(
@@ -75,6 +80,7 @@ def build_launch_overrides(
         "-stdout",
         "-FullStdOutLogOutput",
         *WORKER_LOCKSTEP_PHYSICS_ARGS,
+        *WORKER_CHAOS_SCHEDULING_ARGS,
     ]
     return {
         "session.worker_executable": str(ue_executable),
@@ -92,7 +98,14 @@ def _presentation_args(
     """Return the RHI and windowing flags required by one presentation mode."""
 
     if presentation is PresentationMode.NONE:
-        return ["-nullrhi", "-unattended", "-nosound"]
+        return [
+            "-nullrhi",
+            "-unattended",
+            "-nosound",
+            "-notraceserver",
+            "-trace=none",
+            "-traceautostart=false",
+        ]
     width, height = window_size
     if presentation is PresentationMode.GAMEPLAY:
         return [

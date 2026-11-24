@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"EngineAssociation": "5.8",
 	"Category": "",
-	"Description": "UE RL Engine host project with the UERLEngine Worker plugin.",
+	"Description": "UE RL Engine host project with the UERLEngine runtime and UERLTraining Worker plugins.",
 	"Modules": [
 		{
 			"Name": "UERLHost",
@@ -13,6 +13,10 @@
 	"Plugins": [
 		{
 			"Name": "UERLEngine",
+			"Enabled": true
+		},
+		{
+			"Name": "UERLTraining",
 			"Enabled": true
 		},
 		{

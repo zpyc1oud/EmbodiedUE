@@ -8,8 +8,12 @@
 
 class AActor;
 class FUERLNamedStateWriter;
+class UPrimitiveComponent;
 class USkeletalMeshComponent;
+struct FBodyInstance;
+struct FConstraintInstance;
 struct FGenericRobotContactState;
+struct FUERLBatchFieldBinding;
 
 /**
  * Slot-local inputs for one observation sample. The provider fills this view from
@@ -20,12 +24,15 @@ struct FUERLRobotObservationSlotView
 	USkeletalMeshComponent* Component = nullptr;
 	AActor* Owner = nullptr;
 	const TArray<int32>* ConstraintIndices = nullptr;
+	const TArray<FBodyInstance*>* BodyInstances = nullptr;
+	const TArray<FConstraintInstance*>* Constraints = nullptr;
 	FVector Origin = FVector::ZeroVector;
 	FQuat GroundRotation = FQuat::Identity;
 	/** Observation reference rotation; direct deployment uses world Up (identity). */
 	FQuat ObservationRotation = FQuat::Identity;
 	FUERLSlotCollisionProfile CollisionProfile;
 	const TArray<TWeakObjectPtr<AActor>>* TerrainQueryActors = nullptr;
+	TConstArrayView<AActor*> ResolvedTerrainQueryActors;
 	EUERLTerrainQueryPurpose TerrainQueryPurpose = EUERLTerrainQueryPurpose::TrainingOwned;
 	FGenericRobotContactState* ContactState = nullptr;
 	/** Canonical root body transform in Slot space (for root pose recovery). */
@@ -36,6 +43,8 @@ struct FUERLRobotObservationSlotView
 	TArray<uint8>* TerrainHeightHitValid = nullptr;
 	TArray<FVector>* GroundClearanceWorldHits = nullptr;
 	TArray<uint8>* GroundClearanceHitValid = nullptr;
+	bool* OutRootTransformChecked = nullptr;
+	bool* OutRootTransformValid = nullptr;
 };
 
 /** Recover the observed world transform for one body, rebasing the root when needed. */
@@ -78,4 +87,16 @@ UERLROBOT_API bool WriteGenericRobotObservationFields(
 	const FUERLRobotTopology& Topology,
 	TConstArrayView<FUERLRobotObservationPlanEntry> Plan,
 	FUERLNamedStateWriter& Writer,
-	FString& OutError);
+	FString& OutError,
+	TConstArrayView<const FUERLBatchFieldBinding*> PlanBindings = {});
+
+/** Batch-write observations for a contiguous slice of unique Slots under one physics read lock. */
+UERLROBOT_API bool WriteGenericRobotObservationBatch(
+	UWorld* World,
+	TConstArrayView<int32> SlotIds,
+	TConstArrayView<FUERLRobotObservationSlotView> SlotViews,
+	const FUERLRobotTopology& Topology,
+	TConstArrayView<FUERLRobotObservationPlanEntry> Plan,
+	FUERLNamedStateWriter& Writer,
+	FString& OutError,
+	TConstArrayView<const FUERLBatchFieldBinding*> PlanBindings = {});

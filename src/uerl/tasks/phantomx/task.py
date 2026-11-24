@@ -187,20 +187,26 @@ class PhantomXTask(DirectTask):
                 code="CONFIG_MISSING_FIELD",
                 path="robot_spec",
             )
-        names = [
-            cast(str, item["name"])
-            for item in robot_observation_schema(self.robot_spec, self._require_observation_shapes())
-            if item["semantic"] == "contact_force"
-        ]
+        shapes = self._require_observation_shapes()
+        cache = getattr(self, "_contact_force_names_cache", None)
+        if cache is not None and cache[0] is self.robot_spec and cache[1] == shapes:
+            names = cache[2]
+        else:
+            names = tuple(
+                cast(str, item["name"])
+                for item in robot_observation_schema(self.robot_spec, shapes)
+                if item["semantic"] == "contact_force"
+            )
+            self._contact_force_names_cache = (self.robot_spec, shapes, names)
         columns = []
         for name in names:
-            if name not in raw_state:
+            value = raw_state.get(name)
+            if value is None:
                 raise ConfigError(
                     f"missing contact-force field {name!r}",
                     code="CONFIG_MISSING_FIELD",
                     path=name,
                 )
-            value = raw_state[name]
             columns.append(value.reshape(value.shape[0], -1))
         return torch.cat(columns, dim=1)
 

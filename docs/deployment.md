@@ -56,7 +56,7 @@ uv run uerl deploy --project '<target-project-directory>' --demo phantomx
 ```
 
 This command **changes the target project**.
-It copies `UERLEngine` and enables `UERLEngine`, `ProceduralMeshComponent`, and `NNERuntimeORT`.
+It copies `UERLEngine` and enables `UERLEngine` and `NNERuntimeORT` (without requiring `UERLTraining` or `ProceduralMeshComponent`).
 It writes the synchronous physics settings below.
 With `--demo phantomx`, it copies the mesh, Skeleton, and PhysicsAsset to `/Game/Robots/PhantomX/`.
 Without `--demo`, installation includes only the runtime.
@@ -95,11 +95,11 @@ uv run uerl deploy --project '<target-project-directory>' --task UERL-PhantomX-C
 uv run uerl deploy --project '<target-project-directory>' --task UERL-PhantomX-ContinuousTerrain-v0 --artifact latest --import
 ```
 
-For a custom engine installation, supply `--ue-executable '<UE-root>\Engine\Binaries\Win64\UnrealEditor.exe'`.
+For a custom engine installation, supply `--host-profile '<path-to-host.toml>'` or `--ue-executable '<UE-root>\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'`.
 The generated command has this form:
 
 ```powershell
-& '<UE-root>\Engine\Binaries\Win64\UnrealEditor.exe' '<target-project-directory>\<Project>.uproject' `
+& '<UE-root>\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' '<target-project-directory>\<Project>.uproject' `
   -run=UERLPolicyImport `
   '-artifact=<RunDir>\exported\<task>.uerlpol2' `
   -asset=/Game/UERLEngine/Policies/<PolicyName> `
@@ -154,7 +154,7 @@ explicit logical `ground` binding; the policy stores its name, not actor paths.
 C++ controller users provide the list through `TerrainQueryActors`.
 The attachment `root` refers to the reflected root body's physical transform;
 other attachment names are reflected body names. Missing bindings or ray hits
-fail the required input. See [input declarations](training.md#extend-numeric-input-declarations).
+fail the required input. See [input declarations](extending.md#extend-numeric-input-declarations).
 
 The demo artifact has **116 observations, 18 actions, `physics_dt=0.005 s`, and decimation `[1,7]`**.
 Its `velocity` command channel contains `[forward, lateral, yaw]`.
@@ -601,7 +601,7 @@ without a rollout-quality threshold.
 
 ```powershell
 $ueTrace = Join-Path (Split-Path $project) 'Saved/UERLPolicyTraces/target-scene-ue.yaml'
-uv run python scripts/compare_policy_traces.py $taskTrace $ueTrace
+uv run uerl diagnose compare-traces $taskTrace $ueTrace
 ```
 
 Use `GetRequiredCommandChannels` to obtain the channel names and widths rather

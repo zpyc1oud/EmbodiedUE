@@ -11,6 +11,7 @@
 
 class USkeletalMeshComponent;
 class AActor;
+struct FBodyInstance;
 struct FGenericRobotContactState;
 
 /** Apply the body-Environment event filter at the collision seam. */
@@ -59,6 +60,57 @@ UERLROBOT_API bool IsGenericRobotBodySupportedByTerrain(
 	const FQuat& GroundRotation,
 	const FTransform& RootCanonicalSlotTransform,
 	int32 BodyIndex,
+	TArray<FHitResult>& ScratchHits);
+
+/** Physics-locked snapshot of one support probe geometry before running unlocked world queries. */
+struct FGenericRobotSupportProbeInput
+{
+	int32 BodyIndex = INDEX_NONE;
+	FTransform BodyWorld = FTransform::Identity;
+	FBox BodyBounds = FBox(EForceInit::ForceInitToZero);
+};
+
+/** Snapshot support geometry and read accumulated Chaos collision impulses while locked. */
+UERLROBOT_API void ReadGenericRobotSlotPhysicsContacts_AssumesLocked(
+	USkeletalMeshComponent& Component,
+	const FUERLRobotTopology& Topology,
+	TConstArrayView<FBodyInstance*> BodyInstances,
+	const FTransform& RootCanonicalSlotTransform,
+	TConstArrayView<int32> SupportBodyIndices,
+	TConstArrayView<int32> ContactForceBodyIndices,
+	FGenericRobotContactState& ContactState,
+	EUERLEnvironmentCollisionScope CollisionScope,
+	double SolverStepSeconds,
+	TArray<FGenericRobotSupportProbeInput, TInlineAllocator<16>>& OutSupportInputs);
+
+/** Run geometric foot support traces using previously snapshotted SupportInputs outside physics locks. */
+UERLROBOT_API void ResolveGenericRobotSlotSupportContacts(
+	USkeletalMeshComponent& Component,
+	AActor& Owner,
+	const FUERLSlotCollisionProfile& CollisionProfile,
+	const FQuat& GroundRotation,
+	TConstArrayView<FGenericRobotSupportProbeInput> SupportInputs,
+	FGenericRobotContactState& ContactState,
+	TArray<FHitResult>& ScratchHits);
+
+/**
+ * Snapshot support geometry and accumulated Chaos collision impulses under a single
+ * physics read lock, then trace geometric support only for SupportBodyIndices and
+ * record contact forces only for ContactForceBodyIndices.
+ */
+UERLROBOT_API void SampleGenericRobotSlotPhysicsContacts(
+	USkeletalMeshComponent& Component,
+	AActor& Owner,
+	const FUERLRobotTopology& Topology,
+	TConstArrayView<FBodyInstance*> BodyInstances,
+	const FUERLSlotCollisionProfile& CollisionProfile,
+	const FQuat& GroundRotation,
+	const FTransform& RootCanonicalSlotTransform,
+	TConstArrayView<int32> SupportBodyIndices,
+	TConstArrayView<int32> ContactForceBodyIndices,
+	FGenericRobotContactState& ContactState,
+	EUERLEnvironmentCollisionScope CollisionScope,
+	double SolverStepSeconds,
 	TArray<FHitResult>& ScratchHits);
 
 /** Hold event flags plus the one completed solver-step contact sample for one Robot Slot. */

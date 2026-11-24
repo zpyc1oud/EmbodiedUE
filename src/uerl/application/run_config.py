@@ -106,10 +106,9 @@ def load_run_config_source(
         unsupported_json = _unsupported_json_path(run_directory)
         if unsupported_json is not None:
             raise ConfigError(
-                "this JSON-config Run format is unsupported; preview a separate current-schema recovery copy with "
-                "`python -m uerl.application.run_migration --source <run> --output <recovered-run>` and add "
-                "`--apply` only after reviewing the plan. Incomplete settings are not inferred, and the historical "
-                "JSON file was left unchanged",
+                "this historical JSON-config Run format is unsupported; incomplete settings are not inferred, "
+                "and the historical JSON file was left unchanged. Start a new training Run to produce a "
+                "schema version 1 Run directory",
                 code="UNSUPPORTED_RUN_CONFIG_FORMAT",
                 path=str(unsupported_json),
             )
@@ -217,9 +216,8 @@ def _read_sidecar(path: Path) -> dict[str, object]:
         payload = resolved_config_from_yaml(text, path=str(path))
     except ConfigError as exc:
         raise ConfigError(
-            f"{exc}; current Run metadata requires schema version 1. For a historical JSON or unversioned YAML Run, "
-            "preview a separate copy with `python -m uerl.application.run_migration --source <run> --output "
-            "<recovered-run>`; missing settings are not inferred",
+            f"{exc}; current Run metadata requires schema version 1, and missing historical settings "
+            "are not inferred",
             code=exc.code,
             path=exc.path or str(path),
         ) from exc

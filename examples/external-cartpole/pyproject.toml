@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "uerl-example-cartpole"
 version = "0.1.0"
 requires-python = ">=3.11,<3.12"
-dependencies = ["ue-rl-engine==1.0.0"]
+dependencies = ["ue-rl-engine==0.1.0"]
 
 [project.entry-points."uerl.tasks"]
 example-cartpole = "example_cartpole:create_registration"

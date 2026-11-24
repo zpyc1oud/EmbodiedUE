@@ -215,6 +215,8 @@ bool ApplyGenericRobotActuatorForces(
 	FUERLRobotObservationSlotView ObservationSlot;
 	ObservationSlot.Component = Slot.Component;
 	ObservationSlot.ConstraintIndices = Slot.ConstraintIndices;
+	ObservationSlot.BodyInstances = Slot.BodyInstances;
+	ObservationSlot.Constraints = Slot.Constraints;
 
 	for (const FUERLActuatorConfig& Actuator : Actuators)
 	{
@@ -235,8 +237,9 @@ bool ApplyGenericRobotActuatorForces(
 				*Actuator.JointName.ToString());
 			return false;
 		}
-		FConstraintInstance* Constraint = Slot.Component->GetConstraintInstanceByIndex(
-			(*Slot.ConstraintIndices)[Actuator.JointIndex]);
+		FConstraintInstance* Constraint = (Slot.Constraints && Slot.Constraints->IsValidIndex(Actuator.JointIndex))
+			? (*Slot.Constraints)[Actuator.JointIndex]
+			: Slot.Component->GetConstraintInstanceByIndex((*Slot.ConstraintIndices)[Actuator.JointIndex]);
 		if (!Constraint)
 		{
 			OutError = FString::Printf(
@@ -244,10 +247,34 @@ bool ApplyGenericRobotActuatorForces(
 				*Actuator.JointName.ToString());
 			return false;
 		}
+		// Chaos owns the position drive. Skip world-transform body locks when setting drive targets,
+		// and skip redundant FRotator/FQuat work when the target float is unchanged since last apply/reset.
+		if (IsGenericRobotDriveActuator(Actuator))
+		{
+			const float Target = (*Slot.Targets)[Actuator.Index];
+			if (Slot.LastAppliedDriveTargets && Slot.LastAppliedDriveTargets->IsValidIndex(Actuator.Index))
+			{
+				float& CachedTarget = (*Slot.LastAppliedDriveTargets)[Actuator.Index];
+				if (FMath::IsFinite(CachedTarget) && CachedTarget == Target)
+				{
+					continue;
+				}
+				CachedTarget = Target;
+			}
+			Constraint->SetAngularOrientationTarget(FQuat(
+				GenericJointCoordinateAxis(Joint.Coordinate),
+				Target));
+			continue;
+		}
+
 		const FName ChildName = Topology.BodyNames[Joint.ChildBodyIndex];
 		const FName ParentName = Topology.BodyNames[Joint.ParentBodyIndex];
-		FBodyInstance* ChildInstance = Slot.Component->GetBodyInstance(ChildName);
-		FBodyInstance* ParentInstance = Slot.Component->GetBodyInstance(ParentName);
+		FBodyInstance* ChildInstance = (Slot.BodyInstances && Slot.BodyInstances->IsValidIndex(Joint.ChildBodyIndex))
+			? (*Slot.BodyInstances)[Joint.ChildBodyIndex]
+			: Slot.Component->GetBodyInstance(ChildName);
+		FBodyInstance* ParentInstance = (Slot.BodyInstances && Slot.BodyInstances->IsValidIndex(Joint.ParentBodyIndex))
+			? (*Slot.BodyInstances)[Joint.ParentBodyIndex]
+			: Slot.Component->GetBodyInstance(ParentName);
 		if (!ChildInstance || !ParentInstance)
 		{
 			OutError = FString::Printf(
@@ -269,17 +296,6 @@ bool ApplyGenericRobotActuatorForces(
 				TEXT("generic Robot actuator '%s' has a zero constraint axis"),
 				*Actuator.JointName.ToString());
 			return false;
-		}
-
-		// Chaos owns the position drive. Its target does not depend on measured
-		// joint position/velocity or a separately computed effort. Keep the body
-		// and axis validation above, but avoid repeated state reads and unused effort arithmetic.
-		if (IsGenericRobotDriveActuator(Actuator))
-		{
-			Constraint->SetAngularOrientationTarget(FQuat(
-				GenericJointCoordinateAxis(Joint.Coordinate),
-				(*Slot.Targets)[Actuator.Index]));
-			continue;
 		}
 
 		FUERLRobotObservationPlanEntry Entry;

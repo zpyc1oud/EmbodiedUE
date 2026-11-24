@@ -16,6 +16,7 @@ from rsl_rl.models.mlp_model import MLPModel
 from tensordict import TensorDict
 
 from uerl.core.direct.task import DirectTask
+from uerl.core.inputs import InputField, InputSpec, ResolvedInput
 from uerl.core.mdp.executor import PlanExecutor, PlanInputs
 from uerl.core.mdp.plan import PLAN_VERSION, ActionPlan, ObservationPlan, PlanOp
 from uerl.core.mdp.terms import ObservationCfg
@@ -28,7 +29,16 @@ from uerl.policy.artifact import (
     RobotRuntime,
     RobotRuntimeActuator,
 )
-from uerl.training.export import _export_policy_artifact, export_policy
+from uerl.training.configuration import build_run_config
+from uerl.training.export import _export_policy_artifact, export_policy, export_policy_offline
+from uerl.training.export_contract import (
+    ExportContract,
+    export_contract_from_yaml,
+    load_export_contract,
+    write_export_contract,
+)
+from uerl.training.rsl_rl import UERLOnPolicyRunner
+from uerl.training.runner import build_rsl_rl_train_config
 
 
 def _make_rsl_deterministic_export(
@@ -561,3 +571,179 @@ def test_export_capability_rejects_unknown_before_onnx_export(
     assert "export=unknown" in capsys.readouterr().out
     assert runner.export_calls == 0
     assert not (tmp_path / "unknown.uerlpol2").exists()
+
+
+def test_export_contract_yaml_round_trip_and_tamper_rejection(tmp_path: Path) -> None:
+    """Persist and validate ExportContract schema and observation group widths."""
+
+    obs_plan = _observation_plan(4)
+    action_plan = _action_plan(2)
+    contract = ExportContract(
+        task_id="UERL-CartPole-Direct-v0",
+        robot_id="uerl.robot.cartpole",
+        observation_plan=obs_plan,
+        action_plan=action_plan,
+        input_requirements=(
+            ResolvedInput(
+                spec=InputSpec(name="cart_position", provider_id="uerl.test", provider_version=1),
+                fields=(
+                    InputField(
+                        name="cart_position.value",
+                        shape=(3,),
+                        unit="m",
+                        frame="world",
+                        semantic="position",
+                        source="input",
+                    ),
+                ),
+            ),
+        ),
+        observation_group_widths={"policy": 4},
+        num_actions=2,
+    )
+    path = tmp_path / "export_contract.yaml"
+    write_export_contract(path, contract)
+    loaded = load_export_contract(path)
+
+    assert loaded == contract
+
+    tampered = path.read_text(encoding="utf-8").replace(
+        "observation_group_widths:\n  policy: 4",
+        "observation_group_widths:\n  policy: 5",
+    )
+    with pytest.raises(ConfigError) as raised:
+        export_contract_from_yaml(tampered, path=str(path))
+    assert raised.value.code == "EXPORT_CONTRACT_INVALID"
+
+    bad_schema = path.read_text(encoding="utf-8").replace("schema_version: 1", "schema_version: 99")
+    with pytest.raises(ConfigError) as schema_err:
+        export_contract_from_yaml(bad_schema, path=str(path))
+    assert schema_err.value.code == "UNSUPPORTED_EXPORT_CONTRACT_SCHEMA"
+
+
+def test_export_policy_offline_matches_pytorch_actor_with_obs_normalization(tmp_path: Path) -> None:
+    """Export one real normalized checkpoint offline and verify ONNX parity."""
+
+    from rsl_rl.env import VecEnv
+
+    class _TrainDirectEnvStub:
+        def curriculum_state_dict(self) -> dict[str, object]:
+            return {}
+
+        def load_curriculum_state_dict(self, state: object) -> None:
+            del state
+
+        def load_random_state_dict(self, state: object) -> None:
+            del state
+
+    class _TrainVecEnvStub(VecEnv):  # type: ignore[misc]
+        def __init__(self) -> None:
+            self.direct_env = _TrainDirectEnvStub()
+            self.num_envs = 2
+            self.num_actions = 2
+            self.max_episode_length = 10
+            self.device = "cpu"
+            self.cfg = object()
+
+        def get_observations(self) -> TensorDict:
+            return TensorDict({"policy": torch.zeros((2, 4), dtype=torch.float32)}, batch_size=[2])
+
+        def step(self, actions: torch.Tensor) -> tuple[TensorDict, torch.Tensor, torch.Tensor, dict[str, object]]:
+            del actions
+            raise NotImplementedError
+
+        def reset(self, *, seed: int | None = None) -> tuple[TensorDict, dict[str, object]]:
+            del seed
+            return self.get_observations(), {}
+
+    torch.manual_seed(20260912)
+    base_cfg = build_run_config(
+        "UERL-CartPole-Direct-v0",
+        overrides={
+            "worker.slot_count": "2",
+            "runner.device": "cpu",
+            "logging.run_directory": str(tmp_path / "run"),
+        },
+    )
+    params = dict(base_cfg.runner.parameters)
+    params["hidden_dims"] = (8, 8)
+    params["obs_normalization"] = True
+    train_cfg = replace(base_cfg, runner=replace(base_cfg.runner, parameters=params))
+    runner = UERLOnPolicyRunner(
+        _TrainVecEnvStub(),
+        build_rsl_rl_train_config(train_cfg),
+        log_dir=None,
+        device="cpu",
+    )
+    sample_obs = TensorDict(
+        {"policy": torch.tensor([[1.5, -0.5, 0.25, -2.0], [0.5, 1.5, -1.25, 0.0]])},
+        batch_size=[2],
+    )
+    runner.alg.actor.update_normalization(sample_obs)
+    checkpoint = tmp_path / "model_final.pt"
+    runner.save(str(checkpoint), infos={"uerl_direct_env_random": {"seed": 7}})
+
+    contract = ExportContract(
+        task_id=train_cfg.task_id,
+        robot_id=train_cfg.worker.robot_id,
+        observation_plan=_observation_plan(4),
+        action_plan=_action_plan(2),
+        input_requirements=(),
+        observation_group_widths={"policy": 4},
+        num_actions=2,
+    )
+    output = tmp_path / "offline.uerlpol2"
+    export_cfg = build_run_config(
+        "UERL-CartPole-Direct-v0",
+        overrides={
+            "worker.slot_count": "1",
+            "runner.device": "cpu",
+            "logging.run_directory": str(tmp_path / "run"),
+        },
+    )
+    export_params = dict(export_cfg.runner.parameters)
+    export_params["hidden_dims"] = (8, 8)
+    export_params["obs_normalization"] = True
+    export_cfg = replace(export_cfg, runner=replace(export_cfg.runner, parameters=export_params))
+
+    artifact = export_policy_offline(
+        contract=contract,
+        checkpoint=checkpoint,
+        config=export_cfg,
+        output=output,
+        metadata=_metadata(),
+        robot_runtime=_robot_runtime(actuator_count=2),
+        timing=_timing(),
+    )
+    reloaded = PolicyArtifact.read(output)
+    assert reloaded.task_id == artifact.task_id
+
+    policy = runner.get_inference_policy(device="cpu")
+    ort_session = ort.InferenceSession(reloaded.onnx, providers=["CPUExecutionProvider"])
+    for probe in (
+        np.array([[0.3, -0.7, 1.1, 0.2]], dtype=np.float32),
+        np.array([[-0.4, 0.8, -0.2, 0.9]], dtype=np.float32),
+    ):
+        ort_out = ort_session.run(None, {ort_session.get_inputs()[0].name: probe})[0]
+        with torch.no_grad():
+            torch_out = policy(TensorDict({"policy": torch.from_numpy(probe)}, batch_size=[1])).numpy()
+        np.testing.assert_allclose(ort_out, torch_out, atol=2e-5, rtol=2e-5)
+
+
+def test_direct_submodule_imports_have_no_circular_import() -> None:
+    """Importing policy/contract/plan submodules before uerl must not hit a cycle."""
+
+    import os
+    import subprocess
+    import sys
+
+    code = (
+        "from uerl.policy.artifact import RobotRuntime\n"
+        "from uerl.training.export_contract import ExportContract\n"
+        "from uerl.core.mdp.plan import ActionPlan, ObservationPlan\n"
+        "assert RobotRuntime is not None and ExportContract is not None\n"
+        "assert ActionPlan is not None and ObservationPlan is not None\n"
+    )
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(path for path in sys.path if path)}
+    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr

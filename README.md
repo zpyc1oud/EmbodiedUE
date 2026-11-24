@@ -94,9 +94,10 @@ This repository does not pin their versions.
 The project pins `torch==2.11.0+cu128`, `torchvision==0.26.0+cu128`, and `rsl-rl-lib==5.4.2`.
 The project has no established minimum RAM, GPU memory, or throughput guarantee.
 
-The host enables the bundled `UERLEngine` plugin and its engine dependencies, `ProceduralMeshComponent` and `NNERuntimeORT`.
+The training host enables the bundled `UERLEngine` and `UERLTraining` plugins alongside the engine dependencies `ProceduralMeshComponent` and `NNERuntimeORT`.
+Game deployment requires only `UERLEngine` and `NNERuntimeORT`.
 Before the build, make sure that these engine plugins are available.
-See [troubleshooting](docs/training.md#troubleshooting).
+See [troubleshooting](docs/troubleshooting.md#troubleshooting).
 
 ### Install and build
 
@@ -179,8 +180,8 @@ uv run uerl export --task UERL-PhantomX-ContinuousTerrain-v0 --run $runDir
 uv run uerl deploy --project '<target-project-directory>' --demo phantomx --task UERL-PhantomX-ContinuousTerrain-v0 --artifact $runDir
 ```
 
-Export initializes a UE Session.
-It is not an offline checkpoint conversion.
+Export uses `export_contract.yaml` recorded during training to build `.uerlpol2` offline when present.
+Pass `--online` (or export an older Run without a contract) to open a UE Session instead.
 Deployment copies the runtime, changes target project settings, and prints an import command.
 After the target Editor build succeeds, add `--import` to execute that import.
 Use `deploy --check` for read-only preflight.
@@ -205,7 +206,9 @@ See [configuration](docs/training.md#configuration).
 
 | I want to… | Read |
 |---|---|
-| Configure a host, add a robot or Task, train, evaluate, or record | [Training guide](docs/training.md) |
+| Configure a host, train, evaluate, or record | [Training guide](docs/training.md) |
+| Add a robot, external Task, or numeric input declaration | [Extending EmbodiedUE](docs/extending.md) |
+| Troubleshoot, diagnose runs, and debug rollouts | [Troubleshooting and diagnostics](docs/troubleshooting.md) |
 | Import a policy, connect gameplay commands, validate, and package | [Deployment guide](docs/deployment.md) |
 | Understand interfaces, units, timing, and extension contracts | [Architecture](docs/architecture.md) |
 | Write tests, run checks, or measure runtime cost | [Testing](tests/README.md) |

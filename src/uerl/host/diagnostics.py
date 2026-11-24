@@ -99,8 +99,8 @@ def check_host(profile: HostProfile) -> HostReport:
             )
         else:
             enabled = {item["Name"]: item.get("Enabled") for item in plugins}
-            for name in ("UERLEngine", "ProceduralMeshComponent", "NNERuntimeORT"):
-                # The bundled host explicitly enables all three required plugins.
+            for name in ("UERLEngine", "UERLTraining", "ProceduralMeshComponent", "NNERuntimeORT"):
+                # The bundled host explicitly enables all four required plugins.
                 ok = enabled.get(name) is True
                 checks.append(
                     HostCheck(
@@ -113,10 +113,16 @@ def check_host(profile: HostProfile) -> HostReport:
                 )
 
     plugin_root = profile.project.parent / "Plugins/UERLEngine"
+    training_plugin_root = profile.project.parent / "Plugins/UERLTraining"
     descriptor(plugin_root / "UERLEngine.uplugin", "UERL_PLUGIN", "Install the bundled UERLEngine plugin in the host.")
+    descriptor(
+        training_plugin_root / "UERLTraining.uplugin",
+        "UERL_TRAINING_PLUGIN",
+        "Install the bundled UERLTraining plugin in the host.",
+    )
     build_action = "Build UERLHostEditor Win64 Development with the selected UE 5.8 installation; see README.md."
     file_check(profile.project.parent / "Binaries/Win64/UnrealEditor-UERLHost.dll", "HOST_BUILD", build_action)
-    file_check(plugin_root / "Binaries/Win64/UnrealEditor-UERLWorker.dll", "WORKER_BUILD", build_action)
+    file_check(training_plugin_root / "Binaries/Win64/UnrealEditor-UERLWorker.dll", "WORKER_BUILD", build_action)
     content_action = "Run git lfs pull in the host checkout and restore the bundled CartPole content."
     for name in ("SK_CartPole", "SKM_CartPole", "PA_CartPole", "CartPole"):
         file_check(

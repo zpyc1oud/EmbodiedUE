@@ -60,7 +60,7 @@ def test_malformed_project_is_actionable(tmp_path: Path, payload: str) -> None:
 def test_disabled_dependency_and_missing_build_are_reported_together(tmp_path: Path) -> None:
     selected = make_host(tmp_path)
     project = json.loads(selected.project.read_text(encoding="utf-8"))
-    project["Plugins"][2]["Enabled"] = False
+    next(entry for entry in project["Plugins"] if entry["Name"] == "NNERuntimeORT")["Enabled"] = False
     selected.project.write_text(json.dumps(project), encoding="utf-8")
     (selected.project.parent / "Binaries/Win64/UnrealEditor-UERLHost.dll").unlink()
     failures = [check for check in check_host(selected).checks if not check.ok]
@@ -96,7 +96,7 @@ def make_host(root: Path) -> HostProfile:
         "UE/Engine/Binaries/Win64/UnrealEditor-Cmd.exe",
         "UE/Engine/Content/Maps/Entry.umap",
         "host project/Binaries/Win64/UnrealEditor-UERLHost.dll",
-        "host project/Plugins/UERLEngine/Binaries/Win64/UnrealEditor-UERLWorker.dll",
+        "host project/Plugins/UERLTraining/Binaries/Win64/UnrealEditor-UERLWorker.dll",
         *[
             f"host project/Content/Robots/CartPole/{name}.uasset"
             for name in ("SK_CartPole", "SKM_CartPole", "PA_CartPole", "CartPole")
@@ -108,6 +108,7 @@ def make_host(root: Path) -> HostProfile:
         path.write_bytes(b"fixture content, not an actual UE file")
     for relative in (
         "host project/Plugins/UERLEngine/UERLEngine.uplugin",
+        "host project/Plugins/UERLTraining/UERLTraining.uplugin",
         "UE/Engine/Plugins/Runtime/ProceduralMeshComponent/ProceduralMeshComponent.uplugin",
         "UE/Engine/Plugins/Experimental/NNERuntimeORT/NNERuntimeORT.uplugin",
     ):
@@ -122,6 +123,7 @@ def make_host(root: Path) -> HostProfile:
                     {"Name": name, "Enabled": True}
                     for name in (
                         "UERLEngine",
+                        "UERLTraining",
                         "ProceduralMeshComponent",
                         "NNERuntimeORT",
                     )

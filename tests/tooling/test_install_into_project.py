@@ -47,7 +47,7 @@ def test_empty_blueprint_project_gets_plugin_robot_physics_and_game_module(tmp_p
     data = json.loads((game / "CleanGame.uproject").read_text(encoding="utf-8"))
     enabled = {entry["Name"]: entry["Enabled"] for entry in data["Plugins"]}
     assert enabled["UERLEngine"] is True
-    assert enabled["ProceduralMeshComponent"] is True
+    assert "ProceduralMeshComponent" not in enabled
     assert enabled["NNERuntimeORT"] is True
     assert data["Modules"][0]["Name"] == "CleanGame"
     assert (game / "Plugins" / "UERLEngine" / "UERLEngine.uplugin").is_file()
@@ -265,3 +265,14 @@ def test_preflight_checks_supplied_artifact_timing(
         .replace("MaxSubsteps=7", f"MaxSubsteps={correct_steps}")
     )
     assert all(check.passed for check in installer.check_project(project_dir=game, artifact=artifact))
+
+
+def test_application_project_installer_is_importable_directly(tmp_path: Path) -> None:
+    from uerl.application import project_installer
+
+    repo, game = _layout(tmp_path)
+    project_installer.install(project_dir=game, repo_root=repo)
+    assert all(check.passed for check in project_installer.check_project(project_dir=game))
+    data = json.loads((game / "CleanGame.uproject").read_text(encoding="utf-8"))
+    enabled = {entry["Name"]: entry["Enabled"] for entry in data["Plugins"]}
+    assert enabled == {"UERLEngine": True, "NNERuntimeORT": True}

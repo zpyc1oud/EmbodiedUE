@@ -19,21 +19,33 @@ def body_pose(state: Mapping[str, torch.Tensor], entity: RobotEntityCfg) -> torc
 def body_lin_vel_b(ctx: StepContext, *, entity: RobotEntityCfg) -> torch.Tensor:
     """Body-frame linear velocity (Nx3) from world velocity + pose quaternion."""
 
+    key = ("body_lin_vel_b", entity.body_field_names)
+    cached = ctx._cache.get(key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
     pose = body_pose(ctx.transition_state, entity)
     world_vel = _concat_fields(
         ctx.transition_state, entity.body_field_names, "body_linear_velocity"
     )
-    return _quat_rotate_inverse(pose[:, 3:7], world_vel[:, :3])
+    result = _quat_rotate_inverse(pose[:, 3:7], world_vel[:, :3])
+    ctx._cache[key] = result
+    return result
 
 
 def body_ang_vel_b(ctx: StepContext, *, entity: RobotEntityCfg) -> torch.Tensor:
     """Body-frame angular velocity (Nx3)."""
 
+    key = ("body_ang_vel_b", entity.body_field_names)
+    cached = ctx._cache.get(key)
+    if cached is not None:
+        return cast(torch.Tensor, cached)
     pose = body_pose(ctx.transition_state, entity)
     world_ang = _concat_fields(
         ctx.transition_state, entity.body_field_names, "body_angular_velocity"
     )
-    return _quat_rotate_inverse(pose[:, 3:7], world_ang[:, :3])
+    result = _quat_rotate_inverse(pose[:, 3:7], world_ang[:, :3])
+    ctx._cache[key] = result
+    return result
 
 
 def upright_from_pose(pose: torch.Tensor) -> torch.Tensor:
@@ -102,16 +114,26 @@ def _concat_fields(
             code="CONFIG_OUT_OF_RANGE",
             path="entity",
         )
-    tensors = []
-    for prefix in prefixes:
-        name = f"{prefix}.{semantic}"
-        if name not in state:
+    if len(prefixes) == 1:
+        name = f"{prefixes[0]}.{semantic}"
+        value = state.get(name)
+        if value is None:
             raise ConfigError(
                 f"missing state field {name!r}",
                 code="CONFIG_MISSING_FIELD",
                 path=name,
             )
-        value = state[name]
+        return value.reshape(value.shape[0], -1)
+    tensors = []
+    for prefix in prefixes:
+        name = f"{prefix}.{semantic}"
+        value = state.get(name)
+        if value is None:
+            raise ConfigError(
+                f"missing state field {name!r}",
+                code="CONFIG_MISSING_FIELD",
+                path=name,
+            )
         tensors.append(value.reshape(value.shape[0], -1))
     return torch.cat(tensors, dim=1)
 

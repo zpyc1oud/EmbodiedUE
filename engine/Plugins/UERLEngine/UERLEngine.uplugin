@@ -1,9 +1,9 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.0.0",
+	"VersionName": "0.1.0",
 	"FriendlyName": "UERLEngine",
-	"Description": "UE RL Engine: transport, generic Worker, policy components, and registered robot physics.",
+	"Description": "UE RL Engine runtime: interfaces, providers, registered robot physics, policy inference, and editor tools.",
 	"Category": "RL",
 	"CreatedBy": "",
 	"CreatedByURL": "",
@@ -32,21 +32,6 @@
 			"LoadingPhase": "PreDefault"
 		},
 		{
-			"Name": "UERLTerrain",
-			"Type": "Runtime",
-			"LoadingPhase": "PreDefault"
-		},
-		{
-			"Name": "UERLTransport",
-			"Type": "Runtime",
-			"LoadingPhase": "PreDefault"
-		},
-		{
-			"Name": "UERLWorker",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
-		},
-		{
 			"Name": "UERLRobot",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
@@ -58,10 +43,6 @@
 		}
 	],
 	"Plugins": [
-		{
-			"Name": "ProceduralMeshComponent",
-			"Enabled": true
-		},
 		{
 			"Name": "NNERuntimeORT",
 			"Enabled": true

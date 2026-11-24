@@ -61,7 +61,7 @@ def test_task_scaffold_json_contains_template_contract(tmp_path: Path, capsys) -
     assert result["template"] == "phantomx-walk"
     assert len(result["files"]) == 5
     config = tmp_path / "src" / "uerl" / "tasks" / "walk2" / "config.py"
-    yaml = tmp_path / "configs" / "tasks" / "walk2" / "training.yaml"
+    yaml = tmp_path / "src" / "uerl" / "configs" / "tasks" / "walk2" / "training.yaml"
     registration = tmp_path / "src" / "uerl" / "tasks" / "walk2" / "registration.py"
     config_text = config.read_text()
     yaml_text = yaml.read_text()

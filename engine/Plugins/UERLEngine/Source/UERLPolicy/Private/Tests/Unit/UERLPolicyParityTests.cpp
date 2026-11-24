@@ -3,19 +3,19 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "HAL/FileManager.h"
-#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
-#include "Serialization/JsonReader.h"
-#include "Serialization/JsonSerializer.h"
 #include "UERLInterfaceTypes.h"
 #include "UERLPlan.h"
 #include "UERLPolicyOperators.h"
 #include "UERLPolicyPlanRuntime.h"
+#include "UERLPolicyTestHelpers.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace UERLPolicyParityTestsPrivate
 {
+	using namespace UERLPolicyTestHelpers;
+
 	bool ResolveOperatorCorpusRoot(FString& OutDir, FString& OutError)
 	{
 		TArray<FString> Candidates;
@@ -89,58 +89,6 @@ namespace
 			return false;
 		}
 		return true;
-	}
-
-	bool LoadJsonObject(const FString& Path, TSharedPtr<FJsonObject>& OutObject, FString& OutError)
-	{
-		FString Text;
-		if (!FFileHelper::LoadFileToString(Text, *Path))
-		{
-			OutError = FString::Printf(TEXT("could not read '%s'"), *Path);
-			return false;
-		}
-		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
-		if (!FJsonSerializer::Deserialize(Reader, OutObject) || !OutObject.IsValid())
-		{
-			OutError = FString::Printf(TEXT("JSON deserialize failed for '%s'"), *Path);
-			return false;
-		}
-		return true;
-	}
-
-	bool ParseFloatArray(const TArray<TSharedPtr<FJsonValue>>* Values, TArray<float>& Out, FString& OutError)
-	{
-		if (Values == nullptr)
-		{
-			OutError = TEXT("expected a JSON array of numbers");
-			return false;
-		}
-		Out.Reset();
-		Out.Reserve(Values->Num());
-		for (const TSharedPtr<FJsonValue>& Value : *Values)
-		{
-			if (!Value.IsValid() || Value->Type != EJson::Number)
-			{
-				OutError = TEXT("array entry is not a number");
-				return false;
-			}
-			Out.Add(static_cast<float>(Value->AsNumber()));
-		}
-		return true;
-	}
-
-	FUERLFieldDescriptor MakeLayoutField(const FString& Name, int32 Width)
-	{
-		FUERLFieldDescriptor Field;
-		Field.Name = FName(*Name);
-		Field.DType = TEXT("float32");
-		Field.Shape = {Width};
-		Field.Unit = TEXT("1");
-		Field.CoordinateFrame = TEXT("world");
-		Field.Semantic = TEXT("parity");
-		Field.Source = TEXT("robot");
-		Field.Width = Width;
-		return Field;
 	}
 
 	bool ParseNameWidthLayout(
@@ -587,6 +535,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyOperatorParityCorpusTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyParityTestsPrivate;
 	RegisterBuiltinPlanOperators();
 
 	FString CorpusRoot;
@@ -624,6 +573,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUERLPolicyActionPlanParityCorpusTest::RunTest(const FString& Parameters)
 {
+	using namespace UERLPolicyParityTestsPrivate;
 	RegisterBuiltinPlanOperators();
 
 	FString CorpusRoot;

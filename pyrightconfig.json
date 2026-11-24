@@ -1,7 +1,0 @@
-{
-  "include": ["src", "tools", "tests"],
-  "extraPaths": ["src", "."],
-  "executionEnvironments": [
-    {"root": ".", "extraPaths": ["src", "."]}
-  ]
-}

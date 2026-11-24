@@ -16,7 +16,9 @@ from uerl.cli.flags import EXPORT_FLAGS, add_common_flags, apply_common_flags
 from uerl.cli.host_flags import add_host_flags, resolve_host_flags
 from uerl.core.config.snapshot import decode_worker_args, encode_worker_args
 from uerl.core.config.yaml_loader import load_unique_yaml
-from uerl.training.export import export_policy
+from uerl.errors import ConfigError
+from uerl.training.export import export_policy, export_policy_offline
+from uerl.training.export_contract import EXPORT_CONTRACT_FILENAME, load_export_contract
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -66,6 +68,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--res-x", type=int, default=640)
     parser.add_argument("--res-y", type=int, default=360)
+    parser.add_argument(
+        "--online",
+        action="store_true",
+        help="Always open a UE Session even when the Run contains export_contract.yaml.",
+    )
     return parser
 
 
@@ -118,9 +125,16 @@ def main(argv: list[str] | None = None) -> int:
     base_config = run_config_source.resolve(direct_overrides).config
     if base_config.worker.slot_count != 1:
         parser.error("export uses one robot to build the artifact")
+    contract_path = run_directory / EXPORT_CONTRACT_FILENAME if run_directory is not None else None
+    use_offline = (
+        not args.online
+        and direct_overrides.get("session.mode") != "attach"
+        and contract_path is not None
+        and contract_path.is_file()
+    )
     map_name = base_config.session.map_path
     launch_overrides: dict[str, str] = {}
-    if direct_overrides.get("session.mode") != "attach":
+    if not use_offline and direct_overrides.get("session.mode") != "attach":
         host = resolve_host_flags(args)
         launch_overrides = build_launch_overrides(
             ue_executable=host.ue_executable,
@@ -170,6 +184,35 @@ def main(argv: list[str] | None = None) -> int:
         run_hash=resolved.run_hash,
         git_identity=dict(capture_git_identity()),
     )
+    if use_offline:
+        assert contract_path is not None
+        contract = load_export_contract(contract_path)
+        if contract.task_id != config.task_id or contract.robot_id != registration.robot_id:
+            raise ConfigError(
+                f"export contract identity ({contract.task_id}, {contract.robot_id}) "
+                f"does not match resolved Run ({config.task_id}, {registration.robot_id})",
+                code="EXPORT_CONTRACT_MISMATCH",
+                path=str(contract_path),
+            )
+        artifact = export_policy_offline(
+            contract=contract,
+            checkpoint=checkpoint,
+            config=config,
+            output=output,
+            metadata=metadata,
+            robot_runtime=robot_runtime,
+            timing=ArtifactTiming(
+                config.worker.physics_dt,
+                config.worker.decimation[0],
+                config.worker.decimation[1],
+            ),
+        )
+        print(
+            f"[VERIFY] export: task={artifact.task_id} robot={artifact.robot_id} "
+            f"output={output} onnx_nbytes={len(artifact.onnx)} "
+            f"path=onnx mode=offline shutdown=PASS"
+        )
+        return 0
 
     curriculum_manager = registry.create_curriculum(
         config.task_id,
